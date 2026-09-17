@@ -64,14 +64,46 @@ export interface ProjectMember {
   gh_username?: string;
   display_name?: string;
   avatar_url?: string;
+  task_count?: number;
+  task_points?: number;
 }
 
 export interface Activity {
   id?: number | string;
   project_id: number | string;
   user_name: string;
-  action: string; // e.g., 'pushed', 'moved', 'generated'
+  action: string; // e.g., 'pushed', 'moved', 'generated', 'created', 'completed'
   target: string; // e.g., 'auth-v2', 'Task A to QA'
+  created_at?: string;
+  avatar_url?: string;
+}
+
+export interface TimelineBucket {
+  timestamp: string;
+  label: string;
+  count: number;
+  activities: Activity[];
+}
+
+export interface TimelineData {
+  interval: string;
+  range_start: string;
+  range_end: string;
+  total_activities: number;
+  peak_count: number;
+  buckets: TimelineBucket[];
+}
+
+export interface ProjectHistoryItem {
+  id: string | number;
+  project_id: string | number;
+  user_id?: string | number;
+  user_name?: string;
+  event_type: string;
+  entity_type: string;
+  entity_id?: string | number;
+  description: string;
+  metadata?: Record<string, any>;
   created_at?: string;
 }
 

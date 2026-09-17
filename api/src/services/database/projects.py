@@ -268,21 +268,66 @@ def db_get_project_dashboard_data(project_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # Members — join to get alias from users
+        # Members — join to get user details
         cur.execute(
-            "SELECT pm.user_id, u.display_name AS alias, pm.role, pm.kpi_score, pm.current_load "
-            "FROM opentask.project_member pm "
-            "JOIN opentask.users u ON pm.user_id = u.id "
-            "WHERE pm.project_id = %s;",
+            """
+            SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load,
+                   u.gh_username, u.display_name, u.display_name AS alias
+            FROM opentask.project_member pm
+            LEFT JOIN opentask.users u ON pm.user_id = u.id
+            WHERE pm.project_id = %s;
+            """,
             (project_id,)
         )
         members = cur.fetchall()
-        # Cast Decimal to float for JSON serialization safety
+
+        # Query tasks for this project to calculate workload distribution per member
+        cur.execute(
+            """
+            SELECT t.id, t.lead_assignee_id, COALESCE(t.weight, 3) AS weight, b.state AS bucket_state
+            FROM opentask.tasks t
+            LEFT JOIN opentask.buckets b ON t.bucket_id = b.id
+            WHERE t.project_id = %s;
+            """,
+            (project_id,)
+        )
+        tasks = cur.fetchall()
+
+        # Calculate active assigned tasks vs all assigned tasks
+        active_tasks = [t for t in tasks if t.get("lead_assignee_id") is not None and t.get("bucket_state") != "COMPLETED"]
+        candidate_tasks = active_tasks if active_tasks else [t for t in tasks if t.get("lead_assignee_id") is not None]
+
+        total_weight = sum(t["weight"] for t in candidate_tasks)
+
+        # Cast Decimal/int to float for JSON serialization safety and compute current_load
         for m in members:
+            uid = m["user_id"]
+            m_tasks = [t for t in candidate_tasks if t.get("lead_assignee_id") == uid]
+            m_weight = sum(t["weight"] for t in m_tasks)
+            m_count = len(m_tasks)
+
+            if total_weight > 0:
+                calc_load = round((m_weight / total_weight) * 100)
+            else:
+                calc_load = 0
+
+            m["current_load"] = float(calc_load)
+            m["task_count"] = m_count
+            m["task_points"] = m_weight
+
+            # Update DB column so other services (like Celery reallocation) have up-to-date load
+            if m.get("id"):
+                cur.execute(
+                    "UPDATE opentask.project_member SET current_load = %s WHERE id = %s;",
+                    (int(calc_load), m["id"])
+                )
+
             if m["kpi_score"] is not None:
                 m["kpi_score"] = float(m["kpi_score"])
-            if m["current_load"] is not None:
-                m["current_load"] = float(m["current_load"])
+            if m["max_capacity"] is not None:
+                m["max_capacity"] = int(m["max_capacity"])
+
+        conn.commit()
 
         # Activity — last 20 entries
         cur.execute(

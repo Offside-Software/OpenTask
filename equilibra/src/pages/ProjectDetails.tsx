@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useBoard } from '../controllers/useBoard';
 import { useTasks } from '../controllers/useTasks';
 import { useMeetings } from '../controllers/useMeetings';
@@ -88,10 +88,17 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const { createTask, updateTask, deleteTask } = useTasks(projectId);
   const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting } = useMeetings(projectId);
 
+  const notifyActivityUpdated = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('opentask:activity-updated', { detail: { projectId } }));
+  }, [projectId]);
+
   // Seamless asynchronous reorder queue (debounced + silent retries, zero-latency UI)
   const { queueTaskReorder, queueBucketReorder, cancelTaskFromQueue } = useAsyncReorderQueue({
     projectId,
-    onTasksSynced: () => refreshDashboard(true),
+    onTasksSynced: () => {
+      refreshDashboard(true);
+      notifyActivityUpdated();
+    },
     onBucketsSynced: () => refreshDashboard(true),
     debounceMs: 250,
   });
@@ -131,6 +138,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       // Background sync without blocking indicator dismissal
       refreshDashboard(true);
       refreshBoard(true);
+      notifyActivityUpdated();
     } catch (err) {
       console.error('Failed to create task', err);
       setIsCreatingTask(false);
@@ -147,6 +155,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       await deleteTask(taskId);
       removeTaskLocally(taskId);
       await Promise.all([refreshBoard(true), refreshDashboard(true)]);
+      notifyActivityUpdated();
     } catch (err) {
       console.error("Failed to delete task", err);
       showToast("Failed to delete task", "error");
@@ -172,6 +181,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         }
         refreshDashboard(true);
         refreshBoard(true);
+        notifyActivityUpdated();
       })
       .catch((err) => {
         console.error("Failed to update task:", err);
@@ -403,7 +413,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
         {/* Tasks — Kanban */}
         {activeTab === 'Tasks' && (
-          <div className="bg-[#0C0D0E] border-2 border-black rounded-none p-5 flex flex-col min-h-[600px] shadow-[6px_6px_0px_0px_#000000]">
+          <div className="bg-[#0C0D0E] border-2 border-neutral-700 rounded-none p-5 flex flex-col min-h-[600px] shadow-[6px_6px_0px_0px_#000000]">
             <div className="flex justify-between items-start mb-5 pb-3 border-b-2 border-neutral-800">
               <div>
                 <h2 className="text-[16px] font-mono font-black text-white uppercase tracking-wider">
@@ -465,7 +475,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
                         const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
                         const assignedMember = members.find(m => String(m.user_id) === String(task.lead_assignee_id));
-                        const assigneeName = assignedMember?.display_name || assignedMember?.gh_username || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
+                        const assigneeName = assignedMember?.gh_username || assignedMember?.display_name || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
                         const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
 
                         return (

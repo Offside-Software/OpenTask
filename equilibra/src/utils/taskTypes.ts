@@ -30,12 +30,27 @@ export const saveCustomTaskType = (newType: string): string[] => {
   return existing;
 };
 
+export const parseTaskTypes = (typeString?: string): string[] => {
+  if (!typeString) return [];
+  return typeString
+    .split('|')
+    .map((t) => t.trim().toUpperCase())
+    .filter((t) => t.length > 0);
+};
+
+export const serializeTaskTypes = (types: string[]): string => {
+  const unique = Array.from(new Set(types.map((t) => t.trim().toUpperCase()).filter(Boolean)));
+  return unique.join('|');
+};
+
 export const getAllTaskTypes = (extraTypes: (string | undefined)[] = []): string[] => {
   const custom = getCustomTaskTypes();
   const set = new Set<string>([...DEFAULT_TASK_TYPES, ...custom]);
   extraTypes.forEach((t) => {
     if (t && typeof t === 'string' && t.trim()) {
-      set.add(t.trim().toUpperCase());
+      parseTaskTypes(t).forEach((subType) => {
+        set.add(subType);
+      });
     }
   });
   return Array.from(set);
@@ -46,7 +61,7 @@ export const getTaskTypeVariant = (
 ): 'primary' | 'critical' | 'warning' | 'success' | 'default' | 'outline' => {
   const upper = type ? String(type).trim().toUpperCase() : '';
   if (upper === 'CODE') return 'primary';
-  if (upper === 'BUG' || upper === 'CRITICAL' || upper === 'HOTFIX') return 'critical';
+  if (upper === 'BUG' || upper === 'CRITICAL' || upper === 'HOTFIX' || upper === 'URGENT') return 'critical';
   if (upper === 'DESIGN' || upper === 'UI' || upper === 'UX') return 'warning';
   if (upper === 'REQUIREMENT' || upper === 'SPEC' || upper === 'QA') return 'success';
   return 'default';

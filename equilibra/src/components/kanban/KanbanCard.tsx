@@ -2,7 +2,7 @@ import React from 'react';
 import { Badge } from '../../design-system/Badge';
 import { Clock, GitPullRequest, MoreHorizontal, Trash2, Check } from 'lucide-react';
 import type { TaskType } from '../../models';
-import { getTaskTypeVariant } from '../../utils/taskTypes';
+import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
 
 interface KanbanCardProps {
   id: string | number;
@@ -158,15 +158,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       )}
 
       {/* Tags & Weight */}
-      <div className="flex gap-2 flex-wrap items-center mt-1">
+      <div className="flex gap-1.5 flex-wrap items-center mt-1">
         {isCompleted && (
           <Badge variant="success" className="!py-0.5 !px-1.5 !text-[9px]">
             DONE
           </Badge>
         )}
-        <Badge variant={getTaskTypeVariant(type)} className="!py-0.5 !px-1.5 !text-[9px]">
-          {type}
-        </Badge>
+        {parseTaskTypes(type).map((t) => (
+          <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.5 !px-1.5 !text-[9px]">
+            {t}
+          </Badge>
+        ))}
         <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-[#FFE600]">
           {weight} PTS
         </span>

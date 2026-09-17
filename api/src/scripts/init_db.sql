@@ -124,3 +124,20 @@ CREATE TABLE IF NOT EXISTS opentask.meetings (
 );
 CREATE INDEX IF NOT EXISTS idx_meetings_project_id ON opentask.meetings(project_id);
 
+-- 9. Project History Table (Audit Trail & Timeline)
+CREATE TABLE IF NOT EXISTS opentask.project_history (
+    id BIGINT PRIMARY KEY,
+    project_id BIGINT REFERENCES opentask.projects(id) ON DELETE CASCADE,
+    user_id BIGINT,
+    user_name TEXT,
+    event_type TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id BIGINT,
+    description TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_project_history_project_id ON opentask.project_history(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_history_created_at ON opentask.project_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_project_history_proj_created ON opentask.project_history(project_id, created_at DESC);
+

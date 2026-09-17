@@ -17,10 +17,12 @@ import { ProgressBar } from '../../design-system/ProgressBar';
 import { useAlerts } from '../../controllers/useAlerts';
 import { useDashboard } from '../../controllers/useDashboard';
 import { useTasks } from '../../controllers/useTasks';
+import { useBuckets } from '../../controllers/useBuckets';
 import { useUserProjectStats } from '../../controllers/useUserProjectStats';
 import { useAuth } from '../../auth/useAuth';
 
 import { Skeleton } from '../../design-system/Skeleton';
+import { ProjectPulseChart } from './ProjectPulseChart';
 import type { Task, Bucket } from '../../models';
 
 interface ProjectOverviewProps {
@@ -34,24 +36,80 @@ interface ProjectOverviewDevProps extends ProjectOverviewProps {
   onUpdateTask: (taskId: string | number, data: Partial<Task>) => Promise<void>;
 }
 
+const getInitials = (name?: string): string => {
+  if (!name) return '?';
+  const clean = name.replace(/^User\s*#/i, '').trim();
+  const parts = clean.split(/[\s_-]+/);
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return clean.slice(0, 2).toUpperCase();
+};
+
 export const ProjectOverviewPM: React.FC<ProjectOverviewProps> = ({ projectId }) => {
   const { alerts, loading: alertsLoading } = useAlerts(projectId);
-  const { metrics, members, activity, loading: dashboardLoading } = useDashboard(projectId);
+  const { metrics, members, loading: dashboardLoading } = useDashboard(projectId);
   const { tasks, loading: tasksLoading } = useTasks(projectId);
+  const { buckets } = useBuckets(projectId);
 
-  const activities = activity; // Alias for consistency in the template
+  const memberWorkloads = React.useMemo(() => {
+    if (!members.length) return [];
+
+    // Identify completed buckets
+    const completedBucketIds = new Set(
+      buckets.filter(b => b.state === 'COMPLETED').map(b => String(b.id))
+    );
+
+    // Active tasks assigned to members (bucket not COMPLETED)
+    const activeTasks = tasks.filter(t => t.lead_assignee_id && !completedBucketIds.has(String(t.bucket_id)));
+    // If there are active assigned tasks, calculate from them; otherwise fallback to all assigned tasks
+    const candidateTasks = activeTasks.length > 0 
+      ? activeTasks 
+      : tasks.filter(t => t.lead_assignee_id);
+
+    const totalWeight = candidateTasks.reduce((sum, t) => sum + (Number(t.weight) || 3), 0);
+
+    return members.map(m => {
+      const userTasks = candidateTasks.filter(t => String(t.lead_assignee_id) === String(m.user_id));
+      const userWeight = userTasks.reduce((sum, t) => sum + (Number(t.weight) || 3), 0);
+      const userCount = userTasks.length;
+
+      // Calculate distribution percentage based on assigned tasks
+      let load = 0;
+      if (totalWeight > 0) {
+        load = Math.round((userWeight / totalWeight) * 100);
+      } else if (m.current_load !== undefined && m.current_load !== null) {
+        load = Math.round(m.current_load);
+      }
+
+      // Member username & avatar: prioritize gh_username for GitHub integration
+      const ghUsername = m.gh_username || m.display_name || (m as any).alias || `User #${m.user_id}`;
+      const avatarUrl = m.avatar_url || (m.gh_username ? `https://github.com/${m.gh_username}.png?size=64` : undefined);
+
+      return {
+        ...m,
+        ghUsername,
+        avatarUrl,
+        displayName: m.display_name || ghUsername,
+        calculatedLoad: load,
+        taskCount: userCount || m.task_count || 0,
+        taskPoints: userWeight || m.task_points || 0,
+      };
+    });
+  }, [members, tasks, buckets]);
+
+  const avgLoad = memberWorkloads.length
+    ? Math.round(memberWorkloads.reduce((acc, m) => acc + m.calculatedLoad, 0) / memberWorkloads.length)
+    : 0;
+
+  const overloadedCount = memberWorkloads.filter(
+    m => m.calculatedLoad > 100 || (memberWorkloads.length > 1 && m.calculatedLoad >= 80)
+  ).length;
+
+  const isBalanced = overloadedCount === 0;
 
   const criticalInsights = alerts.filter(a => a.severity === 'critical').slice(0, 3);
   const tasksAtRisk = tasks.filter(t => t.warnStagnant || t.status === 'ON_REVIEW').slice(0, 3);
-
-  const getTimeAgo = (dateStr: string) => {
-    // eslint-disable-next-line react-hooks/purity
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 1) return 'Just now';
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
 
   const isLoading = alertsLoading || dashboardLoading || tasksLoading;
 
@@ -174,9 +232,9 @@ export const ProjectOverviewPM: React.FC<ProjectOverviewProps> = ({ projectId })
 
       {/* Capacity & Feed Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-5">
           <SurfaceCard title="Workload Distribution" subtitle="Team Capacity" icon={Users} className="h-full">
-            <div className="flex items-end justify-between h-40 mt-6 gap-2">
+            <div className="flex items-end justify-between min-h-40 mt-6 gap-3">
               {isLoading ? (
                 [1, 2, 3, 4, 5, 6].map(i => (
                   <div key={i} className="flex-1 flex flex-col items-center">
@@ -186,15 +244,60 @@ export const ProjectOverviewPM: React.FC<ProjectOverviewProps> = ({ projectId })
                   </div>
                 ))
               ) : (
-                members.map((m, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center group">
-                    <div className="w-full bg-[#141619] border-2 border-black rounded-none h-32 relative overflow-hidden shadow-[2px_2px_0px_0px_#000000]">
-                      <div className={`absolute bottom-0 left-0 right-0 ${m.current_load > 100 ? 'bg-[#EF4444]' : m.current_load > 80 ? 'bg-[#FFE600]' : 'bg-[#22C55E]'} transition-all`} style={{ height: `${m.current_load > 100 ? 100 : m.current_load}%` }} />
+                memberWorkloads.map((m, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center group min-w-0">
+                    <div
+                      className="w-full bg-[#141619] border-2 border-black rounded-none h-32 relative overflow-hidden shadow-[2px_2px_0px_0px_#000000]"
+                      title={`${m.ghUsername}${m.displayName && m.displayName !== m.ghUsername ? ` (${m.displayName})` : ''}: ${m.calculatedLoad}% (${m.taskCount} tasks, ${m.taskPoints} pts)`}
+                    >
+                      <div
+                        className={`absolute bottom-0 left-0 right-0 ${m.calculatedLoad > 100 ? 'bg-[#EF4444]' : m.calculatedLoad >= 80 ? 'bg-[#FFE600]' : 'bg-[#22C55E]'} transition-all`}
+                        style={{ height: `${Math.min(100, Math.max(m.calculatedLoad, m.taskCount > 0 ? 6 : 0))}%` }}
+                      />
                     </div>
-                    <span className="text-[10px] font-bold font-mono text-neutral-400 mt-2 uppercase tracking-wider truncate w-full text-center">User {m.user_id}</span>
-                    <span className={`text-[10px] font-black font-mono mt-0.5 ${m.current_load > 100 ? 'text-[#EF4444]' : 'text-white'}`}>{m.current_load}%</span>
+                    
+                    {/* User profile picture + GitHub username */}
+                    <div
+                      className="flex items-center justify-center gap-1.5 mt-2.5 max-w-full px-1"
+                      title={m.displayName && m.displayName !== m.ghUsername ? `${m.ghUsername} (${m.displayName})` : m.ghUsername}
+                    >
+                      {m.avatarUrl ? (
+                        <img
+                          src={m.avatarUrl}
+                          alt={m.ghUsername}
+                          className="w-4 h-4 rounded-none border border-black object-cover shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling;
+                            if (fallback) fallback.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className={`w-4 h-4 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black ${
+                          m.avatarUrl ? 'hidden' : ''
+                        }`}
+                      >
+                        {getInitials(m.ghUsername)}
+                      </span>
+                      <span className="text-[10px] font-bold font-mono text-neutral-300 uppercase tracking-wider truncate">
+                        {m.ghUsername}
+                      </span>
+                    </div>
+
+                    <span className={`text-[10px] font-black font-mono mt-0.5 ${m.calculatedLoad > 100 ? 'text-[#EF4444]' : m.calculatedLoad >= 80 ? 'text-[#FFE600]' : 'text-white'}`}>
+                      {m.calculatedLoad}%
+                    </span>
+                    <span className="text-[9px] font-mono text-neutral-500 font-bold uppercase mt-0.5">
+                      {m.taskCount} {m.taskCount === 1 ? 'TASK' : 'TASKS'}
+                    </span>
                   </div>
                 ))
+              )}
+              {!isLoading && memberWorkloads.length === 0 && (
+                <div className="w-full text-center py-8 text-neutral-500 font-mono text-[11px]">
+                  // NO TEAM MEMBERS ASSIGNED.
+                </div>
               )}
             </div>
             <div className="mt-6 pt-4 border-t-2 border-black flex justify-between">
@@ -202,7 +305,7 @@ export const ProjectOverviewPM: React.FC<ProjectOverviewProps> = ({ projectId })
                 <p className="text-neutral-400 font-mono text-[10px] font-bold uppercase tracking-widest mb-1">// AVG LOAD</p>
                 {isLoading ? <Skeleton width={40} height={20} /> : (
                   <p className="text-white font-mono font-black text-[15px]">
-                    {members.length ? Math.round(members.reduce((acc, m) => acc + m.current_load, 0) / members.length) : 0}%
+                    {avgLoad}%
                   </p>
                 )}
               </div>
@@ -210,50 +313,23 @@ export const ProjectOverviewPM: React.FC<ProjectOverviewProps> = ({ projectId })
                 <p className="text-neutral-400 font-mono text-[10px] font-bold uppercase tracking-widest mb-1">// OVERLOADED</p>
                 {isLoading ? <Skeleton width={40} height={20} /> : (
                   <p className="text-[#EF4444] font-mono font-black text-[15px]">
-                    {members.filter(m => m.current_load > 100).length} <span className="text-[10px] text-neutral-500 font-bold">MEMBER</span>
+                    {overloadedCount} <span className="text-[10px] text-neutral-500 font-bold">{overloadedCount === 1 ? 'MEMBER' : 'MEMBERS'}</span>
                   </p>
                 )}
               </div>
               <div className="text-center">
                 <p className="text-neutral-400 font-mono text-[10px] font-bold uppercase tracking-widest mb-1">// BALANCE</p>
                 {isLoading ? <Skeleton width={40} height={20} /> : (
-                  <p className={`${members.filter(m => m.current_load > 100).length > 0 ? 'text-[#EF4444]' : 'text-[#FFE600]'} font-mono font-black text-[15px]`}>
-                    {members.filter(m => m.current_load > 100).length > 0 ? 'POOR' : 'FAIR'}
+                  <p className={`${isBalanced ? 'text-[#22C55E]' : overloadedCount > 0 ? 'text-[#EF4444]' : 'text-[#FFE600]'} font-mono font-black text-[15px]`}>
+                    {isBalanced ? 'OPTIMAL' : 'UNBALANCED'}
                   </p>
                 )}
               </div>
             </div>
           </SurfaceCard>
         </div>
-        <div className="lg:col-span-4">
-          <SurfaceCard title="Project Pulse" subtitle="Activity Feed" className="h-full">
-            <div className="space-y-4 flex-1 overflow-y-auto no-scrollbar max-h-[300px] pr-1">
-              {isLoading ? (
-                [1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex items-start gap-3">
-                    <Skeleton width={6} height={6} className="mt-1.5 rounded-none" />
-                    <div className="flex-1">
-                      <Skeleton width="50%" height={12} className="mb-1" />
-                      <Skeleton width="90%" height={10} className="mb-1" />
-                      <Skeleton width="30%" height={8} />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                activities.map((act) => (
-                  <div key={act.id!} className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-none bg-[#FFE600] border border-black mt-1.5 flex-shrink-0" />
-                    <div className="text-neutral-400 font-mono text-[12px] min-w-0 flex-1">
-                      <span className="text-white font-bold uppercase truncate block">{act.user_name}</span>
-                      <span className="text-[11px] block mt-0.5 uppercase">{act.action} <span className="text-[#FFE600] font-bold">{act.target}</span></span>
-                      <span className="text-[9px] text-neutral-500 uppercase font-bold mt-1 block font-mono">{getTimeAgo(act.created_at!)}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-              {!isLoading && activities.length === 0 && <div className="text-neutral-500 font-mono text-[11px] text-center py-8">// NO RECENT ACTIVITY.</div>}
-            </div>
-          </SurfaceCard>
+        <div className="lg:col-span-7">
+          <ProjectPulseChart projectId={projectId} />
         </div>
       </div>
     </div>

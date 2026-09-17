@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckSquare, Plus } from 'lucide-react';
 import type { Task, TaskType } from '../../models';
-import { getAllTaskTypes, saveCustomTaskType } from '../../utils/taskTypes';
+import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 
 interface TaskFormModalProps {
   projectId: number | string;
@@ -15,18 +15,32 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   projectId, onClose, onSubmit, initial = {}, title = 'New Task',
 }) => {
   const [taskTitle, setTaskTitle] = useState(initial.title ?? '');
-  const [type, setType] = useState<TaskType>(initial.type ?? 'CODE');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
+    const parsed = parseTaskTypes(initial.type);
+    return parsed.length > 0 ? parsed : ['CODE'];
+  });
   const [weight, setWeight] = useState(initial.weight ?? 3);
   const [availableTypes, setAvailableTypes] = useState<string[]>(() => getAllTaskTypes([initial.type]));
   const [isAddingType, setIsAddingType] = useState(false);
   const [customTypeInput, setCustomTypeInput] = useState('');
+
+  const handleToggleType = (t: string) => {
+    setSelectedTypes(prev => {
+      if (prev.includes(t)) {
+        if (prev.length === 1) return prev; // keep at least 1 type
+        return prev.filter(item => item !== t);
+      } else {
+        return [...prev, t];
+      }
+    });
+  };
 
   const handleAddCustomType = () => {
     const trimmed = customTypeInput.trim().toUpperCase();
     if (!trimmed) return;
     saveCustomTaskType(trimmed);
     setAvailableTypes(getAllTaskTypes([trimmed]));
-    setType(trimmed);
+    setSelectedTypes(prev => prev.includes(trimmed) ? prev : [...prev, trimmed]);
     setCustomTypeInput('');
     setIsAddingType(false);
   };
@@ -35,7 +49,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     e.preventDefault();
     if (!taskTitle.trim()) return;
     onClose();
-    await onSubmit({ project_id: projectId, title: taskTitle.trim(), type, weight, bucket_id: initial.bucket_id });
+    const finalType = serializeTaskTypes(selectedTypes) || 'OTHER';
+    await onSubmit({ project_id: projectId, title: taskTitle.trim(), type: finalType, weight, bucket_id: initial.bucket_id });
   };
 
   return (
@@ -83,11 +98,36 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                   </button>
                 )}
               </div>
+              {/* Selected Type Badges */}
+              <div className="flex flex-wrap gap-1.5 min-h-[28px] mb-2 p-1.5 bg-[#0B0E14] border-2 border-black">
+                {selectedTypes.map(t => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-white"
+                  >
+                    <span className={getTaskTypeVariant(t) === 'critical' ? 'text-[#FF3333]' : getTaskTypeVariant(t) === 'warning' ? 'text-[#FFE600]' : getTaskTypeVariant(t) === 'success' ? 'text-[#00FF66]' : 'text-[#00E5FF]'}>
+                      ●
+                    </span>
+                    {t}
+                    {selectedTypes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleType(t)}
+                        className="hover:text-[#FF3333] cursor-pointer ml-0.5"
+                        title={`Remove ${t}`}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+
               {isAddingType ? (
                 <div className="flex gap-1.5">
                   <input
                     autoFocus
-                    placeholder="CUSTOM TYPE..."
+                    placeholder="CUSTOM TAG..."
                     value={customTypeInput}
                     onChange={(e) => setCustomTypeInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => {
@@ -118,17 +158,23 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 </div>
               ) : (
                 <select
-                  value={type}
+                  value=""
                   onChange={e => {
-                    if (e.target.value === '__ADD_NEW__') {
+                    const val = e.target.value;
+                    if (val === '__ADD_NEW__') {
                       setIsAddingType(true);
-                    } else {
-                      setType(e.target.value);
+                    } else if (val) {
+                      handleToggleType(val);
                     }
                   }}
-                  className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2.5 text-[13px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                  className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                 >
-                  {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  <option value="">+ APPEND / TOGGLE TYPE...</option>
+                  {availableTypes.map(t => (
+                    <option key={t} value={t}>
+                      {selectedTypes.includes(t) ? `✓ ${t}` : `+ ${t}`}
+                    </option>
+                  ))}
                   <option value="__ADD_NEW__">+ ADD CUSTOM TYPE...</option>
                 </select>
               )}

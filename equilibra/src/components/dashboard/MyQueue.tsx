@@ -7,12 +7,7 @@ import { taskService } from '../../services/taskService';
 
 const CURRENT_USER_ID = 1;
 
-const TYPE_VARIANTS: Record<string, 'primary' | 'success' | 'warning' | 'default'> = {
-  CODE:        'primary',
-  'NON-CODE':  'default',
-  DESIGN:      'warning',
-  REQUIREMENT: 'success',
-};
+import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
 
 export const MyQueue: React.FC<{ className?: string }> = ({ className = "" }) => {
   const [tasks, setTasks] = React.useState<Awaited<ReturnType<typeof taskService.getMyTasks>>>([]);
@@ -45,11 +40,13 @@ export const MyQueue: React.FC<{ className?: string }> = ({ className = "" }) =>
             className="p-3.5 rounded-none bg-[#141619] border-2 border-black hover:border-white shadow-[2px_2px_0px_0px_#000000] transition-all flex justify-between items-center group"
           >
             <div>
-              <div className="flex gap-2 mb-1.5 flex-wrap items-center">
-                <Badge variant={TYPE_VARIANTS[task.type] ?? 'default'} className="!py-0.2 !px-1.5 !text-[9px]">
-                  {task.type === 'CODE' ? <Code size={9} /> : <GitMerge size={9} />}
-                  {task.type}
-                </Badge>
+              <div className="flex gap-1.5 mb-1.5 flex-wrap items-center">
+                {parseTaskTypes(task.type).map((t) => (
+                  <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.2 !px-1.5 !text-[9px]">
+                    {t === 'CODE' ? <Code size={9} /> : <GitMerge size={9} />}
+                    {t}
+                  </Badge>
+                ))}
                 <span className="text-[10px] text-neutral-400 font-mono font-bold">#TASK-{task.id}</span>
               </div>
               <h5 className="text-white text-[13px] font-bold line-clamp-1">{task.title}</h5>

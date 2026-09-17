@@ -253,18 +253,19 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                         <div className="space-y-2.5 max-h-[300px] overflow-y-auto no-scrollbar">
                             {members
                                 .filter(m =>
+                                    (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) ||
                                     (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) ||
                                     (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())
                                 )
                                 .map(m => (
                                     <div key={m.id} className="flex items-center justify-between p-3 rounded-none border-2 border-black bg-[#121417] shadow-[2px_2px_0px_0px_#000000]">
                                         <div>
-                                            <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.gh_username || `User ${m.user_id}`}</div>
+                                            <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.display_name || m.gh_username || `User #${m.user_id}`}</div>
                                             <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
                                         </div>
                                     </div>
                                 ))}
-                            {members.length > 0 && members.filter(m => (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())).length === 0 && (
+                            {members.length > 0 && members.filter(m => (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())).length === 0 && (
                                 <div className="text-center py-4 text-neutral-500 text-[11px] uppercase">
                                     // NO MEMBERS MATCH FILTER
                                 </div>

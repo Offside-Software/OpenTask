@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, BotMessageSquare, CheckSquare, Square, AlertCircle, Loader2 } from 'lucide-react';
 import { alertService } from '../../services/alertService';
 import type { ProjectMember, ExtractedTask, ExtractedTaskPayload } from '../../models';
+import { parseTaskTypes } from '../../utils/taskTypes';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -192,11 +193,11 @@ export const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({
                     >
                       W{w}
                     </span>
-                    {task.type && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-none bg-black text-neutral-300 border border-neutral-700">
-                        {task.type}
+                    {task.type && parseTaskTypes(task.type).map(t => (
+                      <span key={t} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-none bg-black text-neutral-300 border border-neutral-700">
+                        {t}
                       </span>
-                    )}
+                    ))}
                   </div>
 
                   {task.description && (

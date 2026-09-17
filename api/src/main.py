@@ -18,6 +18,7 @@ from services.database import project_member as _db_project_member
 from services.database import alerts as _db_alerts
 from services.database import activities as _db_activities
 from services.database import meetings as _db_meetings
+from services.database import history as _db_history
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -26,6 +27,7 @@ if sys.platform == 'win32':
 async def lifespan(app: FastAPI):
     """Create the DB pool on startup and close it on shutdown."""
     create_pool()
+    _db_history.init_project_history_table()
     yield
     close_pool()
 

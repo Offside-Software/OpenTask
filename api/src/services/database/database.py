@@ -140,7 +140,7 @@ def postgresql_dsn():
     return dsn
 
 
-def create_pool(minconn: int = 1, maxconn: int = 10):
+def create_pool(minconn: int = 2, maxconn: int = 30):
     """Create a threaded connection pool using the full Postgres URL from settings."""
     global _pool
     if _pool is None:

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus } from 'lucide-react';
-import type { Task, TaskType, Bucket, ProjectMember } from '../../models';
-import { getAllTaskTypes, saveCustomTaskType } from '../../utils/taskTypes';
+import type { Task, Bucket, ProjectMember } from '../../models';
+import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 
 interface TaskDetailModalProps {
     task: Task;
@@ -18,7 +18,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 }) => {
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description || '');
-    const [type, setType] = useState<TaskType>(task.type);
+    const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
+        const parsed = parseTaskTypes(task.type);
+        return parsed.length > 0 ? parsed : ['CODE'];
+    });
     const [weight, setWeight] = useState<number>(task.weight);
     const [bucketId, setBucketId] = useState<string | undefined>(task.bucket_id ? String(task.bucket_id) : undefined);
     const [leadAssigneeId, setLeadAssigneeId] = useState<string | undefined>(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
@@ -26,12 +29,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [isAddingType, setIsAddingType] = useState(false);
     const [customTypeInput, setCustomTypeInput] = useState('');
 
+    const handleToggleType = (t: string) => {
+        setSelectedTypes(prev => {
+            if (prev.includes(t)) {
+                if (prev.length === 1) return prev; // Keep at least 1 type
+                return prev.filter(item => item !== t);
+            } else {
+                return [...prev, t];
+            }
+        });
+    };
+
     const handleAddCustomType = () => {
         const trimmed = customTypeInput.trim().toUpperCase();
         if (!trimmed) return;
         saveCustomTaskType(trimmed);
         setAvailableTypes(getAllTaskTypes([trimmed]));
-        setType(trimmed);
+        setSelectedTypes(prev => prev.includes(trimmed) ? prev : [...prev, trimmed]);
         setCustomTypeInput('');
         setIsAddingType(false);
     };
@@ -72,7 +86,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     useEffect(() => {
         setTitle(task.title);
         setDescription(task.description || '');
-        setType(task.type);
+        const parsed = parseTaskTypes(task.type);
+        setSelectedTypes(parsed.length > 0 ? parsed : ['CODE']);
         setWeight(task.weight);
         setBucketId(task.bucket_id ? String(task.bucket_id) : undefined);
         setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
@@ -85,10 +100,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         if (!title.trim() || !task.id) return;
 
         setSaving(true);
+        const finalType = serializeTaskTypes(selectedTypes) || 'OTHER';
         const updatePayload: Partial<Task> = {
             title: title.trim(),
             description: description.trim() || undefined,
-            type,
+            type: finalType,
             weight: Number(weight),
             bucket_id: bucketId || undefined,
             lead_assignee_id: leadAssigneeId || undefined,
@@ -256,7 +272,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         {/* Type */}
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5"><Tag size={13} /> TASK TYPE</label>
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5"><Tag size={13} /> TASK TYPES / TAGS</label>
                                 {!isAddingType && (
                                     <button
                                         type="button"
@@ -267,11 +283,37 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                     </button>
                                 )}
                             </div>
+
+                            {/* Selected Type Badges */}
+                            <div className="flex flex-wrap gap-1.5 min-h-[28px] mb-2 p-1.5 bg-[#0B0E14] border-2 border-black">
+                                {selectedTypes.map(t => (
+                                    <span
+                                        key={t}
+                                        className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-white"
+                                    >
+                                        <span className={getTaskTypeVariant(t) === 'critical' ? 'text-[#FF3333]' : getTaskTypeVariant(t) === 'warning' ? 'text-[#FFE600]' : getTaskTypeVariant(t) === 'success' ? 'text-[#00FF66]' : 'text-[#00E5FF]'}>
+                                            ●
+                                        </span>
+                                        {t}
+                                        {selectedTypes.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleType(t)}
+                                                className="hover:text-[#FF3333] cursor-pointer ml-0.5"
+                                                title={`Remove ${t}`}
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </span>
+                                ))}
+                            </div>
+
                             {isAddingType ? (
                                 <div className="flex gap-1.5">
                                     <input
                                         type="text"
-                                        placeholder="CUSTOM TYPE..."
+                                        placeholder="CUSTOM TAG..."
                                         value={customTypeInput}
                                         onChange={(e) => setCustomTypeInput(e.target.value.toUpperCase())}
                                         onKeyDown={(e) => {
@@ -302,17 +344,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 </div>
                             ) : (
                                 <select
-                                    value={type}
+                                    value=""
                                     onChange={(e) => {
-                                        if (e.target.value === '__ADD_NEW__') {
+                                        const val = e.target.value;
+                                        if (val === '__ADD_NEW__') {
                                             setIsAddingType(true);
-                                        } else {
-                                            setType(e.target.value as TaskType);
+                                        } else if (val) {
+                                            handleToggleType(val);
                                         }
                                     }}
                                     className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                                 >
-                                    {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    <option value="">+ APPEND / TOGGLE TYPE...</option>
+                                    {availableTypes.map(t => (
+                                        <option key={t} value={t}>
+                                            {selectedTypes.includes(t) ? `✓ ${t}` : `+ ${t}`}
+                                        </option>
+                                    ))}
                                     <option value="__ADD_NEW__">+ ADD CUSTOM TYPE...</option>
                                 </select>
                             )}
