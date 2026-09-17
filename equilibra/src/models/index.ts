@@ -8,7 +8,8 @@ export type BucketState =
   | "ON_REVIEW"
   | "COMPLETED";
 
-export type TaskType = "CODE" | "REQUIREMENT" | "DESIGN" | "OTHER" | "NON-CODE";
+export type DefaultTaskType = "CODE" | "REQUIREMENT" | "DESIGN" | "OTHER" | "NON-CODE";
+export type TaskType = DefaultTaskType | string;
 export type AlertType = "STAGNATION" | "REALLOCATION" | "DRAFT_APPROVAL";
 
 export interface Bucket {
@@ -61,6 +62,8 @@ export interface ProjectMember {
   max_capacity: number;
   current_load: number; // For workload distribution chart
   gh_username?: string;
+  display_name?: string;
+  avatar_url?: string;
 }
 
 export interface Activity {

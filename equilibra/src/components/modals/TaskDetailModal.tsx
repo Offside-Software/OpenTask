@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check } from 'lucide-react';
+import { X, CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus } from 'lucide-react';
 import type { Task, TaskType, Bucket, ProjectMember } from '../../models';
+import { getAllTaskTypes, saveCustomTaskType } from '../../utils/taskTypes';
 
 interface TaskDetailModalProps {
     task: Task;
@@ -10,7 +11,6 @@ interface TaskDetailModalProps {
     onUpdate: (taskId: string | number, data: Partial<Task>) => Promise<void>;
 }
 
-const TASK_TYPES: TaskType[] = ['CODE', 'REQUIREMENT', 'DESIGN', 'NON-CODE', 'OTHER'];
 const TASK_WEIGHTS = [1, 2, 3, 5, 8]; // Fibonacci sequence for story points
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
@@ -22,6 +22,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [weight, setWeight] = useState<number>(task.weight);
     const [bucketId, setBucketId] = useState<string | undefined>(task.bucket_id ? String(task.bucket_id) : undefined);
     const [leadAssigneeId, setLeadAssigneeId] = useState<string | undefined>(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
+    const [availableTypes, setAvailableTypes] = useState<string[]>(() => getAllTaskTypes([task.type]));
+    const [isAddingType, setIsAddingType] = useState(false);
+    const [customTypeInput, setCustomTypeInput] = useState('');
+
+    const handleAddCustomType = () => {
+        const trimmed = customTypeInput.trim().toUpperCase();
+        if (!trimmed) return;
+        saveCustomTaskType(trimmed);
+        setAvailableTypes(getAllTaskTypes([trimmed]));
+        setType(trimmed);
+        setCustomTypeInput('');
+        setIsAddingType(false);
+    };
 
     const [branchName, setBranchName] = useState(task.branch_name || '');
     const [saving, setSaving] = useState(false);
@@ -64,6 +77,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         setBucketId(task.bucket_id ? String(task.bucket_id) : undefined);
         setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
         setBranchName(task.branch_name || '');
+        setAvailableTypes(getAllTaskTypes([task.type]));
     }, [task]);
 
     const handleSave = async (e: React.FormEvent) => {
@@ -241,14 +255,67 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                         {/* Type */}
                         <div>
-                            <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><Tag size={13} /> TASK TYPE</label>
-                            <select
-                                value={type}
-                                onChange={(e) => setType(e.target.value as TaskType)}
-                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
-                            >
-                                {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5"><Tag size={13} /> TASK TYPE</label>
+                                {!isAddingType && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAddingType(true)}
+                                        className="text-[10px] font-mono font-bold text-[#FFE600] hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Plus size={11} /> NEW
+                                    </button>
+                                )}
+                            </div>
+                            {isAddingType ? (
+                                <div className="flex gap-1.5">
+                                    <input
+                                        type="text"
+                                        placeholder="CUSTOM TYPE..."
+                                        value={customTypeInput}
+                                        onChange={(e) => setCustomTypeInput(e.target.value.toUpperCase())}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleAddCustomType();
+                                            } else if (e.key === 'Escape') {
+                                                setIsAddingType(false);
+                                            }
+                                        }}
+                                        className="flex-1 min-w-0 bg-[#0B0E14] border-2 border-[#FFE600] rounded-none px-2 py-1.5 text-[11px] font-mono uppercase text-white focus:outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAddCustomType}
+                                        disabled={!customTypeInput.trim()}
+                                        className="px-2 py-1.5 bg-[#FFE600] text-black font-black text-[10px] rounded-none border border-black disabled:opacity-50 cursor-pointer shrink-0"
+                                    >
+                                        ADD
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAddingType(false)}
+                                        className="px-2 py-1.5 bg-[#1E2227] text-neutral-400 hover:text-white text-[10px] rounded-none border border-neutral-700 cursor-pointer shrink-0"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ) : (
+                                <select
+                                    value={type}
+                                    onChange={(e) => {
+                                        if (e.target.value === '__ADD_NEW__') {
+                                            setIsAddingType(true);
+                                        } else {
+                                            setType(e.target.value as TaskType);
+                                        }
+                                    }}
+                                    className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                                >
+                                    {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    <option value="__ADD_NEW__">+ ADD CUSTOM TYPE...</option>
+                                </select>
+                            )}
                         </div>
 
                         {/* Weight */}

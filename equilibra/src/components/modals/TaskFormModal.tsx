@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { X, CheckSquare } from 'lucide-react';
+import { X, CheckSquare, Plus } from 'lucide-react';
 import type { Task, TaskType } from '../../models';
-
-const TASK_TYPES: TaskType[] = ['CODE', 'REQUIREMENT', 'DESIGN', 'NON-CODE', 'OTHER'];
+import { getAllTaskTypes, saveCustomTaskType } from '../../utils/taskTypes';
 
 interface TaskFormModalProps {
   projectId: number | string;
@@ -18,6 +17,19 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [taskTitle, setTaskTitle] = useState(initial.title ?? '');
   const [type, setType] = useState<TaskType>(initial.type ?? 'CODE');
   const [weight, setWeight] = useState(initial.weight ?? 3);
+  const [availableTypes, setAvailableTypes] = useState<string[]>(() => getAllTaskTypes([initial.type]));
+  const [isAddingType, setIsAddingType] = useState(false);
+  const [customTypeInput, setCustomTypeInput] = useState('');
+
+  const handleAddCustomType = () => {
+    const trimmed = customTypeInput.trim().toUpperCase();
+    if (!trimmed) return;
+    saveCustomTaskType(trimmed);
+    setAvailableTypes(getAllTaskTypes([trimmed]));
+    setType(trimmed);
+    setCustomTypeInput('');
+    setIsAddingType(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,14 +71,67 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2">TYPE</label>
-              <select
-                value={type}
-                onChange={e => setType(e.target.value as TaskType)}
-                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2.5 text-[13px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
-              >
-                {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider">TYPE</label>
+                {!isAddingType && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingType(true)}
+                    className="text-[10px] text-[#FFE600] hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Plus size={10} strokeWidth={3} /> NEW
+                  </button>
+                )}
+              </div>
+              {isAddingType ? (
+                <div className="flex gap-1.5">
+                  <input
+                    autoFocus
+                    placeholder="CUSTOM TYPE..."
+                    value={customTypeInput}
+                    onChange={(e) => setCustomTypeInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomType();
+                      } else if (e.key === 'Escape') {
+                        setIsAddingType(false);
+                      }
+                    }}
+                    className="flex-1 min-w-0 bg-[#0B0E14] border-2 border-[#FFE600] rounded-none px-2 py-1.5 text-[11px] font-mono uppercase text-white focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomType}
+                    disabled={!customTypeInput.trim()}
+                    className="px-2 py-1.5 bg-[#FFE600] text-black font-black text-[10px] rounded-none border border-black disabled:opacity-50 cursor-pointer shrink-0"
+                  >
+                    ADD
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingType(false)}
+                    className="px-2 py-1.5 bg-[#1E2227] text-neutral-400 hover:text-white text-[10px] rounded-none border border-neutral-700 cursor-pointer shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={type}
+                  onChange={e => {
+                    if (e.target.value === '__ADD_NEW__') {
+                      setIsAddingType(true);
+                    } else {
+                      setType(e.target.value);
+                    }
+                  }}
+                  className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2.5 text-[13px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                >
+                  {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  <option value="__ADD_NEW__">+ ADD CUSTOM TYPE...</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2">WEIGHT (1–5)</label>

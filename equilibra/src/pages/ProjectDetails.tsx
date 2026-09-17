@@ -257,7 +257,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     queueTaskReorder(newBucketId, taskIds);
   };
 
-  const handleSaveBucketSettings = async (bucketId: string | number, data: { name: string; description?: string }) => {
+  const handleSaveBucketSettings = async (bucketId: string | number, data: { name: string; description?: string; state?: BucketState }) => {
     updateBucketLocally(bucketId, data);
     try {
       await updateBucket(bucketId, data);
@@ -464,6 +464,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                         }
 
                         const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
+                        const assignedMember = members.find(m => String(m.user_id) === String(task.lead_assignee_id));
+                        const assigneeName = assignedMember?.display_name || assignedMember?.gh_username || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
+                        const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
 
                         return (
                           <KanbanCard
@@ -472,7 +475,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                             title={task.title}
                             type={task.type}
                             weight={task.weight}
-                            assignee={task.lead_assignee_id ? 'JD' : undefined}
+                            assignee={assigneeName}
+                            assigneeAvatar={assigneeAvatar}
                             pr={!!task.prUrl}
                             description={task.description}
                             warnStagnant={task.warnStagnant}

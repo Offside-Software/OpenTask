@@ -128,7 +128,7 @@ def db_get_members(project_id: SafeId):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """
-            SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load, u.gh_username
+            SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load, u.gh_username, u.display_name
             FROM opentask.project_member pm
             LEFT JOIN opentask.users u ON pm.user_id = u.id
             WHERE pm.project_id = %s
@@ -151,7 +151,7 @@ def db_get_member_by_id(project_id: SafeId, member_id: SafeId):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             """
-            SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load, u.gh_username
+            SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load, u.gh_username, u.display_name
             FROM opentask.project_member pm
             LEFT JOIN opentask.users u ON pm.user_id = u.id
             WHERE pm.project_id = %s AND pm.user_id = %s LIMIT 1;

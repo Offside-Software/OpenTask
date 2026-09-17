@@ -1,7 +1,8 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
-import { Clock, GitPullRequest, MoreHorizontal, User, Trash2, Check } from 'lucide-react';
+import { Clock, GitPullRequest, MoreHorizontal, Trash2, Check } from 'lucide-react';
 import type { TaskType } from '../../models';
+import { getTaskTypeVariant } from '../../utils/taskTypes';
 
 interface KanbanCardProps {
   id: string | number;
@@ -9,6 +10,7 @@ interface KanbanCardProps {
   type: TaskType;
   weight: number;
   assignee?: string;
+  assigneeAvatar?: string;
   status?: string;
   warnStagnant?: boolean;
   isSuggested?: boolean;
@@ -22,12 +24,23 @@ interface KanbanCardProps {
   description?: string;
 }
 
+const getInitials = (name?: string): string => {
+  if (!name) return '?';
+  const clean = name.replace(/^User\s*#/i, '').trim();
+  const parts = clean.split(/[\s_-]+/);
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return clean.slice(0, 2).toUpperCase();
+};
+
 export const KanbanCard: React.FC<KanbanCardProps> = ({
   id,
   title,
   type,
   weight,
   assignee,
+  assigneeAvatar,
   warnStagnant,
   isSuggested,
   pr,
@@ -151,8 +164,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             DONE
           </Badge>
         )}
-        <Badge variant={type === 'CODE' ? 'primary' : 'default'} className="!py-0.5 !px-1.5 !text-[9px]">
-          {type === 'CODE' ? 'CODE' : 'SPEC'}
+        <Badge variant={getTaskTypeVariant(type)} className="!py-0.5 !px-1.5 !text-[9px]">
+          {type}
         </Badge>
         <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-[#FFE600]">
           {weight} PTS
@@ -175,9 +188,27 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {/* Card Footer */}
       <div className="mt-2 pt-2 border-t-2 border-neutral-800 flex items-center justify-between">
         {assignee ? (
-          <div className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[10px] font-black flex items-center gap-1 shadow-[1px_1px_0px_0px_#000000]">
-            <User size={10} strokeWidth={3} />
-            {assignee.toUpperCase()}
+          <div className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[10px] font-black flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000000] max-w-[170px]">
+            {assigneeAvatar ? (
+              <img
+                src={assigneeAvatar}
+                alt={assignee}
+                className="w-3.5 h-3.5 rounded-none border border-black object-cover shrink-0"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling;
+                  if (fallback) fallback.classList.remove('hidden');
+                }}
+              />
+            ) : null}
+            <span
+              className={`w-3.5 h-3.5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black ${
+                assigneeAvatar ? 'hidden' : ''
+              }`}
+            >
+              {getInitials(assignee)}
+            </span>
+            <span className="truncate">{assignee.toUpperCase()}</span>
           </div>
         ) : (
           <div className="font-mono text-[10px] text-neutral-500 font-semibold uppercase">
