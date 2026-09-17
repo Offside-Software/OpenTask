@@ -12,13 +12,13 @@ def check_task_status():
     conn = _get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        cur.execute("SELECT id, title, bucket_id, lead_assignee_id, branch_name, type FROM public.tasks ORDER BY id DESC LIMIT 10;")
+        cur.execute("SELECT id, title, bucket_id, lead_assignee_id, branch_name, type FROM opentask.tasks ORDER BY id DESC LIMIT 10;")
         tasks = cur.fetchall()
         print("Last 10 tasks:")
         for t in tasks:
             print(f"ID: {t['id']} | Title: {t['title']} | Bucket: {t['bucket_id']} | Assignee: {t['lead_assignee_id']} | Branch: {t['branch_name']} | Type: {t['type']}")
             
-        cur.execute("SELECT id, state, name FROM public.buckets;")
+        cur.execute("SELECT id, state, name FROM opentask.buckets;")
         buckets = cur.fetchall()
         print("\nBuckets:")
         for b in buckets:

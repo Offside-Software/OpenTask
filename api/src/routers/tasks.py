@@ -41,7 +41,7 @@ def batch_review_tasks(payload: BatchReviewPayload):
 
     Steps (all-or-nothing):
     1. Lock the ALERT row and reject if already resolved (409).
-    2. Batch-insert tasks into public.tasks with bucket_id=1 and status='DRAFT'.
+    2. Batch-insert tasks into opentask.tasks with bucket_id=1 and status='DRAFT'.
     3. Mark the alert as resolved.
     """
     conn = _get_conn()
@@ -53,7 +53,7 @@ def batch_review_tasks(payload: BatchReviewPayload):
         # Step 1: Lock the alert row; guard against double-processing
         # ------------------------------------------------------------------
         cur.execute(
-            "SELECT is_resolved FROM public.alerts WHERE id = %s FOR UPDATE;",
+            "SELECT is_resolved FROM opentask.alerts WHERE id = %s FOR UPDATE;",
             (payload.alert_id,),
         )
         alert_row = cur.fetchone()
@@ -69,7 +69,7 @@ def batch_review_tasks(payload: BatchReviewPayload):
         # Step 1.5: Find the first bucket for the project
         # ------------------------------------------------------------------
         cur.execute(
-            "SELECT id FROM public.buckets WHERE project_id = %s ORDER BY order_idx ASC LIMIT 1;",
+            "SELECT id FROM opentask.buckets WHERE project_id = %s ORDER BY order_idx ASC LIMIT 1;",
             (payload.project_id,)
         )
         bucket_row = cur.fetchone()
@@ -82,7 +82,7 @@ def batch_review_tasks(payload: BatchReviewPayload):
         # Step 1.6: Find the max order_idx for the target bucket
         # ------------------------------------------------------------------
         cur.execute(
-            "SELECT COALESCE(MAX(order_idx), -1) AS max_idx FROM public.tasks WHERE bucket_id = %s;",
+            "SELECT COALESCE(MAX(order_idx), -1) AS max_idx FROM opentask.tasks WHERE bucket_id = %s;",
             (target_bucket_id,)
         )
         max_idx_row = cur.fetchone()
@@ -92,7 +92,7 @@ def batch_review_tasks(payload: BatchReviewPayload):
         # Step 2: Batch-insert tasks (bucket_id=target_bucket_id, status=DRAFT)
         # ------------------------------------------------------------------
         insert_sql = """
-            INSERT INTO public.tasks (
+            INSERT INTO opentask.tasks (
                 id, project_id, bucket_id, lead_assignee_id,
                 title, description, type, weight, status, order_idx
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
@@ -118,7 +118,7 @@ def batch_review_tasks(payload: BatchReviewPayload):
         # Step 3: Resolve the alert
         # ------------------------------------------------------------------
         cur.execute(
-            "UPDATE public.alerts SET is_resolved = TRUE WHERE id = %s;",
+            "UPDATE opentask.alerts SET is_resolved = TRUE WHERE id = %s;",
             (payload.alert_id,),
         )
 

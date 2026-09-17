@@ -43,7 +43,7 @@ def db_create_activity(activity: DatabaseActivity):
         params = [mapping[k] for k in columns]
 
         sql = (
-            f"INSERT INTO public.activities ({', '.join(columns)}) "
+            f"INSERT INTO opentask.activities ({', '.join(columns)}) "
             f"VALUES ({', '.join(placeholders)}) "
             f"RETURNING id, project_id, user_name, action, target, created_at;"
         )
@@ -74,7 +74,7 @@ def db_get_activities_by_project(project_id: int):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT id, project_id, user_name, action, target, created_at "
-            "FROM public.activities "
+            "FROM opentask.activities "
             "WHERE project_id = %s "
             "ORDER BY created_at DESC;",
             (project_id,),
@@ -97,7 +97,7 @@ def db_get_activity_by_id(activity_id: int):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT id, project_id, user_name, action, target, created_at "
-            "FROM public.activities WHERE id = %s LIMIT 1;",
+            "FROM opentask.activities WHERE id = %s LIMIT 1;",
             (activity_id,),
         )
         row = cur.fetchone()

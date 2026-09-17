@@ -91,7 +91,11 @@ async def create_meeting_record(meeting: dict):
 # KONFIGURASI AI
 # ==========================================
 MODEL_ID = "gemini-2.5-flash"
-client = genai.Client(api_key=settings.gemini_api_key)
+try:
+    client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+except Exception as e:
+    print(f"Failed to initialize Gemini Client: {e}")
+    client = None
 
 GEMINI_SYSTEM_PROMPT = """
 Role: Expert Project Manager dan AI Transcriber.
@@ -562,14 +566,14 @@ def confirm_meeting_tasks(
             params = [mapping[k] for k in columns]
 
             sql = (
-                f"INSERT INTO public.tasks ({', '.join(columns)}) "
+                f"INSERT INTO opentask.tasks ({', '.join(columns)}) "
                 f"VALUES ({', '.join(placeholders)});"
             )
             cur.execute(sql, params)
 
         # 2. Resolve the alert
         cur.execute(
-            "UPDATE public.alerts SET is_resolved = true, updated_at = NOW() "
+            "UPDATE opentask.alerts SET is_resolved = true, updated_at = NOW() "
             "WHERE id = %s;",
             (body.alert_id,),
         )

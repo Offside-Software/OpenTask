@@ -31,7 +31,7 @@ def db_create_bucket(item: DatabaseBucket):
         # Compute next order_idx (based on active buckets)
         if item.order_idx is None:
             cur.execute(
-                "SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM public.buckets WHERE project_id = %s",
+                "SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.buckets WHERE project_id = %s",
                 (item.project_id,)
             )
             result = cur.fetchone()
@@ -61,7 +61,7 @@ def db_create_bucket(item: DatabaseBucket):
         
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO public.buckets ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx;"
+        sql = f"INSERT INTO opentask.buckets ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx;"
 
         cur.execute(sql, params)
         conn.commit()
@@ -87,7 +87,7 @@ def db_get_buckets(project_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx FROM public.buckets WHERE project_id = %s ORDER BY order_idx ASC;",
+            "SELECT id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx FROM opentask.buckets WHERE project_id = %s ORDER BY order_idx ASC;",
             (project_id,)
         )
         rows = cur.fetchall()
@@ -105,7 +105,7 @@ def db_get_bucket_by_id(project_id: int, bucket_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx FROM public.buckets WHERE id = %s AND project_id = %s LIMIT 1;",
+            "SELECT id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx FROM opentask.buckets WHERE id = %s AND project_id = %s LIMIT 1;",
             (bucket_id, project_id),
         )
         row = cur.fetchone()
@@ -128,14 +128,14 @@ def db_reorder_buckets(project_id: int, bucket_ids: list[SafeId]):
         # Step 1: Set order_idx to negative equivalents to avoid unique constraint violations during swap
         for idx, b_id in enumerate(bucket_ids):
             cur.execute(
-                "UPDATE public.buckets SET order_idx = %s WHERE id = %s AND project_id = %s;",
+                "UPDATE opentask.buckets SET order_idx = %s WHERE id = %s AND project_id = %s;",
                 (-(idx + 1000), b_id, project_id)
             )
             
         # Step 2: Set absolute new order_idx
         for idx, b_id in enumerate(bucket_ids):
             cur.execute(
-                "UPDATE public.buckets SET order_idx = %s, updated_at = NOW() WHERE id = %s AND project_id = %s;",
+                "UPDATE opentask.buckets SET order_idx = %s, updated_at = NOW() WHERE id = %s AND project_id = %s;",
                 (idx, b_id, project_id)
             )
 
@@ -158,12 +158,12 @@ def db_delete_bucket(project_id: int, bucket_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         # Check if tasks are in the bucket
-        cur.execute("SELECT COUNT(*) as count FROM public.tasks WHERE bucket_id = %s;", (bucket_id,))
+        cur.execute("SELECT COUNT(*) as count FROM opentask.tasks WHERE bucket_id = %s;", (bucket_id,))
         count = cur.fetchone()['count']
         if count > 0:
              raise HTTPException(status_code=400, detail="Cannot delete bucket with active tasks. Please move or delete tasks first.")
 
-        cur.execute("DELETE FROM public.buckets WHERE id = %s AND project_id = %s RETURNING id;", (bucket_id, project_id))
+        cur.execute("DELETE FROM opentask.buckets WHERE id = %s AND project_id = %s RETURNING id;", (bucket_id, project_id))
         conn.commit()
         row = cur.fetchone()
         if row is None:

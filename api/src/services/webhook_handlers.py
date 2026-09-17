@@ -79,20 +79,20 @@ async def sync_github_tasks(payload: dict):
         try:
             # Look up lead_assignee_id by gh_username
             if pr_author_gh:
-                cur.execute("SELECT id FROM public.users WHERE gh_username = %s LIMIT 1;", (pr_author_gh,))
+                cur.execute("SELECT id FROM opentask.users WHERE gh_username = %s LIMIT 1;", (pr_author_gh,))
                 user_row = cur.fetchone()
                 if user_row:
                     lead_assignee_id = user_row["id"]
 
             # Find project by repo URL
-            cur.execute("SELECT id FROM public.projects WHERE %s = ANY(gh_repo_url) LIMIT 1;", (repo_url,))
+            cur.execute("SELECT id FROM opentask.projects WHERE %s = ANY(gh_repo_url) LIMIT 1;", (repo_url,))
             project_row = cur.fetchone()
             
             if not project_row:
                 # Zero-Config: Create project
                 project_id = _generator.generate()
                 cur.execute(
-                    "INSERT INTO public.projects (id, name, gh_repo_url) VALUES (%s, %s, %s) RETURNING id;",
+                    "INSERT INTO opentask.projects (id, name, gh_repo_url) VALUES (%s, %s, %s) RETURNING id;",
                     (project_id, repo_full_name.split("/")[-1], [repo_url])
                 )
                 project_id = cur.fetchone()["id"]
@@ -100,7 +100,7 @@ async def sync_github_tasks(payload: dict):
                 # Create default DRAFT bucket
                 bucket_id = _generator.generate()
                 cur.execute(
-                    "INSERT INTO public.buckets (id, project_id, name, state, is_system_locked, order_idx) "
+                    "INSERT INTO opentask.buckets (id, project_id, name, state, is_system_locked, order_idx) "
                     "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;",
                     (bucket_id, project_id, "AI Drafts", "DRAFT", True, 0)
                 )
@@ -109,7 +109,7 @@ async def sync_github_tasks(payload: dict):
             else:
                 project_id = project_row["id"]
                 # Find DRAFT bucket
-                cur.execute("SELECT id FROM public.buckets WHERE project_id = %s AND state = 'DRAFT' LIMIT 1;", (project_id,))
+                cur.execute("SELECT id FROM opentask.buckets WHERE project_id = %s AND state = 'DRAFT' LIMIT 1;", (project_id,))
                 bucket_row = cur.fetchone()
                 if bucket_row:
                     target_bucket_id = bucket_row["id"]
@@ -117,7 +117,7 @@ async def sync_github_tasks(payload: dict):
                     # Create if missing
                     bucket_id = _generator.generate()
                     cur.execute(
-                        "INSERT INTO public.buckets (id, project_id, name, state, is_system_locked, order_idx) "
+                        "INSERT INTO opentask.buckets (id, project_id, name, state, is_system_locked, order_idx) "
                         "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;",
                         (bucket_id, project_id, "AI Drafts", "DRAFT", True, 0)
                     )
@@ -127,14 +127,14 @@ async def sync_github_tasks(payload: dict):
             created_count = 0
             for task_title in all_tasks:
                 # Check if task already exists
-                cur.execute("SELECT id FROM public.tasks WHERE project_id = %s AND title = %s LIMIT 1;", (project_id, task_title))
+                cur.execute("SELECT id FROM opentask.tasks WHERE project_id = %s AND title = %s LIMIT 1;", (project_id, task_title))
                 if cur.fetchone():
                     continue
                 
                 # Insert new task
                 task_id = _generator.generate()
                 cur.execute(
-                    "INSERT INTO public.tasks (id, project_id, bucket_id, lead_assignee_id, title, type, weight) VALUES (%s, %s, %s, %s, %s, 'CODE', 1);",
+                    "INSERT INTO opentask.tasks (id, project_id, bucket_id, lead_assignee_id, title, type, weight) VALUES (%s, %s, %s, %s, %s, 'CODE', 1);",
                     (task_id, project_id, target_bucket_id, lead_assignee_id, task_title)
                 )
                 created_count += 1
@@ -231,7 +231,7 @@ async def process_kpi_score(payload: dict, pool=None):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("BEGIN;")
         
-        cur.execute("SELECT id, project_id, weight, lead_assignee_id FROM public.tasks WHERE id = %s LIMIT 1;", (task_id,))
+        cur.execute("SELECT id, project_id, weight, lead_assignee_id FROM opentask.tasks WHERE id = %s LIMIT 1;", (task_id,))
         task_row = cur.fetchone()
         if not task_row:
             logger.info(f"Task {task_id} not found in DB.")
@@ -245,19 +245,19 @@ async def process_kpi_score(payload: dict, pool=None):
         if lead_assignee_id:
             score_delta = weight * 1.0
             cur.execute(
-                "UPDATE public.project_member "
+                "UPDATE opentask.project_member "
                 "SET kpi_score = kpi_score + %s "
                 "WHERE user_id = %s AND project_id = %s;",
                 (score_delta, lead_assignee_id, project_id)
             )
         
-        cur.execute("SELECT id FROM public.buckets WHERE project_id = %s AND state = 'COMPLETED' LIMIT 1;", (project_id,))
+        cur.execute("SELECT id FROM opentask.buckets WHERE project_id = %s AND state = 'COMPLETED' LIMIT 1;", (project_id,))
         bucket_row = cur.fetchone()
         completed_bucket_id = bucket_row["id"] if bucket_row else None
         
         if completed_bucket_id:
             cur.execute(
-                "UPDATE public.tasks SET bucket_id = %s, updated_at = NOW() WHERE id = %s;",
+                "UPDATE opentask.tasks SET bucket_id = %s, updated_at = NOW() WHERE id = %s;",
                 (completed_bucket_id, task_id)
             )
             
@@ -305,7 +305,7 @@ async def process_review_kpi(payload: dict, pool=None):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("BEGIN;")
         
-        cur.execute("SELECT id FROM public.users WHERE gh_username = %s LIMIT 1;", (reviewer_username,))
+        cur.execute("SELECT id FROM opentask.users WHERE gh_username = %s LIMIT 1;", (reviewer_username,))
         reviewer_row = cur.fetchone()
         if not reviewer_row:
             logger.info(f"Reviewer {reviewer_username} not found in DB.")
@@ -314,7 +314,7 @@ async def process_review_kpi(payload: dict, pool=None):
             
         reviewer_id = reviewer_row["id"]
         
-        cur.execute("SELECT id, project_id, weight FROM public.tasks WHERE id = %s LIMIT 1;", (task_id,))
+        cur.execute("SELECT id, project_id, weight FROM opentask.tasks WHERE id = %s LIMIT 1;", (task_id,))
         task_row = cur.fetchone()
         if not task_row:
             cur.execute("ROLLBACK;")
@@ -325,7 +325,7 @@ async def process_review_kpi(payload: dict, pool=None):
         score_delta = weight * 0.2
         
         cur.execute(
-            "UPDATE public.project_member "
+            "UPDATE opentask.project_member "
             "SET kpi_score = kpi_score + %s "
             "WHERE user_id = %s AND project_id = %s;",
             (score_delta, reviewer_id, project_id)
@@ -351,7 +351,7 @@ def find_project_bucket_by_state(repo_url: str, target_state: str):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id FROM public.projects WHERE %s = ANY(gh_repo_url) LIMIT 1;",
+            "SELECT id FROM opentask.projects WHERE %s = ANY(gh_repo_url) LIMIT 1;",
             (repo_url,)
         )
         project_row = cur.fetchone()
@@ -359,7 +359,7 @@ def find_project_bucket_by_state(repo_url: str, target_state: str):
         
         # The Magic Query
         cur.execute(
-            "SELECT id FROM public.buckets WHERE project_id = %s AND state = %s ORDER BY order_idx ASC LIMIT 1;", 
+            "SELECT id FROM opentask.buckets WHERE project_id = %s AND state = %s ORDER BY order_idx ASC LIMIT 1;", 
             (project_row["id"], target_state)
         )
         bucket_row = cur.fetchone()
@@ -377,7 +377,7 @@ def find_task_by_branch(project_id: int, branch_name: str):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, title, type, weight FROM public.tasks WHERE project_id = %s AND branch_name = %s LIMIT 1;",
+            "SELECT id, title, type, weight FROM opentask.tasks WHERE project_id = %s AND branch_name = %s LIMIT 1;",
             (project_id, branch_name)
         )
         return cur.fetchone()

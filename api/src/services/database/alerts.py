@@ -48,14 +48,14 @@ async def db_create_alert(alert_data: DatabaseAlert):
         # If context_id is omitted, we might default it to project_id or something similar if the schema allows, 
         # but since it violated not-null, we must supply it.
         context_id = alert_data.context_id if alert_data.context_id else alert_data.project_id
-        
-        sql = """
-            INSERT INTO public.alerts 
-                (id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved) 
-            VALUES 
-                (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE) 
-            RETURNING id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved, created_at;
-        """
+
+        sql = (
+            f"INSERT INTO opentask.alerts" 
+            f"(id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved)"
+            f"VALUES" 
+            f"(%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)"
+            f"RETURNING id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved, created_at;"
+        )
         
         cur.execute(sql, (
             alert_id,
@@ -75,7 +75,7 @@ async def db_create_alert(alert_data: DatabaseAlert):
         # 2. Telegram Notification (Fire and Forget or Async)
         try:
             # Query for the user's telegram_chat_id
-            cur.execute("SELECT telegram_chat_id FROM public.users WHERE gh_id = %s LIMIT 1;", (str(alert_data.user_id),))
+            cur.execute("SELECT telegram_chat_id FROM opentask.users WHERE gh_id = %s LIMIT 1;", (str(alert_data.user_id),))
             user_row = cur.fetchone()
             
             if user_row and user_row.get("telegram_chat_id"):
@@ -106,7 +106,7 @@ def db_get_alerts():
         cur.execute(
             "SELECT id, user_id, project_id, title, description, type, severity, "
             "suggested_actions, is_resolved, created_at, updated_at "
-            "FROM public.alerts ORDER BY created_at DESC;"
+            "FROM opentask.alerts ORDER BY created_at DESC;"
         )
         rows = cur.fetchall()
         return rows
@@ -128,7 +128,7 @@ def db_get_alerts_for_user(user_id: str):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT id, type, context_id, created_at "
-            "FROM public.alerts WHERE user_id = %s AND is_resolved = FALSE "
+            "FROM opentask.alerts WHERE user_id = %s AND is_resolved = FALSE "
             "ORDER BY created_at DESC;",
             (user_id,)
         )
@@ -152,7 +152,7 @@ def db_get_alert_by_id(alert_id: int):
         cur.execute(
             "SELECT id, user_id, project_id, title, description, type, severity, "
             "suggested_actions, is_resolved, created_at, updated_at "
-            "FROM public.alerts WHERE id = %s LIMIT 1;",
+            "FROM opentask.alerts WHERE id = %s LIMIT 1;",
             (alert_id,),
         )
         row = cur.fetchone()
@@ -184,7 +184,7 @@ def db_update_alert(alert_id: int, alert_data: DatabaseAlert):
         params.append(alert_id)
 
         sql = (
-            f"UPDATE public.alerts SET {set_clause}, updated_at = NOW() "
+            f"UPDATE opentask.alerts SET {set_clause}, updated_at = NOW() "
             f"WHERE id = %s "
             f"RETURNING id, user_id, project_id, title, description, type, severity, "
             f"suggested_actions, is_resolved, created_at, updated_at;"

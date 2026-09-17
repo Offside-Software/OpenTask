@@ -62,6 +62,7 @@ async def get_current_user(
             headers={
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github+json",
+                "User-Agent": "OpenTask-App",
             },
             timeout=10,
         )
@@ -155,23 +156,27 @@ async def auth_callback(code: str, state: str):
     user = user_resp.json() if user_resp.status_code == 200 else {}
     
     if user:
-        await run_in_threadpool(
-            get_or_create_user,
-            int(user.get("id", 0) or 0),
-            user.get("email"),
-            user.get("login"),
-            user.get("name"),
-            None,
-            access_token
-        )
+        try:
+            await run_in_threadpool(
+                get_or_create_user,
+                int(user.get("id", 0) or 0),
+                user.get("email"),
+                user.get("login"),
+                user.get("name"),
+                None,
+                access_token
+            )
+        except Exception as err:
+            print(f"[AUTH WARNING] Failed to persist user in database during callback: {err}")
 
-    response = RedirectResponse(url="/", status_code=302)
+    response = RedirectResponse(url=settings.frontend_url or "/", status_code=302)
     response.set_cookie(
         key=AUTH_COOKIE,
         value=access_token,
         httponly=True,
         secure=False,   # set True in production (HTTPS only)
         samesite="lax",
+        path="/",
         max_age=28800,  # 8 hours
     )
     return response
@@ -182,13 +187,17 @@ async def auth_me(current_user: dict = Depends(get_current_user)):
     Return the profile of the currently authenticated GitHub user.
     Requires: Authorization: Bearer <access_token>
     """
-    db_user = await run_in_threadpool(
-        get_or_create_user,
-        int(current_user.get("id", 0) or 0),
-        current_user.get("email"),
-        current_user.get("login"),
-        current_user.get("name"),
-    )
+    db_user = None
+    try:
+        db_user = await run_in_threadpool(
+            get_or_create_user,
+            int(current_user.get("id", 0) or 0),
+            current_user.get("email"),
+            current_user.get("login"),
+            current_user.get("name"),
+        )
+    except Exception as err:
+        print(f"[AUTH WARNING] Failed to fetch db_user in /me: {err}")
     
     return {
         "id": current_user.get("id"),

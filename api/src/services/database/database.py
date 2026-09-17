@@ -144,12 +144,18 @@ def create_pool(minconn: int = 1, maxconn: int = 10):
     """Create a threaded connection pool using the full Postgres URL from settings."""
     global _pool
     if _pool is None:
-
-        _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn,
-            maxconn,
-            dsn=postgresql_dsn(),
-        )
+        try:
+            dsn = postgresql_dsn()
+            _pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn,
+                maxconn,
+                dsn=dsn,
+            )
+            print("[DATABASE] Connected to PostgreSQL pool.")
+        except Exception as e:
+            print(f"[DATABASE WARNING] Could not connect to PostgreSQL on startup: {e}")
+            print("[DATABASE INFO] Set POSTGRESQL_DATABASE_URL in api/.env to connect to database features.")
+            _pool = None
     return _pool
 
 
@@ -157,7 +163,10 @@ def close_pool():
     """Close all pooled connections."""
     global _pool
     if _pool is not None:
-        _pool.closeall()
+        try:
+            _pool.closeall()
+        except Exception:
+            pass
         _pool = None
 
 
@@ -165,10 +174,18 @@ def _get_conn():
     global _pool
     if _pool is None:
         create_pool()
+    if _pool is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Database connection is not available. Please check POSTGRESQL_DATABASE_URL in api/.env"
+        )
     return _pool.getconn()
 
 
 def _put_conn(conn):
     global _pool
-    if _pool is not None:
-        _pool.putconn(conn)
+    if _pool is not None and conn is not None:
+        try:
+            _pool.putconn(conn)
+        except Exception:
+            pass

@@ -40,7 +40,7 @@ def db_create_task(task: DatabaseTask):
         target_bucket_id = task.bucket_id
         if target_bucket_id == 'draft' or target_bucket_id is None:
             cur.execute(
-                "SELECT id FROM public.buckets WHERE project_id = %s AND state = 'DRAFT' LIMIT 1;",
+                "SELECT id FROM opentask.buckets WHERE project_id = %s AND state = 'DRAFT' LIMIT 1;",
                 (task.project_id,)
             )
             row = cur.fetchone()
@@ -52,7 +52,7 @@ def db_create_task(task: DatabaseTask):
         # Generate new order_idx if missing
         assigned_order_idx = task.order_idx
         if assigned_order_idx is None and target_bucket_id is not None:
-            cur.execute("SELECT COALESCE(MAX(order_idx), -1) + 1 AS next_idx FROM public.tasks WHERE bucket_id = %s;", (target_bucket_id,))
+            cur.execute("SELECT COALESCE(MAX(order_idx), -1) + 1 AS next_idx FROM opentask.tasks WHERE bucket_id = %s;", (target_bucket_id,))
             row = cur.fetchone()
             assigned_order_idx = row['next_idx'] if row else 0
 
@@ -87,7 +87,7 @@ def db_create_task(task: DatabaseTask):
         
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO public.tasks ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
+        sql = f"INSERT INTO opentask.tasks ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
 
         cur.execute(sql, params)
         conn.commit()
@@ -112,7 +112,7 @@ def db_get_tasks():
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at FROM public.tasks;")
+        cur.execute("SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at FROM opentask.tasks;")
         rows = cur.fetchall()
         return rows
     finally:
@@ -128,7 +128,7 @@ def db_get_task_by_id(task_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at FROM public.tasks WHERE id = %s LIMIT 1;",
+            "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at FROM opentask.tasks WHERE id = %s LIMIT 1;",
             (task_id,),
         )
         row = cur.fetchone()
@@ -171,7 +171,7 @@ def db_update_task(task_id: int, task_data: TaskUpdate, background_tasks: Backgr
         params = list(update_data.values())
         params.append(task_id)
         
-        sql = f"UPDATE public.tasks SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
+        sql = f"UPDATE opentask.tasks SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
         
         cur.execute(sql, params)
         conn.commit()
@@ -199,7 +199,7 @@ def db_delete_task(task_id: int):
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("DELETE FROM public.tasks WHERE id = %s RETURNING id;", (task_id,))
+        cur.execute("DELETE FROM opentask.tasks WHERE id = %s RETURNING id;", (task_id,))
         conn.commit()
         row = cur.fetchone()
         if row is None:
@@ -231,7 +231,7 @@ def db_reorder_tasks(project_id: int, bucket_id: int, task_ids: list[int], backg
 
         format_strings = ','.join(['%s'] * len(task_ids))
         cur.execute(
-            f"SELECT id FROM public.tasks WHERE project_id = %s AND id IN ({format_strings});",
+            f"SELECT id FROM opentask.tasks WHERE project_id = %s AND id IN ({format_strings});",
             tuple([project_id] + task_ids)
         )
         valid_tasks = set(row['id'] for row in cur.fetchall())
@@ -242,14 +242,14 @@ def db_reorder_tasks(project_id: int, bucket_id: int, task_ids: list[int], backg
         # Step 1: Push out of the valid constraint range to avoid conflicts
         for idx, t_id in enumerate(task_ids):
             cur.execute(
-                "UPDATE public.tasks SET order_idx = %s, bucket_id = %s WHERE id = %s AND project_id = %s;",
+                "UPDATE opentask.tasks SET order_idx = %s, bucket_id = %s WHERE id = %s AND project_id = %s;",
                 (-(idx + 1000), bucket_id, t_id, project_id)
             )
 
         # Step 2: Set absolute new order_idx within the same bucket
         for idx, t_id in enumerate(task_ids):
             cur.execute(
-                "UPDATE public.tasks SET order_idx = %s, updated_at = NOW() WHERE id = %s AND project_id = %s;",
+                "UPDATE opentask.tasks SET order_idx = %s, updated_at = NOW() WHERE id = %s AND project_id = %s;",
                 (idx, t_id, project_id)
             )
 

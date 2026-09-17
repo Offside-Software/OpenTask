@@ -52,7 +52,7 @@ def db_create_meeting(meeting: DatabaseMeeting):
         placeholders = ", ".join(["%s"] * len(columns))
 
         sql = f"""
-            INSERT INTO public.meetings ({cols}) 
+            INSERT INTO opentask.meetings ({cols}) 
             VALUES ({placeholders}) 
             RETURNING id, project_id, user_uuid, title, date, time, duration, source_type, mom_summary, key_decisions, action_items, created_at;
         """
@@ -93,7 +93,7 @@ def db_get_meetings_by_project(project_id: SafeId):
         # Fetch them individually via GET /db-meetings/{id}.
         sql = """
             SELECT id, project_id, user_uuid, title, date, time, duration, source_type, action_items, created_at
-            FROM public.meetings 
+            FROM opentask.meetings 
             WHERE project_id = %s
             ORDER BY created_at DESC;
         """

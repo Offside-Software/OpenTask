@@ -56,7 +56,7 @@ def db_create_project(project: DatabaseProject, current_user: dict | None = Depe
         
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO public.projects ({cols_sql}) VALUES ({vals_sql}) RETURNING id, name, gh_repo_url, description, created_at, updated_at;"
+        sql = f"INSERT INTO opentask.projects ({cols_sql}) VALUES ({vals_sql}) RETURNING id, name, gh_repo_url, description, created_at, updated_at;"
 
         cur.execute(sql, params)
         row = cur.fetchone()
@@ -68,7 +68,7 @@ def db_create_project(project: DatabaseProject, current_user: dict | None = Depe
         project_id = row["id"]
         bucket_id = _generator.generate()
         cur.execute(
-            "INSERT INTO public.buckets (id, project_id, name, state, is_system_locked, order_idx) "
+            "INSERT INTO opentask.buckets (id, project_id, name, state, is_system_locked, order_idx) "
             "VALUES (%s, %s, %s, %s, %s, %s);",
             (bucket_id, project_id, "AI Drafts", "DRAFT", True, 0)
         )
@@ -95,7 +95,7 @@ def db_get_projects():
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, name, gh_repo_url, description, created_at, updated_at FROM public.projects;"
+            "SELECT id, name, gh_repo_url, description, created_at, updated_at FROM opentask.projects;"
         )
         rows = cur.fetchall()
         return rows
@@ -122,7 +122,7 @@ def db_get_projects_for_current_user(current_user: dict = Depends(get_current_us
 
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT project_id FROM public.project_member WHERE user_id = %s",
+            "SELECT project_id FROM opentask.project_member WHERE user_id = %s",
             (db_user_id,)
         )
         rows = cur.fetchall()
@@ -132,7 +132,7 @@ def db_get_projects_for_current_user(current_user: dict = Depends(get_current_us
             return []
 
         cur.execute(
-            "SELECT id, name, gh_repo_url, description, created_at, updated_at FROM public.projects WHERE id = ANY(%s);",
+            "SELECT id, name, gh_repo_url, description, created_at, updated_at FROM opentask.projects WHERE id = ANY(%s);",
             (project_ids,)
         )
         projects = cur.fetchall()
@@ -150,7 +150,7 @@ def db_get_project_by_id(project_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, name, gh_repo_url, description, created_at, updated_at FROM public.projects WHERE id = %s LIMIT 1;",
+            "SELECT id, name, gh_repo_url, description, created_at, updated_at FROM opentask.projects WHERE id = %s LIMIT 1;",
             (project_id,),
         )
         row = cur.fetchone()
@@ -182,7 +182,7 @@ def db_update_project(project_id: int, project_data: DatabaseProject):
         params = list(update_data.values())
         params.append(project_id)
         
-        sql = f"UPDATE public.projects SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, name, gh_repo_url, description, created_at, updated_at;"
+        sql = f"UPDATE opentask.projects SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, name, gh_repo_url, description, created_at, updated_at;"
         
         cur.execute(sql, params)
         conn.commit()
@@ -205,8 +205,8 @@ def db_delete_project(project_id: int):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Hard delete the project and all its members
-        cur.execute("DELETE FROM public.project_member WHERE project_id = %s;", (project_id,))
-        cur.execute("DELETE FROM public.projects WHERE id = %s RETURNING id;", (project_id,))
+        cur.execute("DELETE FROM opentask.project_member WHERE project_id = %s;", (project_id,))
+        cur.execute("DELETE FROM opentask.projects WHERE id = %s RETURNING id;", (project_id,))
         row = cur.fetchone()
         if row is None:
             conn.rollback()
@@ -232,7 +232,7 @@ def db_get_project_board_data(project_id: int):
 
         cur.execute(
             "SELECT id, name, state, order_idx, is_system_locked "
-            "FROM public.buckets WHERE project_id = %s "
+            "FROM opentask.buckets WHERE project_id = %s "
             "ORDER BY order_idx ASC;",
             (project_id,)
         )
@@ -241,7 +241,7 @@ def db_get_project_board_data(project_id: int):
         cur.execute(
             "SELECT id, bucket_id, title, type, weight, "
             "lead_assignee_id, suggested_assignee_id, last_activity_at, order_idx "
-            "FROM public.tasks WHERE project_id = %s "
+            "FROM opentask.tasks WHERE project_id = %s "
             "ORDER BY order_idx ASC;",
             (project_id,)
         )
@@ -270,8 +270,8 @@ def db_get_project_dashboard_data(project_id: int):
         # Members — join to get alias from users
         cur.execute(
             "SELECT pm.user_id, u.display_name AS alias, pm.role, pm.kpi_score, pm.current_load "
-            "FROM public.project_member pm "
-            "JOIN public.users u ON pm.user_id = u.id "
+            "FROM opentask.project_member pm "
+            "JOIN opentask.users u ON pm.user_id = u.id "
             "WHERE pm.project_id = %s;",
             (project_id,)
         )
@@ -286,7 +286,7 @@ def db_get_project_dashboard_data(project_id: int):
         # Activity — last 20 entries
         cur.execute(
             "SELECT id, user_name, action, target, created_at "
-            "FROM public.activities WHERE project_id = %s "
+            "FROM opentask.activities WHERE project_id = %s "
             "ORDER BY created_at DESC LIMIT 20;",
             (project_id,)
         )
@@ -297,8 +297,8 @@ def db_get_project_dashboard_data(project_id: int):
             "SELECT "
             "  COUNT(*) FILTER (WHERE b.state = 'COMPLETED') AS completed, "
             "  COUNT(*) AS total "
-            "FROM public.tasks t "
-            "JOIN public.buckets b ON t.bucket_id = b.id "
+            "FROM opentask.tasks t "
+            "JOIN opentask.buckets b ON t.bucket_id = b.id "
             "WHERE t.project_id = %s;",
             (project_id,)
         )

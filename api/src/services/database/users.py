@@ -52,7 +52,7 @@ def db_create_user(user: DatabaseUser):
 
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO public.users ({cols_sql}) VALUES ({vals_sql}) RETURNING id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email;"
+        sql = f"INSERT INTO opentask.users ({cols_sql}) VALUES ({vals_sql}) RETURNING id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email;"
 
         cur.execute(sql, params)
         conn.commit()
@@ -79,12 +79,12 @@ def db_get_users(username: Optional[str] = None):
         if username:
             search = f"%{username}%"
             cur.execute(
-                "SELECT id, display_name, created_at, gh_username, gh_id, email FROM public.users WHERE gh_username ILIKE %s;",
+                "SELECT id, display_name, created_at, gh_username, gh_id, email FROM opentask.users WHERE gh_username ILIKE %s;",
                 (search,)
             )
         else:
             cur.execute(
-                "SELECT id, display_name, created_at, gh_username, gh_id, email FROM public.users;"
+                "SELECT id, display_name, created_at, gh_username, gh_id, email FROM opentask.users;"
             )
         rows = cur.fetchall()
         return rows
@@ -106,13 +106,13 @@ def get_or_create_user(github_id: Optional[int] = None, email: Optional[str] = N
         # Check by GitHub ID (as string)
         if github_id is not None:
             cur.execute(
-                "SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email FROM public.users WHERE gh_id = %s LIMIT 1;",
+                "SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email FROM opentask.users WHERE gh_id = %s LIMIT 1;",
                 (str(github_id),),
             )
             row = cur.fetchone()
             if row:
                 if gh_access_token and row.get("gh_access_token") != gh_access_token:
-                    cur.execute("UPDATE public.users SET gh_access_token = %s WHERE id = %s;", (gh_access_token, row["id"]))
+                    cur.execute("UPDATE opentask.users SET gh_access_token = %s WHERE id = %s;", (gh_access_token, row["id"]))
                     conn.commit()
                     row["gh_access_token"] = gh_access_token
                 return row
@@ -120,13 +120,13 @@ def get_or_create_user(github_id: Optional[int] = None, email: Optional[str] = N
         # Check by username (ignore empty string)
         if username:
             cur.execute(
-                "SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email FROM public.users WHERE gh_username = %s LIMIT 1;",
+                "SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email FROM opentask.users WHERE gh_username = %s LIMIT 1;",
                 (username,),
             )
             row = cur.fetchone()
             if row:
                 if gh_access_token and row.get("gh_access_token") != gh_access_token:
-                    cur.execute("UPDATE public.users SET gh_access_token = %s WHERE id = %s;", (gh_access_token, row["id"]))
+                    cur.execute("UPDATE opentask.users SET gh_access_token = %s WHERE id = %s;", (gh_access_token, row["id"]))
                     conn.commit()
                     row["gh_access_token"] = gh_access_token
                 return row
@@ -134,13 +134,13 @@ def get_or_create_user(github_id: Optional[int] = None, email: Optional[str] = N
         # Check by email (ignore empty string)
         if email:
             cur.execute(
-                "SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email FROM public.users WHERE email = %s LIMIT 1;",
+                "SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email FROM opentask.users WHERE email = %s LIMIT 1;",
                 (email,),
             )
             row = cur.fetchone()
             if row:
                 if gh_access_token and row.get("gh_access_token") != gh_access_token:
-                    cur.execute("UPDATE public.users SET gh_access_token = %s WHERE id = %s;", (gh_access_token, row["id"]))
+                    cur.execute("UPDATE opentask.users SET gh_access_token = %s WHERE id = %s;", (gh_access_token, row["id"]))
                     conn.commit()
                     row["gh_access_token"] = gh_access_token
                 return row
@@ -175,7 +175,7 @@ def get_or_create_user(github_id: Optional[int] = None, email: Optional[str] = N
 
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO public.users ({cols_sql}) VALUES ({vals_sql}) RETURNING id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email;"
+        sql = f"INSERT INTO opentask.users ({cols_sql}) VALUES ({vals_sql}) RETURNING id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email;"
 
         cur.execute(sql, params)
         conn.commit()
@@ -212,7 +212,7 @@ def db_update_user(user_id: int, user_data: UserUpdate):
         params = list(update_data.values())
         params.append(user_id)
         
-        sql = f"UPDATE public.users SET {set_clause} WHERE id = %s RETURNING id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email;"
+        sql = f"UPDATE opentask.users SET {set_clause} WHERE id = %s RETURNING id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id, email;"
         
         cur.execute(sql, params)
         conn.commit()
@@ -233,7 +233,7 @@ def db_delete_user(user_id: int):
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        sql = "DELETE FROM public.users WHERE id = %s RETURNING id;"
+        sql = "DELETE FROM opentask.users WHERE id = %s RETURNING id;"
         cur.execute(sql, (user_id,))
         conn.commit()
         row = cur.fetchone()

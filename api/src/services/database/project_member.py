@@ -60,7 +60,7 @@ def db_create_member(project_id: SafeId, member: DatabaseProjectMember):
 
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO public.project_member ({cols_sql}) VALUES ({vals_sql}) RETURNING id, user_id, project_id, role, kpi_score, max_capacity, current_load, gh_username;"
+        sql = f"INSERT INTO opentask.project_member ({cols_sql}) VALUES ({vals_sql}) RETURNING id, user_id, project_id, role, kpi_score, max_capacity, current_load, gh_username;"
 
         cur.execute(sql, params)
         conn.commit()
@@ -93,8 +93,8 @@ def db_get_my_project_members(current_user: dict = Depends(get_current_user)):
         cur.execute(
             """
             SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load, u.gh_username
-            FROM public.project_member pm
-            LEFT JOIN public.users u ON pm.user_id = u.id
+            FROM opentask.project_member pm
+            LEFT JOIN opentask.users u ON pm.user_id = u.id
             WHERE pm.user_id = %s
             """,
             (db_user_id,)
@@ -116,8 +116,8 @@ def db_get_members(project_id: SafeId):
         cur.execute(
             """
             SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load, u.gh_username
-            FROM public.project_member pm
-            LEFT JOIN public.users u ON pm.user_id = u.id
+            FROM opentask.project_member pm
+            LEFT JOIN opentask.users u ON pm.user_id = u.id
             WHERE pm.project_id = %s
             """,
             (project_id,)
@@ -139,8 +139,8 @@ def db_get_member_by_id(project_id: SafeId, member_id: SafeId):
         cur.execute(
             """
             SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load, u.gh_username
-            FROM public.project_member pm
-            LEFT JOIN public.users u ON pm.user_id = u.id
+            FROM opentask.project_member pm
+            LEFT JOIN opentask.users u ON pm.user_id = u.id
             WHERE pm.project_id = %s AND pm.user_id = %s LIMIT 1;
             """,
             (project_id, member_id),

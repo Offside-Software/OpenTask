@@ -19,14 +19,14 @@ def sync_task_to_github_branch(task_id: int, new_bucket_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # 1. Look up the new_bucket_id in public.buckets and verify state == 'ONGOING'
-        cur.execute("SELECT state FROM public.buckets WHERE id = %s LIMIT 1;", (new_bucket_id,))
+        # 1. Look up the new_bucket_id in opentask.buckets and verify state == 'ONGOING'
+        cur.execute("SELECT state FROM opentask.buckets WHERE id = %s LIMIT 1;", (new_bucket_id,))
         bucket_row = cur.fetchone()
         if not bucket_row or bucket_row["state"] != "ONGOING":
             return
             
         # 2. Look up the task. Verify type == 'CODE'. If branch_name exists, exit.
-        cur.execute("SELECT id, project_id, lead_assignee_id, type, branch_name, title FROM public.tasks WHERE id = %s LIMIT 1;", (task_id,))
+        cur.execute("SELECT id, project_id, lead_assignee_id, type, branch_name, title FROM opentask.tasks WHERE id = %s LIMIT 1;", (task_id,))
         task_row = cur.fetchone()
         if not task_row:
             return
@@ -42,13 +42,13 @@ def sync_task_to_github_branch(task_id: int, new_bucket_id: int):
         
         gh_access_token = None
         if lead_assignee_id:
-            cur.execute("SELECT gh_access_token FROM public.users WHERE id = %s LIMIT 1;", (lead_assignee_id,))
+            cur.execute("SELECT gh_access_token FROM opentask.users WHERE id = %s LIMIT 1;", (lead_assignee_id,))
             user_row = cur.fetchone()
             if user_row:
                 gh_access_token = user_row["gh_access_token"]
         
         # 3. Fetch project's gh_repo_url
-        cur.execute("SELECT gh_repo_url FROM public.projects WHERE id = %s LIMIT 1;", (task_row["project_id"],))
+        cur.execute("SELECT gh_repo_url FROM opentask.projects WHERE id = %s LIMIT 1;", (task_row["project_id"],))
         project_row = cur.fetchone()
         if not project_row or not project_row.get("gh_repo_url"):
             logger.warning(f"Project for task {task_id} has no gh_repo_url. Cannot sync to GitHub.")
@@ -93,7 +93,7 @@ def sync_task_to_github_branch(task_id: int, new_bucket_id: int):
             
             # Update database
             cur.execute(
-                "UPDATE public.tasks SET branch_name = %s, last_activity_at = NOW() WHERE id = %s;",
+                "UPDATE opentask.tasks SET branch_name = %s, last_activity_at = NOW() WHERE id = %s;",
                 (branch_name, task_id)
             )
             conn.commit()

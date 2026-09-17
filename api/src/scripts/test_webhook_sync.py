@@ -69,27 +69,27 @@ class TestWebhookSync(unittest.IsolatedAsyncioTestCase):
         # Assertions
         # 1. Project should be inserted
         mock_cur.execute.assert_any_call(
-            "INSERT INTO public.projects (id, name, gh_repo_url) VALUES (%s, %s, %s) RETURNING id;",
+            "INSERT INTO opentask.projects (id, name, gh_repo_url) VALUES (%s, %s, %s) RETURNING id;",
             (unittest.mock.ANY, "repo", ["https://github.com/test/repo"])
         )
         
         # 2. Bucket should be inserted
         mock_cur.execute.assert_any_call(
-            "INSERT INTO public.buckets (id, project_id, name, state, is_system_locked, order_idx) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;",
+            "INSERT INTO opentask.buckets (id, project_id, name, state, is_system_locked, order_idx) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;",
             (unittest.mock.ANY, unittest.mock.ANY, "AI Drafts", "DRAFT", True, 0)
         )
         
         # 3. Tasks should be inserted
         mock_cur.execute.assert_any_call(
-            "INSERT INTO public.tasks (id, project_id, bucket_id, title, type, weight) VALUES (%s, %s, %s, %s, 'CODE', 1);",
+            "INSERT INTO opentask.tasks (id, project_id, bucket_id, title, type, weight) VALUES (%s, %s, %s, %s, 'CODE', 1);",
             (unittest.mock.ANY, unittest.mock.ANY, unittest.mock.ANY, "Task 1")
         )
         mock_cur.execute.assert_any_call(
-            "INSERT INTO public.tasks (id, project_id, bucket_id, title, type, weight) VALUES (%s, %s, %s, %s, 'CODE', 1);",
+            "INSERT INTO opentask.tasks (id, project_id, bucket_id, title, type, weight) VALUES (%s, %s, %s, %s, 'CODE', 1);",
             (unittest.mock.ANY, unittest.mock.ANY, unittest.mock.ANY, "Task 2")
         )
         mock_cur.execute.assert_any_call(
-            "INSERT INTO public.tasks (id, project_id, bucket_id, title, type, weight) VALUES (%s, %s, %s, %s, 'CODE', 1);",
+            "INSERT INTO opentask.tasks (id, project_id, bucket_id, title, type, weight) VALUES (%s, %s, %s, %s, 'CODE', 1);",
             (unittest.mock.ANY, unittest.mock.ANY, unittest.mock.ANY, "Task 3")
         )
         
