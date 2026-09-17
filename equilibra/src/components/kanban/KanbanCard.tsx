@@ -15,6 +15,7 @@ interface KanbanCardProps {
   pr?: boolean;
   isCompleted?: boolean;
   onToggleComplete?: (completed: boolean) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   onDropTask?: (draggedTaskId: string | number, targetTaskId?: string | number) => void;
   onClick?: () => void;
   onDelete?: () => void;
@@ -32,6 +33,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   pr,
   isCompleted = false,
   onToggleComplete,
+  onContextMenu,
   onDropTask,
   onClick,
   onDelete,
@@ -69,6 +71,13 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     <div
       draggable
       onClick={onClick}
+      onContextMenu={(e) => {
+        if (onContextMenu) {
+          e.preventDefault();
+          e.stopPropagation();
+          onContextMenu(e);
+        }
+      }}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -175,7 +184,22 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             [UNASSIGNED]
           </div>
         )}
-        <MoreHorizontal size={14} className="text-neutral-500 group-hover:text-white transition-colors" />
+        {onContextMenu ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onContextMenu(e);
+            }}
+            className="p-1 -mr-1 rounded-none hover:bg-black hover:text-[#FFE600] text-neutral-500 transition-colors cursor-pointer border border-transparent hover:border-neutral-700"
+            title="Task options"
+            aria-label="Task options"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+        ) : (
+          <MoreHorizontal size={14} className="text-neutral-500 group-hover:text-white transition-colors" />
+        )}
       </div>
     </div>
   );

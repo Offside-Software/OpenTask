@@ -13,6 +13,7 @@ import { MeetingAccordion } from '../components/dashboard/MeetingAccordion';
 import { MeetingIntelligenceTab } from '../components/dashboard/MeetingIntelligenceTab';
 import { KanbanCard } from '../components/kanban/KanbanCard';
 import { KanbanColumn } from '../components/kanban/KanbanColumn';
+import { TaskContextMenu, type ContextMenuState } from '../components/kanban/TaskContextMenu';
 import { TaskDetailModal } from '../components/modals/TaskDetailModal';
 import { ConfirmModal } from '../components/modals/ConfirmModal';
 import { BucketSettingsModal } from '../components/modals/BucketSettingsModal';
@@ -52,6 +53,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
   const [selectedBucketForEdit, setSelectedBucketForEdit] = useState<Bucket | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const { showToast } = useToast();
 
   React.useEffect(() => {
@@ -206,6 +208,18 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     } else {
       showToast("No suitable column found", "error");
     }
+  };
+
+  const handleMoveTaskToBucket = (taskId: string | number, targetBucketId: string | number) => {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task || String(task.bucket_id) === String(targetBucketId)) return;
+
+    const targetBucketTasks = tasks.filter(t => String(t.bucket_id) === String(targetBucketId));
+    const newOrderIdx = targetBucketTasks.length;
+
+    handleUpdateTask(taskId, { bucket_id: targetBucketId, order_idx: newOrderIdx });
+    const targetBucket = buckets.find(b => String(b.id) === String(targetBucketId));
+    showToast(`Moved to ${targetBucket?.name || 'column'}`, "success");
   };
 
   const handleDropTask = async (taskId: number | string, newBucketId: number | string, targetTaskId?: number | string) => {
@@ -465,6 +479,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                             isSuggested={task.isSuggested}
                             isCompleted={isTaskCompleted}
                             onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
+                            onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
                             onClick={() => setSelectedTaskForEdit(task)}
                             onDelete={() => handleDeleteTask(task.id!)}
                             onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
@@ -686,6 +701,16 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
           variant="danger"
         />
       )}
+
+      <TaskContextMenu
+        contextMenu={contextMenu}
+        buckets={buckets}
+        onClose={() => setContextMenu(null)}
+        onEdit={(t) => setSelectedTaskForEdit(t)}
+        onToggleComplete={(tId, completed) => handleToggleTaskComplete(tId, completed)}
+        onMoveToBucket={handleMoveTaskToBucket}
+        onDelete={(tId) => handleDeleteTask(tId)}
+      />
     </div>
   );
 };
