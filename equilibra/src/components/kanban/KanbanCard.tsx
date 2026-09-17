@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
-import { Clock, GitPullRequest, MoreHorizontal, User, Trash2 } from 'lucide-react';
+import { Clock, GitPullRequest, MoreHorizontal, User, Trash2, Check } from 'lucide-react';
 import type { TaskType } from '../../models';
 
 interface KanbanCardProps {
@@ -13,6 +13,8 @@ interface KanbanCardProps {
   warnStagnant?: boolean;
   isSuggested?: boolean;
   pr?: boolean;
+  isCompleted?: boolean;
+  onToggleComplete?: (completed: boolean) => void;
   onDropTask?: (draggedTaskId: string | number, targetTaskId?: string | number) => void;
   onClick?: () => void;
   onDelete?: () => void;
@@ -28,6 +30,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   warnStagnant,
   isSuggested,
   pr,
+  isCompleted = false,
+  onToggleComplete,
   onDropTask,
   onClick,
   onDelete,
@@ -76,11 +80,33 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           ? 'border-[#FF3333] shadow-[3px_3px_0px_0px_#FF3333]'
           : isSuggested
           ? 'border-[#FFE600] shadow-[3px_3px_0px_0px_#FFE600]'
+          : isCompleted
+          ? 'border-neutral-800 opacity-80 hover:opacity-100 shadow-[3px_3px_0px_0px_#000000] hover:border-neutral-600'
           : 'border-black shadow-[3px_3px_0px_0px_#000000] hover:border-white hover:shadow-[4px_4px_0px_0px_#000000]'
       }`}
     >
-      <div className="flex justify-between items-start gap-2">
-        <h4 className="text-white text-[13px] font-bold leading-tight flex-1">
+      <div className="flex items-start gap-2.5">
+        {onToggleComplete && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleComplete(!isCompleted);
+            }}
+            className={`shrink-0 mt-0.5 w-4 h-4 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer shadow-[1px_1px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] ${
+              isCompleted
+                ? 'bg-[#00FF66] border-black text-black'
+                : 'bg-[#0E1012] border-neutral-600 hover:border-[#FFE600] text-transparent hover:text-neutral-500'
+            }`}
+            title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
+            aria-label={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
+          >
+            <Check size={11} strokeWidth={3.5} className={isCompleted ? 'opacity-100' : 'opacity-0 hover:opacity-50'} />
+          </button>
+        )}
+        <h4 className={`text-[13px] font-bold leading-tight flex-1 transition-colors ${
+          isCompleted ? 'line-through text-neutral-400' : 'text-white'
+        }`}>
           {title}
         </h4>
         <div className="flex items-center gap-1.5 shrink-0 -mt-0.5">
@@ -111,6 +137,11 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 
       {/* Tags & Weight */}
       <div className="flex gap-2 flex-wrap items-center mt-1">
+        {isCompleted && (
+          <Badge variant="success" className="!py-0.5 !px-1.5 !text-[9px]">
+            DONE
+          </Badge>
+        )}
         <Badge variant={type === 'CODE' ? 'primary' : 'default'} className="!py-0.5 !px-1.5 !text-[9px]">
           {type === 'CODE' ? 'CODE' : 'SPEC'}
         </Badge>

@@ -73,7 +73,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`group min-w-[300px] w-[300px] border-2 rounded-none flex flex-col max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${
+      className={`group min-w-[316px] w-[316px] border-2 rounded-none flex flex-col max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${
         isOver 
           ? 'bg-[#1E2227] border-[#FFE600] ring-2 ring-[#FFE600]' 
           : 'bg-[#0E1012] border-neutral-700'

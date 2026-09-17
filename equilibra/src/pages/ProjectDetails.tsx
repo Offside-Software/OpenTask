@@ -178,6 +178,36 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       });
   };
 
+  const handleToggleTaskComplete = async (taskId: number | string, completed: boolean) => {
+    const task = tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
+
+    let targetBucket: Bucket | undefined;
+    if (completed) {
+      targetBucket = buckets.find(b => b.state === 'COMPLETED');
+      if (!targetBucket) {
+        try {
+          const newBucket = await createBucket('Completed', 'COMPLETED');
+          if (newBucket) {
+            addBucketLocally(newBucket);
+            targetBucket = newBucket;
+          }
+        } catch (err) {
+          console.error('Failed to create completed bucket', err);
+        }
+      }
+    } else {
+      targetBucket = buckets.find(b => b.state === 'TODO') || buckets.find(b => b.state === 'ONGOING') || buckets.find(b => b.state !== 'COMPLETED');
+    }
+
+    if (targetBucket && targetBucket.id) {
+      handleUpdateTask(taskId, { bucket_id: targetBucket.id });
+      showToast(completed ? "Task marked as complete" : "Task marked as incomplete", "success");
+    } else {
+      showToast("No suitable column found", "error");
+    }
+  };
+
   const handleDropTask = async (taskId: number | string, newBucketId: number | string, targetTaskId?: number | string) => {
     // Determine the task order within the target bucket based on where it was dropped
     const bucketTasks = tasks.filter(t => String(t.bucket_id) === String(newBucketId)).sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
@@ -419,6 +449,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                           );
                         }
 
+                        const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
+
                         return (
                           <KanbanCard
                             key={task.id}
@@ -431,6 +463,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                             description={task.description}
                             warnStagnant={task.warnStagnant}
                             isSuggested={task.isSuggested}
+                            isCompleted={isTaskCompleted}
+                            onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
                             onClick={() => setSelectedTaskForEdit(task)}
                             onDelete={() => handleDeleteTask(task.id!)}
                             onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
@@ -457,7 +491,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
                 {/* In-Flight Creating Column Indicator */}
                 {isCreatingBucketSubmitting && (
-                  <div className="min-w-[300px] w-[300px] border-2 border-dashed border-[#FFE600] bg-[#141619] p-5 rounded-none flex flex-col justify-center items-center shadow-[4px_4px_0px_0px_#000000] animate-pulse">
+                  <div className="min-w-[316px] w-[316px] border-2 border-dashed border-[#FFE600] bg-[#141619] p-5 rounded-none flex flex-col justify-center items-center shadow-[4px_4px_0px_0px_#000000] animate-pulse">
                     <div className="flex items-center gap-2 text-[#FFE600] font-mono text-[12px] font-black uppercase mb-2">
                       <Loader2 size={16} className="animate-spin text-[#FFE600]" />
                       <span>CREATING COLUMN...</span>

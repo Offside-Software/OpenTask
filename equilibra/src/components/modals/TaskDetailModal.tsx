@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, AlignLeft, Tag, GitPullRequest, Activity } from 'lucide-react';
+import { X, CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check } from 'lucide-react';
 import type { Task, TaskType, Bucket, ProjectMember } from '../../models';
 
 interface TaskDetailModalProps {
@@ -25,6 +25,36 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
     const [branchName, setBranchName] = useState(task.branch_name || '');
     const [saving, setSaving] = useState(false);
+
+    const currentBucket = buckets.find(b => String(b.id) === String(bucketId));
+    const isCompleted = currentBucket?.state === 'COMPLETED';
+
+    const [previousBucketId, setPreviousBucketId] = useState<string | undefined>(() => {
+        if (currentBucket && currentBucket.state !== 'COMPLETED') {
+            return String(currentBucket.id);
+        }
+        const fallback = buckets.find(b => b.state === 'TODO') || buckets.find(b => b.state === 'ONGOING') || buckets.find(b => b.state !== 'COMPLETED');
+        return fallback ? String(fallback.id) : undefined;
+    });
+
+    const handleToggleComplete = (markComplete: boolean) => {
+        if (markComplete) {
+            if (currentBucket && currentBucket.state !== 'COMPLETED') {
+                setPreviousBucketId(String(currentBucket.id));
+            }
+            const compBucket = buckets.find(b => b.state === 'COMPLETED');
+            if (compBucket) {
+                setBucketId(String(compBucket.id));
+            }
+        } else {
+            const fallback = (previousBucketId && buckets.some(b => String(b.id) === String(previousBucketId) && b.state !== 'COMPLETED'))
+                ? previousBucketId
+                : (buckets.find(b => b.state === 'TODO') || buckets.find(b => b.state === 'ONGOING') || buckets.find(b => b.state !== 'COMPLETED'))?.id;
+            if (fallback) {
+                setBucketId(String(fallback));
+            }
+        }
+    };
 
     useEffect(() => {
         setTitle(task.title);
@@ -73,20 +103,46 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <X size={18} strokeWidth={3} />
                     </button>
                     <div className="flex items-center gap-3 w-full pr-12">
-                        <div className="p-2 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0">
+                        <div className={`p-2 rounded-none ${isCompleted ? 'bg-[#00FF66]' : 'bg-[#FFE600]'} text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0 transition-colors`}>
                             <CheckSquare size={18} strokeWidth={2.5} />
                         </div>
                         <input
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="TASK TITLE"
-                            className="bg-transparent text-white font-mono font-black uppercase text-lg w-full focus:outline-none focus:border-b-2 focus:border-[#FFE600] rounded-none px-2 py-1 -ml-2 transition-all"
+                            className={`bg-transparent ${isCompleted ? 'text-neutral-400 line-through' : 'text-white'} font-mono font-black uppercase text-lg w-full focus:outline-none focus:border-b-2 focus:border-[#FFE600] rounded-none px-2 py-1 -ml-2 transition-all`}
                         />
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-400 ml-11 uppercase">
-                        <span>// PROJECT PIPELINE</span>
-                        <span className="w-1.5 h-1.5 bg-[#FFE600]"></span>
-                        <span>TASK ID: #{String(task.id)}</span>
+                    <div className="flex items-center justify-between w-full pr-12 flex-wrap gap-2">
+                        <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-400 uppercase">
+                            <span>// PROJECT PIPELINE</span>
+                            <span className="w-1.5 h-1.5 bg-[#FFE600]"></span>
+                            <span>TASK ID: #{String(task.id)}</span>
+                        </div>
+
+                        {/* Mark as Complete Checkbox in Header */}
+                        <button
+                            type="button"
+                            onClick={() => handleToggleComplete(!isCompleted)}
+                            className={`flex items-center gap-2 cursor-pointer select-none px-3 py-1 border-2 transition-all active:translate-x-[1px] active:translate-y-[1px] ${
+                                isCompleted
+                                    ? 'bg-[#00FF66]/15 border-[#00FF66] shadow-[2px_2px_0px_0px_#00FF66]'
+                                    : 'bg-[#0E1012] border-black hover:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000]'
+                            }`}
+                        >
+                            <div className={`w-4 h-4 rounded-none border-2 flex items-center justify-center transition-all ${
+                                isCompleted
+                                    ? 'bg-[#00FF66] border-black text-black shadow-[1px_1px_0px_0px_#000000]'
+                                    : 'bg-[#16191D] border-neutral-600'
+                            }`}>
+                                {isCompleted && <Check size={11} strokeWidth={3.5} />}
+                            </div>
+                            <span className={`text-[11px] font-mono font-black tracking-wider uppercase ${
+                                isCompleted ? 'text-[#00FF66]' : 'text-neutral-300'
+                            }`}>
+                                {isCompleted ? 'COMPLETED' : 'MARK AS COMPLETE'}
+                            </span>
+                        </button>
                     </div>
                 </div>
 
@@ -137,6 +193,36 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                     {/* Sidebar (Right) */}
                     <div className="w-full md:w-64 space-y-5 shrink-0">
+
+                        {/* Mark as Complete Sidebar Card */}
+                        <div
+                            onClick={() => handleToggleComplete(!isCompleted)}
+                            className={`p-3 border-2 transition-all cursor-pointer select-none ${
+                                isCompleted
+                                    ? 'bg-[#00FF66]/10 border-[#00FF66] shadow-[2px_2px_0px_0px_#00FF66]'
+                                    : 'bg-[#0B0E14] border-black hover:border-neutral-500 shadow-[2px_2px_0px_0px_#000000]'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded-none border-2 flex items-center justify-center transition-all shrink-0 ${
+                                    isCompleted
+                                        ? 'bg-[#00FF66] border-black text-black shadow-[1.5px_1.5px_0px_0px_#000000]'
+                                        : 'bg-[#121417] border-neutral-600'
+                                }`}>
+                                    {isCompleted && <Check size={13} strokeWidth={3.5} />}
+                                </div>
+                                <div>
+                                    <div className={`text-[11px] font-mono font-black uppercase tracking-wider ${
+                                        isCompleted ? 'text-[#00FF66]' : 'text-white'
+                                    }`}>
+                                        {isCompleted ? 'TASK COMPLETED' : 'MARK AS COMPLETE'}
+                                    </div>
+                                    <div className="text-[9px] font-mono text-neutral-400 mt-0.5">
+                                        {isCompleted ? 'In Completed column' : 'Move to Completed column'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Bucket (State) */}
                         <div>
