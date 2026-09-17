@@ -1,38 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  /* Core Color Palette */
-  --cmd-app-bg: #0d1117;
-  --cmd-surface: #161b22;
-  --cmd-component: #21262d;
-  --cmd-border: #30363d;
-  --cmd-primary: #2f81f7;
-  --cmd-success: #238636;
-  --cmd-danger: #da3633;
-  --cmd-warning: #d29922;
+  /* Brutalist Industrial Dark Palette (Default) */
+  --cmd-app-bg: #0C0D0E;
+  --cmd-surface: #141619;
+  --cmd-component: #1E2227;
+  --cmd-border: #2D3239;
+  --cmd-border-hard: #FFFFFF;
+  --cmd-primary: #FFE600;
+  --cmd-success: #00FF66;
+  --cmd-danger: #FF3333;
+  --cmd-warning: #FF9900;
+  --cmd-info: #00E5FF;
+  --cmd-magenta: #FF2A85;
 
-  /* Typography Hierarchy */
-  --cmd-font-stack:
-    Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --cmd-text-h1: #f0f6fc;
-  --cmd-text-h2: #f0f6fc;
-  --cmd-text-body: #c9d1d9;
-  --cmd-text-meta: #8b949e;
-  --cmd-text-mono: #e6edf3;
-  --cmd-scrollbar-track: var(--cmd-surface);
-  --cmd-scrollbar-thumb: var(--cmd-border);
-  --cmd-scrollbar-thumb-hover: #3b434d;
+  /* Typography */
+  --cmd-font-stack: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cmd-font-mono: "JetBrains Mono", monospace;
+  
+  --cmd-text-h1: #FFFFFF;
+  --cmd-text-h2: #FFFFFF;
+  --cmd-text-body: #E5E7EB;
+  --cmd-text-meta: #9CA3AF;
+  --cmd-text-mono: #FFE600;
 
-  /* Global Styles based on Typography Hierarchy */
+  /* Brutal Shadows */
+  --brutal-shadow-color: #000000;
+  --brutal-shadow: 4px 4px 0px 0px var(--brutal-shadow-color);
+  --brutal-shadow-sm: 2px 2px 0px 0px var(--brutal-shadow-color);
+  --brutal-shadow-lg: 6px 6px 0px 0px var(--brutal-shadow-color);
+
   color-scheme: dark;
   font-family: var(--cmd-font-stack);
-  line-height: 1.5;
+  line-height: 1.4;
   font-weight: 500;
-  /* Medium for body */
   font-size: 14px;
   color: var(--cmd-text-body);
   background: var(--cmd-app-bg);
-  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -40,77 +44,142 @@
 }
 
 :root[data-theme="light"] {
-  --cmd-app-bg: #f6f8fa;
-  --cmd-surface: #ffffff;
-  --cmd-component: #f0f3f6;
-  --cmd-border: #d0d7de;
-  --cmd-primary: #0969da;
-  --cmd-success: #1a7f37;
-  --cmd-danger: #cf222e;
-  --cmd-warning: #9a6700;
+  --cmd-app-bg: #F4F4F0;
+  --cmd-surface: #FFFFFF;
+  --cmd-component: #EAEAE4;
+  --cmd-border: #000000;
+  --cmd-border-hard: #000000;
+  --cmd-primary: #FFE600;
+  --cmd-success: #00CC55;
+  --cmd-danger: #E60000;
+  --cmd-warning: #FF8800;
+  --cmd-info: #0088FF;
+  --cmd-magenta: #E60066;
 
-  --cmd-text-h1: #1f2328;
-  --cmd-text-h2: #1f2328;
-  --cmd-text-body: #24292f;
-  --cmd-text-meta: #57606a;
-  --cmd-text-mono: #1f2328;
+  --cmd-text-h1: #000000;
+  --cmd-text-h2: #000000;
+  --cmd-text-body: #111111;
+  --cmd-text-meta: #555555;
+  --cmd-text-mono: #000000;
 
-  --cmd-scrollbar-track: #f6f8fa;
-  --cmd-scrollbar-thumb: #c1c9d1;
-  --cmd-scrollbar-thumb-hover: #9da7b2;
-
+  --brutal-shadow-color: #000000;
   color-scheme: light;
 }
 
-* {
+/* Brutalist selection */
+::selection {
+  background: #FFE600;
+  color: #000000;
+}
+
+/* Sharp elements by default */
+*, *::before, *::after {
   box-sizing: border-box;
+}
+
+/* Blocky industrial scrollbars */
+* {
   scrollbar-width: thin;
-  scrollbar-color: var(--cmd-scrollbar-thumb) var(--cmd-scrollbar-track);
+  scrollbar-color: #374151 var(--cmd-app-bg);
 }
 
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 *::-webkit-scrollbar-track {
-  background: var(--cmd-scrollbar-track);
+  background: var(--cmd-app-bg);
+  border: 1px solid var(--cmd-border);
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: var(--cmd-scrollbar-thumb);
-  border-radius: 999px;
-  border: 2px solid var(--cmd-scrollbar-track);
+  background-color: #374151;
+  border-radius: 0px !important;
+  border: 1px solid #000000;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: var(--cmd-scrollbar-thumb-hover);
+  background-color: var(--cmd-primary);
 }
 
 body {
   margin: 0;
   min-width: 320px;
+  background-color: #0B0E14;
+  color: var(--cmd-text-body);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  *,
-  *::before,
-  *::after {
-    transition:
-      background-color 180ms ease,
-      color 180ms ease,
-      border-color 180ms ease,
-      box-shadow 180ms ease,
-      fill 180ms ease,
-      stroke 180ms ease;
-  }
+.bg-dots {
+  background-color: #0B0E14;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* Brutalist Utility Classes */
+.brutal-border {
+  border: 2px solid #000000;
+}
+
+.brutal-border-white {
+  border: 2px solid #FFFFFF;
+}
+
+.brutal-card {
+  border: 2px solid #2D3239;
+  background-color: var(--cmd-surface);
+  box-shadow: 4px 4px 0px 0px #000000;
+  border-radius: 0px !important;
+}
+
+.brutal-card-highlight {
+  border: 2px solid #FFE600;
+  background-color: var(--cmd-surface);
+  box-shadow: 4px 4px 0px 0px #FFE600;
+  border-radius: 0px !important;
+}
+
+.brutal-btn {
+  font-family: var(--cmd-font-stack);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 2px solid #000000;
+  box-shadow: 3px 3px 0px 0px #000000;
+  border-radius: 0px !important;
+  transition: transform 60ms ease, box-shadow 60ms ease;
+  cursor: pointer;
+}
+
+.brutal-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px 0px #000000;
+}
+
+.brutal-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0px 0px 0px 0px #000000 !important;
+}
+
+.brutal-mono {
+  font-family: var(--cmd-font-mono);
+}
+
+.brutal-tag {
+  font-family: var(--cmd-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1.5px solid #000000;
+  box-shadow: 1.5px 1.5px 0px 0px #000000;
+  border-radius: 0px !important;
 }
 
 @keyframes spin {
   from {
     transform: rotate(0deg);
   }
-
   to {
     transform: rotate(360deg);
   }

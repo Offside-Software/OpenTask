@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Trash2 } from 'lucide-react';
+import { CheckCircle2, Trash2, Plus } from 'lucide-react';
 import { Badge } from '../../design-system/Badge';
 
 interface KanbanColumnProps {
@@ -52,7 +52,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     } else if (columnIdString && onDropColumn) {
       e.preventDefault();
       e.stopPropagation();
-      // Pass `id` (this column = drop target), not columnIdString (the dragged column)
       onDropColumn(e, id);
     }
   };
@@ -70,43 +69,55 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`group min-w-[280px] w-[280px] border rounded-xl flex flex-col max-h-full transition-colors ${isOver ? 'bg-[#1F2937]/50 border-[#3B82F6]' : 'bg-[#0B0E14] border-[#374151]'
-        }`}
+      className={`group min-w-[300px] w-[300px] border-2 rounded-none flex flex-col max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${
+        isOver 
+          ? 'bg-[#1E2227] border-[#FFE600] ring-2 ring-[#FFE600]' 
+          : 'bg-[#0E1012] border-neutral-700'
+      }`}
     >
-      <div className="p-4 border-b border-[#374151]">
-        <div className="flex justify-between items-start mb-2">
+      {/* Column Header */}
+      <div className="p-3.5 border-b-2 border-neutral-700 bg-[#141619] select-none">
+        <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full opacity-20 flex items-center justify-center ${colorClass.replace('bg-', 'text-')}`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${colorClass}`} />
-            </div>
-            <h3 className="text-white font-bold text-[13px] uppercase tracking-wider">{name}</h3>
+            <div className={`w-2.5 h-2.5 rounded-none border border-black ${colorClass}`} />
+            <h3 className="text-white font-mono font-black text-[13px] uppercase tracking-wider">
+              <span className="text-[#FFE600] mr-1">//</span>{name}
+            </h3>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-[#1F2937] text-slate-400 flex items-center justify-center text-[10px] font-bold">{taskCount}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 rounded-none bg-black text-[#FFE600] border border-neutral-700 font-mono text-[10px] font-black">
+              {String(taskCount).padStart(2, '0')}
+            </span>
             {onDeleteBucket && (
               <button
-                onClick={() => {
-                  onDeleteBucket(id);
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[#EF4444]/10 text-slate-500 hover:text-[#EF4444] transition-all"
+                onClick={() => onDeleteBucket(id)}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded-none hover:bg-[#FF3333] hover:text-white text-neutral-400 border border-transparent hover:border-black transition-all cursor-pointer"
                 title="Delete column"
               >
-                <Trash2 size={14} />
+                <Trash2 size={13} />
               </button>
             )}
           </div>
         </div>
-        <Badge variant={statusText === 'RUNNING' ? 'success' : statusText === 'PAUSED' ? 'warning' : 'default'} className="!text-[8px] !py-0.5">
-          <CheckCircle2 size={10} /> {statusText}
-        </Badge>
+
+        <div className="flex items-center gap-2">
+          <Badge 
+            variant={statusText === 'RUNNING' ? 'success' : statusText === 'PAUSED' ? 'warning' : 'default'} 
+            className="!text-[9px] !py-0.5"
+          >
+            <CheckCircle2 size={10} strokeWidth={2.5} /> {statusText}
+          </Badge>
+        </div>
       </div>
-      <div className="p-3 overflow-y-auto space-y-3 no-scrollbar flex-1 relative min-h-[100px]">
+
+      {/* Task List */}
+      <div className="p-3 overflow-y-auto space-y-3 no-scrollbar flex-1 relative min-h-[140px]">
         {children}
         <button
           onClick={() => onAddTask && onAddTask(id)}
-          className="w-full mt-2 py-2 flex items-center justify-center gap-1.5 text-slate-500 hover:text-white border border-dashed border-[#374151] hover:border-[#3B82F6] hover:bg-[#1F2937]/30 rounded-lg transition-all text-[12px] font-medium"
+          className="w-full py-2.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-black border-2 border-dashed border-neutral-700 hover:border-black hover:bg-[#FFE600] rounded-none transition-all duration-75 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
         >
-          <span className="text-xl leading-none">+</span> Add Task
+          <Plus size={14} strokeWidth={3} /> Add Task
         </button>
       </div>
     </div>

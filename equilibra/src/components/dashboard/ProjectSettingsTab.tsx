@@ -116,33 +116,33 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 select-none font-mono">
             {/* General Settings */}
             <SurfaceCard title="Project Details" subtitle="Update basic project information" icon={Settings} rightElement={null}>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-[12px] font-medium text-slate-400 mb-1">Project Title</label>
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// PROJECT TITLE</label>
                         <input
                             type="text"
                             value={name}
                             onChange={e => setName(e.target.value)}
-                            className="w-full bg-[#151A22] border border-[#374151] rounded-lg px-4 py-2 text-[14px] text-white focus:border-[#3B82F6] focus:outline-none"
+                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
                         />
                     </div>
                     <div>
-                        <label className="block text-[12px] font-medium text-slate-400 mb-1">Description</label>
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// DESCRIPTION</label>
                         <textarea
                             value={description}
                             onChange={e => setDescription(e.target.value)}
-                            className="w-full bg-[#151A22] border border-[#374151] rounded-lg px-4 py-2 text-[14px] text-white focus:border-[#3B82F6] focus:outline-none min-h-[100px]"
+                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none min-h-[100px] shadow-[2px_2px_0px_0px_#000000]"
                         />
                     </div>
 
                     <button
                         onClick={handleUpdateProject}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#3B82F6] text-white rounded-lg text-[13px] font-bold hover:bg-[#2563EB] transition-colors"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                     >
-                        <Save size={14} /> Save Changes
+                        <Save size={14} strokeWidth={2.5} /> Save Changes
                     </button>
                 </div>
             </SurfaceCard>
@@ -152,75 +152,75 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                 <div className="space-y-6">
                     <div className="space-y-3">
                         {members.map(m => (
-                            <div key={m.id} className="flex items-center justify-between p-3 rounded-xl border border-[#374151] bg-[#151A22]">
+                            <div key={m.id} className="flex items-center justify-between p-3.5 rounded-none border-2 border-black bg-[#121417] shadow-[2px_2px_0px_0px_#000000]">
                                 <div>
-                                    <div className="text-[14px] font-medium text-white">{m.gh_username || `User ${m.user_id}`}</div>
-                                    <div className="text-[12px] text-slate-400 mt-0.5">{m.role}</div>
+                                    <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.gh_username || `User ${m.user_id}`}</div>
+                                    <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    <div className="pt-4 border-t border-[#374151]">
-                        <h4 className="text-[14px] font-bold text-white mb-4">Add New Member</h4>
+                    <div className="pt-4 border-t-2 border-neutral-800">
+                        <h4 className="text-[13px] font-black uppercase tracking-wider text-white mb-4">// ADD NEW MEMBER</h4>
 
                         {!selectedUser ? (
                             <div className="space-y-2 relative">
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                        <Search size={14} className="text-slate-400" />
+                                        <Search size={14} className="text-neutral-400" />
                                     </div>
                                     <input
                                         type="text"
-                                        placeholder="Search by GitHub username..."
+                                        placeholder="SEARCH GITHUB USERNAME..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full bg-[#151A22] border border-[#374151] rounded-lg pl-9 pr-4 py-2 text-[14px] text-white focus:border-[#3B82F6] focus:outline-none"
+                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
                                     />
                                     {isSearching && (
                                         <div className="absolute inset-y-0 right-3 flex items-center">
-                                            <div className="w-4 h-4 rounded-full border-2 border-[#3B82F6] border-t-transparent animate-spin"></div>
+                                            <div className="w-4 h-4 rounded-none border-2 border-black border-t-[#FFE600] animate-spin"></div>
                                         </div>
                                     )}
                                 </div>
 
                                 {searchQuery.length >= 2 && searchResults.length > 0 && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#1F2937] border border-[#374151] rounded-lg overflow-hidden z-10">
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none overflow-hidden z-10 shadow-[4px_4px_0px_0px_#000000]">
                                         {searchResults.map(u => (
                                             <button
                                                 key={u.id}
                                                 onClick={() => setSelectedUser(u)}
-                                                className="w-full flex items-center px-4 py-2 hover:bg-[#374151] transition-colors text-left"
+                                                className="w-full flex items-center px-4 py-2.5 hover:bg-[#FFE600] hover:text-black transition-colors text-left font-mono text-[12px] font-bold uppercase text-white cursor-pointer"
                                             >
-                                                <span className="text-[13px] text-white">{u.gh_username}</span>
+                                                <span>{u.gh_username}</span>
                                             </button>
                                         ))}
                                     </div>
                                 )}
 
                                 {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#1F2937] border border-[#374151] rounded-lg p-3 text-[13px] text-slate-400 text-center z-10">
-                                        No users found
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none p-3 text-[12px] font-mono text-neutral-400 text-center z-10 shadow-[4px_4px_0px_0px_#000000]">
+                                        NO USERS MATCHING QUERY
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            <div className="bg-[#151A22] border border-[#374151] rounded-lg p-4 space-y-4">
+                            <div className="bg-[#121417] border-2 border-black rounded-none p-4 space-y-4 shadow-[3px_3px_0px_0px_#000000]">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[14px] font-medium text-white">Adding: {selectedUser.gh_username}</span>
-                                    <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-white transition-colors">
-                                        <X size={16} />
+                                    <span className="text-[13px] font-bold text-white uppercase">// TARGET: {selectedUser.gh_username}</span>
+                                    <button onClick={() => setSelectedUser(null)} className="text-neutral-400 hover:text-white transition-colors cursor-pointer">
+                                        <X size={16} strokeWidth={3} />
                                     </button>
                                 </div>
 
                                 <div>
-                                    <label className="block text-[12px] font-medium text-slate-400 mb-1">Assign Role</label>
+                                    <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5">// ASSIGN ROLE</label>
                                     <select
                                         value={selectedRole}
                                         onChange={(e) => setSelectedRole(e.target.value)}
-                                        className="w-full bg-[#1F2937] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white focus:border-[#3B82F6] focus:outline-none"
+                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
                                     >
-                                        <option value="" disabled>Select a role</option>
+                                        <option value="" disabled>SELECT A ROLE...</option>
                                         {DEFAULT_ROLES.map(r => (
                                             <option key={r} value={r}>{r}</option>
                                         ))}
@@ -231,9 +231,9 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                                     <button
                                         onClick={handleAddMember}
                                         disabled={!selectedRole}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-[#3B82F6] text-white rounded-lg text-[13px] font-bold hover:bg-[#2563EB] disabled:opacity-50 transition-colors"
+                                        className="flex items-center gap-2 px-5 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
                                     >
-                                        <Plus size={14} /> Add to Project
+                                        <Plus size={14} strokeWidth={3} /> Add to Project
                                     </button>
                                 </div>
                             </div>

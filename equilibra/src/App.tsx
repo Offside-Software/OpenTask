@@ -24,7 +24,7 @@ function AppShell() {
     <div className="h-screen w-full bg-[#0B0E14] text-slate-300 font-sans flex overflow-hidden selection:bg-[#3B82F6]/30">
       <Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
 
-      <main className="flex-1 overflow-y-auto no-scrollbar p-8 pb-32">
+      <main className="flex-1 overflow-y-auto no-scrollbar p-8 pb-32 bg-dots">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -35,8 +35,8 @@ function AppShell() {
         </Routes>
       </main>
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <TelegramLinkPrompt onOpenSettings={() => setIsSettingsOpen(true)} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }

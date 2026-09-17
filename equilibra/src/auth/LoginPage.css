@@ -2,61 +2,64 @@
   display: grid;
   place-items: center;
   min-height: 100vh;
-  background: var(--cmd-app-bg);
+  background-color: #0B0E14;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+  padding: 1.5rem;
 }
 
 .login-card {
-  background: var(--cmd-surface);
-  border: 1px solid var(--cmd-border);
-  border-radius: 1rem;
-  padding: 2.5rem 2rem;
-  width: min(420px, 90vw);
+  background: #141619;
+  border: 3px solid #000000;
+  box-shadow: 8px 8px 0px 0px #000000;
+  border-radius: 0px !important;
+  padding: 3rem 2.25rem;
+  width: min(440px, 92vw);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
+  align-items: stretch;
+  gap: 1.75rem;
+  position: relative;
 }
 
-.login-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.login-logo img {
-  width: 2.25rem;
-  height: 2.25rem;
-  object-fit: contain;
-}
-
-.login-logo-text {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--cmd-text-h1);
-  letter-spacing: -0.02em;
-}
-
-.login-divider {
-  width: 100%;
-  border: none;
-  border-top: 1px solid var(--cmd-border);
+.login-card::before {
+  content: "SYS_AUTH // v1.0";
+  position: absolute;
+  top: -14px;
+  left: 16px;
+  background: #FFE600;
+  color: #000000;
+  font-family: var(--cmd-font-mono);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border: 2px solid #000000;
+  letter-spacing: 0.1em;
 }
 
 .login-title {
-  text-align: center;
+  text-align: left;
   margin: 0;
+  border-bottom: 2px solid #2D3239;
+  padding-bottom: 1.25rem;
 }
 
 .login-title h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--cmd-text-h1);
-  margin: 0 0 0.4rem;
+  font-family: var(--cmd-font-stack);
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #FFFFFF;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  margin: 0 0 0.5rem;
 }
 
 .login-title p {
-  font-size: 0.92rem;
-  color: var(--cmd-text-meta);
+  font-family: var(--cmd-font-mono);
+  font-size: 0.8rem;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   margin: 0;
 }
 
@@ -64,22 +67,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.65rem;
+  gap: 0.75rem;
   width: 100%;
-  padding: 0.75rem 1.25rem;
-  background: var(--cmd-primary);
-  color: var(--cmd-text-h1);
-  border: 1px solid var(--cmd-primary);
-  border-radius: 0.6rem;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 0.9rem 1.5rem;
+  background: #FFE600;
+  color: #000000;
+  border: 3px solid #000000;
+  border-radius: 0px !important;
+  box-shadow: 4px 4px 0px 0px #000000;
+  font-family: var(--cmd-font-stack);
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   cursor: pointer;
   text-decoration: none;
-  transition: opacity 0.15s;
+  transition: transform 60ms ease, box-shadow 60ms ease, background-color 60ms ease;
 }
 
 .login-btn:hover {
-  opacity: 0.9;
+  background: #FFF066;
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0px 0px #000000;
+}
+
+.login-btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0px 0px 0px 0px #000000 !important;
 }
 
 .login-btn svg {
@@ -89,8 +103,14 @@
 }
 
 .login-footer {
-  font-size: 0.82rem;
-  color: var(--cmd-text-meta);
+  font-family: var(--cmd-font-mono);
+  font-size: 0.75rem;
+  color: #6B7280;
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
   margin: 0;
+  border-top: 1px dashed #2D3239;
+  padding-top: 1rem;
 }

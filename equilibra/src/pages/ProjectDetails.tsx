@@ -167,35 +167,44 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   }
 
   return (
-    <div className="animate-in fade-in duration-500 flex flex-col h-full max-w-[1600px] mx-auto w-full">
+    <div className="animate-in fade-in duration-200 flex flex-col h-full max-w-[1600px] mx-auto w-full select-none">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-lg bg-[#151A22] border border-[#374151] flex items-center justify-center text-slate-400 hover:text-white"
+          className="w-10 h-10 rounded-none bg-[#141619] border-2 border-black flex items-center justify-center text-neutral-300 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
         >
-          <ChevronLeft size={20} />
+          <ChevronLeft size={20} strokeWidth={3} />
         </button>
         <div>
-          <span className="text-[#3B82F6] text-[10px] font-bold uppercase tracking-widest mb-1 block">Project Deep Dive</span>
-          <h1 className="text-[28px] font-bold text-white leading-none">{project ? project.name : 'Loading...'}</h1>
-          <p className="text-[12px] text-slate-400 mt-1">{project ? project.issue || "System operating normally." : '...'}</p>
+          <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[10px] font-black uppercase tracking-wider mb-1 inline-block">
+            // PROJECT PIPELINE CONTROL
+          </span>
+          <h1 className="text-[26px] sm:text-[30px] font-black text-white uppercase tracking-tight font-mono leading-none">
+            {project ? project.name : 'LOADING PROJECT...'}
+          </h1>
+          <p className="text-[11px] font-mono text-neutral-400 mt-1 uppercase tracking-wider">
+            {project ? project.issue || "SYSTEM PIPELINE NOMINAL." : '...'}
+          </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 bg-[#151A22] p-1.5 rounded-lg border border-[#374151] w-fit">
+      <div className="flex gap-2 mb-6 bg-[#0E1012] p-1.5 rounded-none border-2 border-black w-fit shadow-[3px_3px_0px_0px_#000000] flex-wrap">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-[12px] font-bold rounded-md transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-[#3B82F6] text-white' : 'text-slate-400 hover:text-white'
-              }`}
+            className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none transition-all duration-75 flex items-center gap-2 cursor-pointer ${
+              activeTab === tab 
+                ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]' 
+                : 'bg-[#141619] text-neutral-400 border border-neutral-800 hover:border-white hover:text-white'
+            }`}
           >
-            {tab === 'Overview' && <LayoutDashboard size={14} />}
-            {tab === 'Tasks' && <Briefcase size={14} />}
-            {tab === 'MoM & Meetings' && <Video size={14} />}
-            {tab === 'Settings' && <Settings size={14} />}
+            {tab === 'Overview' && <LayoutDashboard size={14} strokeWidth={2.5} />}
+            {tab === 'Tasks' && <Briefcase size={14} strokeWidth={2.5} />}
+            {tab === 'MoM & Meetings' && <Video size={14} strokeWidth={2.5} />}
+            {tab === 'Settings' && <Settings size={14} strokeWidth={2.5} />}
             {tab}
           </button>
         ))}
@@ -205,7 +214,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       <div className="flex-1 min-h-0">
         {/* Overview */}
         {activeTab === 'Overview' && (
-          roleLoading ? <div className="text-slate-500 py-10 text-center">Resolving permissions...</div> :
+          roleLoading ? <div className="text-neutral-500 font-mono text-[12px] py-10 text-center">// RESOLVING PERMISSIONS...</div> :
             isManager ? <ProjectOverviewPM projectId={projectId} /> : (
               <ProjectOverviewDev
                 projectId={projectId}
@@ -219,11 +228,15 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
         {/* Tasks — Kanban */}
         {activeTab === 'Tasks' && (
-          <div className="bg-[#151A22] border border-[#374151] rounded-xl p-6 flex flex-col min-h-[600px]">
-            <div className="flex justify-between items-start mb-6">
+          <div className="bg-[#0C0D0E] border-2 border-black rounded-none p-5 flex flex-col min-h-[600px] shadow-[6px_6px_0px_0px_#000000]">
+            <div className="flex justify-between items-start mb-5 pb-3 border-b-2 border-neutral-800">
               <div>
-                <h2 className="text-[18px] font-bold text-white">Task Flow Pipeline</h2>
-                <p className="text-[12px] text-slate-400 mt-1">6-Stage Flow System • DRAFT → COMPLETED</p>
+                <h2 className="text-[16px] font-mono font-black text-white uppercase tracking-wider">
+                  <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
+                </h2>
+                <p className="text-[11px] font-mono text-neutral-400 mt-0.5 uppercase tracking-wider">
+                  6-STAGE STACK ARCHITECTURE • DRAFT → COMPLETED
+                </p>
               </div>
             </div>
 
@@ -264,9 +277,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                           />
                           <button
                             onClick={async () => { await deleteTask(task.id!); await Promise.all([refreshBoard(true), refreshDashboard(true)]); }}
-                            className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 p-1 rounded bg-[#1F2937] text-slate-500 hover:text-[#EF4444] transition-all"
+                            className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 p-1.5 rounded-none bg-black border border-neutral-700 text-neutral-400 hover:text-white hover:bg-[#EF4444] transition-all cursor-pointer"
+                            title="Delete task"
                           >
-                            <Trash2 size={10} />
+                            <Trash2 size={11} />
                           </button>
                         </div>
                       ))}
@@ -280,26 +294,26 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                   {!isCreatingBucket ? (
                     <button
                       onClick={() => setIsCreatingBucket(true)}
-                      className="w-full h-12 border border-dashed border-[#374151] rounded-xl flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:border-[#3B82F6] hover:bg-[#151A22] transition-all text-[13px] font-semibold"
+                      className="w-full h-12 border-2 border-dashed border-black bg-[#121417] rounded-none flex items-center justify-center gap-2 text-neutral-400 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] cursor-pointer"
                     >
-                      <Plus size={16} /> Add Column
+                      <Plus size={16} strokeWidth={3} /> ADD COLUMN
                     </button>
                   ) : (
-                    <div className="border border-[#3B82F6] rounded-xl bg-[#151A22] p-3 space-y-3">
+                    <div className="border-2 border-black rounded-none bg-[#121417] p-4 space-y-3 font-mono shadow-[4px_4px_0px_0px_#000000]">
                       <input
                         type="text"
                         autoFocus
                         value={newBucketName}
                         onChange={e => setNewBucketName(e.target.value)}
-                        placeholder="Column Name"
-                        className="w-full bg-[#0B0E14] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white focus:border-[#3B82F6] focus:outline-none"
+                        placeholder="COLUMN NAME"
+                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
                       />
                       <div className="space-y-1">
-                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1">Behavior State</label>
+                        <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">// BEHAVIOR STATE</label>
                         <select
                           value={newBucketState}
                           onChange={(e) => setNewBucketState(e.target.value as BucketState)}
-                          className="w-full bg-[#0B0E14] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white focus:border-[#3B82F6] focus:outline-none appearance-none"
+                          className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white focus:border-[#FFE600] focus:outline-none appearance-none shadow-[2px_2px_0px_0px_#000000]"
                         >
                           <option value="DRAFT">DRAFT (AI Suggestions)</option>
                           <option value="PENDING">PENDING (Approval Needed)</option>
@@ -309,17 +323,17 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                           <option value="COMPLETED">COMPLETED (Finished)</option>
                         </select>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 pt-1">
                         <button
                           onClick={handleCreateBucket}
                           disabled={!newBucketName.trim()}
-                          className="flex-1 bg-[#3B82F6] text-white text-[12px] font-bold py-1.5 rounded-lg hover:bg-[#2563EB] disabled:opacity-50 transition-colors"
+                          className="flex-1 bg-[#FFE600] text-black border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
                         >
                           Save
                         </button>
                         <button
                           onClick={() => { setIsCreatingBucket(false); setNewBucketName(''); setNewBucketState('TODO'); }}
-                          className="flex-1 bg-[#1F2937] text-white text-[12px] font-bold py-1.5 rounded-lg hover:bg-[#374151] transition-colors"
+                          className="flex-1 bg-[#1E2227] text-neutral-300 border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer"
                         >
                           Cancel
                         </button>
@@ -359,7 +373,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                       <MeetingAccordion meeting={mtg} isDefaultExpanded={idx === 0} />
                       <button
                         onClick={() => deleteMeeting(mtg.id!)}
-                        className="absolute top-3 right-10 opacity-0 group-hover/mtg:opacity-100 p-1.5 rounded-lg bg-[#1F2937] text-slate-500 hover:text-[#EF4444] transition-all"
+                        className="absolute top-3 right-10 opacity-0 group-hover/mtg:opacity-100 p-1.5 rounded-none bg-black border border-neutral-700 text-neutral-400 hover:text-white hover:bg-[#EF4444] hover:border-black transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000]"
                       >
                         <Trash2 size={12} />
                       </button>

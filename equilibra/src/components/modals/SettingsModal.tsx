@@ -33,68 +33,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 select-none animate-in fade-in duration-100" onClick={onClose}>
             <div
-                className="bg-[#0B0E14] border border-[#374151] rounded-3xl w-full max-w-md shadow-[0_0_50px_rgba(59,130,246,0.2)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+                className="bg-[#121417] border-3 border-black rounded-none w-full max-w-md shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="p-6 border-b border-[#374151] flex justify-between items-center bg-gradient-to-r from-[#3B82F6]/5 to-transparent">
+                <div className="p-6 border-b-2 border-black flex justify-between items-center bg-[#181B20]">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 border border-[#3B82F6]/20 flex items-center justify-center text-[#3B82F6]">
-                            <Shield size={20} />
+                        <div className="w-10 h-10 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] flex items-center justify-center">
+                            <Shield size={20} strokeWidth={2.5} />
                         </div>
                         <div>
-                            <h2 className="text-white text-[18px] font-bold">Account Settings</h2>
-                            <p className="text-slate-500 text-[12px]">Manage your profile and notifications</p>
+                            <h2 className="text-white text-[16px] font-mono font-black uppercase tracking-wider">ACCOUNT SETTINGS</h2>
+                            <p className="text-neutral-400 text-[11px] uppercase tracking-wider">// PROFILE & DISPATCH CHANNELS</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-[#1F2937] rounded-lg transition-colors">
-                        <X size={20} />
+                    <button onClick={onClose} className="p-1 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer">
+                        <X size={18} strokeWidth={3} />
                     </button>
                 </div>
 
                 {/* Body */}
-                <div className="p-8 space-y-8">
+                <div className="p-6 space-y-6">
                     {/* User Info Section */}
                     <section>
-                        <h4 className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <User size={12} /> Profile Info
+                        <h4 className="text-[#FFE600] text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <User size={12} /> // PROFILE SPECIFICATION
                         </h4>
-                        <div className="bg-[#151A22] border border-[#374151] rounded-2xl p-4 flex items-center gap-4">
-                            <img src={user?.avatar_url} alt="Avatar" className="w-12 h-12 rounded-full border border-[#374151]" />
+                        <div className="bg-[#0B0E14] border-2 border-black rounded-none p-4 flex items-center gap-4 shadow-[2px_2px_0px_0px_#000000]">
+                            <img src={user?.avatar_url} alt="Avatar" className="w-12 h-12 rounded-none border-2 border-black" />
                             <div className="min-w-0">
-                                <h3 className="text-white font-bold truncate">{user?.name || user?.login}</h3>
-                                <p className="text-slate-500 text-[12px] truncate">{user?.email || 'No email provided'}</p>
+                                <h3 className="text-white font-black uppercase truncate text-[14px]">{user?.name || user?.login}</h3>
+                                <p className="text-neutral-400 text-[11px] truncate mt-0.5">{user?.email || 'NO EMAIL CONFIGURED'}</p>
                             </div>
                         </div>
                     </section>
 
                     {/* Telegram Section */}
                     <section>
-                        <h4 className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Bell size={12} /> Telegram Notifications
+                        <h4 className="text-[#FFE600] text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Bell size={12} /> // TELEGRAM DISPATCH PIPELINE
                         </h4>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="text-slate-300 text-[13px] font-medium mb-1.5 block">
-                                    Chat ID
+                                <label className="text-neutral-300 text-[11px] font-bold uppercase mb-1.5 block">
+                                    CHAT ID
                                 </label>
                                 <div className="relative group">
                                     <input
                                         type="text"
                                         value={chatId}
                                         onChange={(e) => setChatId(e.target.value)}
-                                        placeholder="Enter your Telegram Chat ID"
-                                        className="w-full bg-[#151A22] border border-[#374151] rounded-xl py-3 px-4 text-white text-[14px] focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all placeholder:text-slate-600"
+                                        placeholder="ENTER TELEGRAM CHAT ID"
+                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none py-2.5 px-4 text-white text-[13px] font-mono focus:outline-none focus:border-[#FFE600] transition-all placeholder:text-neutral-600 shadow-[2px_2px_0px_0px_#000000]"
                                     />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#3B82F6] transition-colors">
-                                        <Send size={16} />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-[#FFE600] transition-colors">
+                                        <Send size={15} />
                                     </div>
                                 </div>
-                                <p className="text-slate-500 text-[11px] mt-2 leading-relaxed">
-                                    Dapatkan Chat ID dengan mengirim pesan <code className="text-[#3B82F6] font-mono">/start</code> ke bot kami.
+                                <p className="text-neutral-400 text-[10px] mt-1.5 uppercase leading-relaxed">
+                                    SEND <code className="text-[#FFE600] font-black">/start</code> TO BOT TO RETRIEVE ID.
                                 </p>
                             </div>
 
@@ -102,44 +102,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                 href="https://t.me/equilibra_notif_bot"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center justify-between p-4 bg-[#3B82F6]/5 border border-[#3B82F6]/10 rounded-2xl group hover:bg-[#3B82F6]/10 transition-all cursor-pointer"
+                                className="flex items-center justify-between p-4 bg-[#141619] border-2 border-black rounded-none group hover:bg-[#FFE600] transition-all cursor-pointer shadow-[3px_3px_0px_0px_#000000]"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-[#3B82F6] flex items-center justify-center text-white">
+                                    <div className="w-8 h-8 rounded-none bg-black border border-black flex items-center justify-center text-[#FFE600] group-hover:text-black group-hover:bg-white">
                                         <Send size={14} />
                                     </div>
                                     <div>
-                                        <span className="text-white text-[13px] font-bold block">Open Telegram Bot</span>
-                                        <span className="text-[#3B82F6] text-[11px]">@equilibra_notif_bot</span>
+                                        <span className="text-white group-hover:text-black text-[12px] font-black uppercase block">OPEN TELEGRAM BOT</span>
+                                        <span className="text-neutral-400 group-hover:text-black text-[10px]">@equilibra_notif_bot</span>
                                     </div>
                                 </div>
-                                <ExternalLink size={14} className="text-slate-500 group-hover:text-white transition-colors" />
+                                <ExternalLink size={14} className="text-neutral-400 group-hover:text-black transition-colors" />
                             </a>
                         </div>
                     </section>
 
                     {message && (
-                        <div className={`p-4 rounded-xl text-[13px] font-medium animate-in slide-in-from-top-2 duration-300 ${message.type === 'success' ? 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20' : 'bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/20'
-                            }`}>
+                        <div className={`p-3 rounded-none text-[11px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000000] ${
+                            message.type === 'success' ? 'bg-[#22C55E] text-black' : 'bg-[#EF4444] text-white'
+                        }`}>
                             {message.text}
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 bg-[#151A22]/50 border-t border-[#374151] flex justify-end gap-3">
+                <div className="p-4 bg-[#0E1012] border-t-2 border-black flex justify-end gap-3">
                     <button
                         onClick={onClose}
-                        className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white text-[14px] font-bold transition-colors"
+                        className="px-4 py-2 rounded-none text-neutral-300 border-2 border-black bg-[#1E2227] text-[12px] font-black uppercase tracking-wider hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="px-6 py-2.5 rounded-xl bg-[#3B82F6] text-white text-[14px] font-bold hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#3B82F6]/20"
+                        className="px-5 py-2 rounded-none bg-[#FFE600] text-black border-2 border-black text-[12px] font-black uppercase tracking-wider hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[3px_3px_0px_0px_#000000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
-                        {isSaving ? 'Saving...' : 'Save Changes'}
+                        {isSaving ? 'SAVING...' : 'SAVE CHANGES'}
                     </button>
                 </div>
             </div>

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
-import { Clock, GitPullRequest, MoreHorizontal, UserCircle2 } from 'lucide-react';
-
+import { Clock, GitPullRequest, MoreHorizontal, User } from 'lucide-react';
 import type { TaskType } from '../../models';
 
 interface KanbanCardProps {
@@ -68,41 +67,67 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`p-4 rounded-xl bg-[#151A22] border group flex flex-col gap-3 shadow-sm ${isOver ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]/30' :
-        warnStagnant ? 'border-[#EF4444]' : isSuggested ? 'border-[#F59E0B]' : 'border-[#374151] hover:border-[#3B82F6]'
-        } transition-all cursor-grab active:cursor-grabbing`}
+      className={`p-3.5 rounded-none bg-[#16191D] border-2 group flex flex-col gap-2.5 transition-all duration-75 cursor-grab active:cursor-grabbing select-none ${
+        isOver
+          ? 'border-[#FFE600] shadow-[4px_4px_0px_0px_#FFE600] bg-[#1E2227]'
+          : warnStagnant
+          ? 'border-[#FF3333] shadow-[3px_3px_0px_0px_#FF3333]'
+          : isSuggested
+          ? 'border-[#FFE600] shadow-[3px_3px_0px_0px_#FFE600]'
+          : 'border-black shadow-[3px_3px_0px_0px_#000000] hover:border-white hover:shadow-[4px_4px_0px_0px_#000000]'
+      }`}
     >
-      <div className="text-white text-[13px] font-semibold leading-snug">{title}</div>
-      <p className="text-[10px] text-slate-400 line-clamp-2">{description || 'No description provided.'}</p>
-
-      <div className="flex gap-2 flex-wrap mt-1">
-        <Badge variant={type === 'CODE' ? 'primary' : 'default'} className="!py-0.5 !px-1.5 !text-[8px]">
-          {type === 'CODE' ? 'FEATURE' : 'NON-CODE'}
-        </Badge>
-        <Badge variant="default" className="!py-0.5 !px-1.5 !text-[8px]">{weight}</Badge>
+      <div className="flex justify-between items-start gap-2">
+        <h4 className="text-white text-[13px] font-bold leading-tight flex-1">
+          {title}
+        </h4>
+        <span className="font-mono text-[10px] text-neutral-500 font-bold">
+          #{String(id).slice(-4)}
+        </span>
       </div>
 
+      {description && (
+        <p className="text-[11px] font-mono text-neutral-400 line-clamp-2 leading-relaxed">
+          {description}
+        </p>
+      )}
+
+      {/* Tags & Weight */}
+      <div className="flex gap-2 flex-wrap items-center mt-1">
+        <Badge variant={type === 'CODE' ? 'primary' : 'default'} className="!py-0.5 !px-1.5 !text-[9px]">
+          {type === 'CODE' ? 'CODE' : 'SPEC'}
+        </Badge>
+        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-[#FFE600]">
+          {weight} PTS
+        </span>
+      </div>
+
+      {/* Warnings & Badges */}
       {warnStagnant && (
-        <div className="mt-2 text-[#EF4444] text-[10px] font-bold flex items-center gap-1 bg-[#EF4444]/10 w-fit px-2 py-1 rounded">
-          <Clock size={12} /> Last commit 2h ago
+        <div className="mt-1 text-black font-mono text-[10px] font-black flex items-center gap-1.5 bg-[#FF3333] border border-black px-2 py-0.5 shadow-[1.5px_1.5px_0px_0px_#000000]">
+          <Clock size={11} strokeWidth={3} /> STAGNANT &gt; 48H
         </div>
       )}
 
       {pr && (
-        <div className="mt-2 text-[#F59E0B] text-[10px] font-bold flex items-center gap-1 border border-[#F59E0B]/30 w-fit px-2 py-1 rounded">
-          <GitPullRequest size={12} /> PR #42 • Waiting QA
+        <div className="mt-1 text-black font-mono text-[10px] font-black flex items-center gap-1.5 bg-[#FFE600] border border-black px-2 py-0.5 shadow-[1.5px_1.5px_0px_0px_#000000]">
+          <GitPullRequest size={11} strokeWidth={3} /> PR LINKED
         </div>
       )}
 
-      <div className="mt-3 pt-3 border-t border-[#374151] flex items-center justify-between">
+      {/* Card Footer */}
+      <div className="mt-2 pt-2 border-t-2 border-neutral-800 flex items-center justify-between">
         {assignee ? (
-          <div className="w-6 h-6 rounded-full bg-[#3B82F6] text-white flex items-center justify-center text-[10px] font-bold">{assignee}</div>
+          <div className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[10px] font-black flex items-center gap-1 shadow-[1px_1px_0px_0px_#000000]">
+            <User size={10} strokeWidth={3} />
+            {assignee.toUpperCase()}
+          </div>
         ) : (
-          <div className="w-6 h-6 rounded-full border border-dashed border-[#374151] flex items-center justify-center">
-            <UserCircle2 size={12} className="text-slate-400" />
+          <div className="font-mono text-[10px] text-neutral-500 font-semibold uppercase">
+            [UNASSIGNED]
           </div>
         )}
-        <MoreHorizontal size={14} className="text-slate-400" />
+        <MoreHorizontal size={14} className="text-neutral-500 group-hover:text-white transition-colors" />
       </div>
     </div>
   );

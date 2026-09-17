@@ -72,19 +72,16 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
           const data = await response.json();
           if (data.status === "success" && data.data && data.data.mom) {
             try {
-              const momContent = JSON.parse(latest.mom_content);
-              const momData = momContent.mom || momContent;
-
               const transformedTasks: Task[] = (
-                latest.proposed_tasks || []
+                (data.proposed_tasks as Record<string, unknown>[]) || []
               ).map((t: Record<string, unknown>, i: number) => ({
                 id: `task-bg-${i}-${Date.now()}`,
-                title: t.title,
-                pic: t.assignee_username || "TBD",
+                title: (t.title as string) || "Untitled Task",
+                pic: (t.assignee_username as string) || "TBD",
                 priority:
                   ((t.priority as string)?.toLowerCase() as Task["priority"]) ||
                   "medium",
-                due_date: t.due_date || "TBD",
+                due_date: (t.due_date as string) || "TBD",
                 completed: false,
               }));
 
@@ -116,7 +113,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
     }
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, lastMeetingCount]);
+  }, [view]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -254,26 +251,25 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
   };
 
   return (
-    <div className="bg-[#151A22] border border-[#374151] rounded-xl p-8 min-h-[600px] relative overflow-hidden">
-      {/* Background Decorative Gradient */}
-      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#3B82F6]/5 blur-[120px] rounded-full pointer-events-none" />
-
+    <div className="bg-[#0C0D0E] border-2 border-black rounded-none p-8 min-h-[600px] relative overflow-hidden select-none shadow-[6px_6px_0px_0px_#000000]">
       {view === "choice" && (
         <div className="relative z-10 flex flex-col items-center justify-center h-full py-12">
-          <div className="w-16 h-16 bg-[#3B82F6]/20 rounded-2xl flex items-center justify-center text-[#3B82F6] mb-6 border border-[#3B82F6]/30 animate-pulse">
+          <div className="w-16 h-16 bg-black border-2 border-black rounded-none flex items-center justify-center text-[#FFE600] mb-6 shadow-[3px_3px_0px_0px_#000000]">
             <Sparkles size={32} />
           </div>
-          <h2 className="text-[28px] font-bold text-white mb-2 text-center">
-            Meeting Intelligence
+          <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[10px] font-black uppercase tracking-wider mb-2 inline-block">
+            // AI RECON INTELLIGENCE
+          </span>
+          <h2 className="text-[28px] font-mono font-black uppercase tracking-wide text-white mb-2 text-center">
+            MEETING INTELLIGENCE
           </h2>
-          <p className="text-slate-400 text-[14px] text-center max-w-md mb-12">
-            Let AI transform your meeting recordings or live sessions into
-            structured MoM and actionable tasks.
+          <p className="text-neutral-400 font-mono text-[12px] text-center max-w-md mb-12 uppercase tracking-wider">
+            CONVERT RECORDINGS OR LIVE SESSIONS INTO ACTIONABLE TASKS & EXECUTIVE SPECIFICATIONS.
           </p>
 
           {error && (
-            <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-[13px] text-center w-full max-w-md flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+            <div className="mb-8 p-4 bg-[#EF4444]/10 border-2 border-black rounded-none text-[#EF4444] font-mono text-[12px] text-center w-full max-w-md flex items-center gap-3 shadow-[3px_3px_0px_0px_#000000]">
+              <div className="w-2 h-2 rounded-none bg-[#EF4444]" />
               {error}
             </div>
           )}
@@ -281,33 +277,31 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
             <div
               onClick={() => setView("upload")}
-              className="bg-[#1F2937]/50 border border-[#374151] hover:border-[#3B82F6] rounded-2xl p-8 cursor-pointer transition-all group hover:-translate-y-1 hover:bg-[#1F2937]/80 shadow-lg"
+              className="bg-[#141619] border-2 border-black rounded-none p-8 cursor-pointer transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] shadow-[4px_4px_0px_0px_#000000] hover:shadow-[6px_6px_0px_0px_#000000] active:translate-x-[0px] active:translate-y-[0px] active:shadow-[2px_2px_0px_0px_#000000] group"
             >
-              <div className="w-12 h-12 bg-[#3B82F6] rounded-xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform">
-                <Video size={24} />
+              <div className="w-12 h-12 bg-[#FFE600] text-black border-2 border-black rounded-none flex items-center justify-center mb-6 shadow-[2px_2px_0px_0px_#000000]">
+                <Video size={24} strokeWidth={2.5} />
               </div>
-              <h3 className="text-white font-bold text-[18px] mb-2">
+              <h3 className="text-white font-mono font-black text-[18px] uppercase tracking-wider mb-2 group-hover:text-[#FFE600] transition-colors">
                 Upload Video
               </h3>
-              <p className="text-slate-400 text-[13px] leading-relaxed">
-                Upload MP4 or WEBM recordings. Get executive summaries and task
-                breakdowns in seconds.
+              <p className="text-neutral-400 font-mono text-[12px] leading-relaxed">
+                Upload MP4, WEBM, or MOV recordings. Extract executive summaries and tasks in seconds.
               </p>
             </div>
 
             <div
               onClick={() => setView("link")}
-              className="bg-[#1F2937]/50 border border-[#374151] hover:border-[#8B5CF6] rounded-2xl p-8 cursor-pointer transition-all group hover:-translate-y-1 hover:bg-[#1F2937]/80 shadow-lg"
+              className="bg-[#141619] border-2 border-black rounded-none p-8 cursor-pointer transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] shadow-[4px_4px_0px_0px_#000000] hover:shadow-[6px_6px_0px_0px_#000000] active:translate-x-[0px] active:translate-y-[0px] active:shadow-[2px_2px_0px_0px_#000000] group"
             >
-              <div className="w-12 h-12 bg-[#8B5CF6] rounded-xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform">
-                <LinkIcon size={24} />
+              <div className="w-12 h-12 bg-[#00F0FF] text-black border-2 border-black rounded-none flex items-center justify-center mb-6 shadow-[2px_2px_0px_0px_#000000]">
+                <LinkIcon size={24} strokeWidth={2.5} />
               </div>
-              <h3 className="text-white font-bold text-[18px] mb-2">
+              <h3 className="text-white font-mono font-black text-[18px] uppercase tracking-wider mb-2 group-hover:text-[#00F0FF] transition-colors">
                 Meeting Link
               </h3>
-              <p className="text-slate-400 text-[13px] leading-relaxed">
-                Connect our AI bot to Zoom, Google Meet, or Teams. It will
-                record and analyze the meeting live.
+              <p className="text-neutral-400 font-mono text-[12px] leading-relaxed">
+                Dispatch our AI bot to Zoom, Google Meet, or Teams to transcribe and analyze live.
               </p>
             </div>
           </div>
@@ -318,36 +312,36 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
         <div className="relative z-10">
           <button
             onClick={() => setView("choice")}
-            className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
+            className="flex items-center gap-2 text-neutral-400 hover:text-white mb-8 font-mono text-[12px] uppercase font-bold tracking-wider transition-colors group cursor-pointer"
           >
             <ArrowLeft
               size={16}
               className="group-hover:-translate-x-1 transition-transform"
             />
-            <span className="text-[14px]">Selection</span>
+            <span>// BACK TO SELECTION</span>
           </button>
 
           <div className="max-w-2xl mx-auto">
-            <h3 className="text-[20px] font-bold text-white mb-2">
-              Upload Recording
+            <h3 className="text-[20px] font-mono font-black text-white uppercase tracking-wider mb-2">
+              UPLOAD RECORDING
             </h3>
-            <p className="text-slate-400 text-[13px] mb-8">
-              Select your video file to start the AI analysis pipeline.
+            <p className="text-neutral-400 font-mono text-[12px] uppercase tracking-wider mb-8">
+              SELECT VIDEO/AUDIO FILE TO INITIALIZE GEMINI PIPELINE
             </p>
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-[#374151] hover:border-[#3B82F6] rounded-2xl p-16 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-[#3B82F6]/5 transition-all"
+              className="border-2 border-dashed border-neutral-700 hover:border-[#FFE600] bg-[#121417] rounded-none p-16 flex flex-col items-center justify-center gap-4 cursor-pointer shadow-[4px_4px_0px_0px_#000000] transition-all"
             >
-              <div className="w-16 h-16 bg-[#374151] rounded-full flex items-center justify-center text-slate-400">
-                <Upload size={32} />
+              <div className="w-16 h-16 bg-black border-2 border-black rounded-none flex items-center justify-center text-[#FFE600] shadow-[2px_2px_0px_0px_#000000]">
+                <Upload size={32} strokeWidth={2.5} />
               </div>
               <div className="text-center">
-                <p className="text-white font-semibold">
-                  Drop your file here or click to browse
+                <p className="text-white font-mono font-bold text-[14px] uppercase tracking-wider">
+                  DROP MEDIA FILE HERE OR CLICK TO BROWSE
                 </p>
-                <p className="text-slate-500 text-[12px] mt-1">
-                  MP4, WEBM, MOV up to 500MB
+                <p className="text-neutral-500 font-mono text-[11px] mt-1 uppercase tracking-wider">
+                  MP4, WEBM, MOV, MP3, WAV UP TO 500MB
                 </p>
               </div>
               <input
@@ -366,38 +360,38 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
         <div className="relative z-10">
           <button
             onClick={() => setView("choice")}
-            className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group"
+            className="flex items-center gap-2 text-neutral-400 hover:text-white mb-8 font-mono text-[12px] uppercase font-bold tracking-wider transition-colors group cursor-pointer"
           >
             <ArrowLeft
               size={16}
               className="group-hover:-translate-x-1 transition-transform"
             />
-            <span className="text-[14px]">Selection</span>
+            <span>// BACK TO SELECTION</span>
           </button>
 
           <div className="max-w-2xl mx-auto">
-            <h3 className="text-[20px] font-bold text-white mb-2">
-              Invite AI Bot
+            <h3 className="text-[20px] font-mono font-black text-white uppercase tracking-wider mb-2">
+              DISPATCH MEETING BOT
             </h3>
-            <p className="text-slate-400 text-[13px] mb-8">
-              Enter your live meeting URL to allow the bot to join and record.
+            <p className="text-neutral-400 font-mono text-[12px] uppercase tracking-wider mb-8">
+              ENTER LIVE MEETING URL TO DEPLOY OUR RECON BOT
             </p>
 
             <form onSubmit={handleLinkSubmit} className="space-y-4">
               <input
                 type="url"
                 required
-                placeholder="Paste Google Meet, Zoom, or Teams URL..."
+                placeholder="https://meet.google.com/xxx-xxxx-xxx"
                 value={meetingUrl}
                 onChange={(e) => setMeetingUrl(e.target.value)}
-                className="w-full bg-[#0B0E14] border border-[#374151] rounded-xl px-4 py-4 text-white placeholder-slate-600 focus:outline-none focus:border-[#8B5CF6] transition-all shadow-inner"
+                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-4 text-white font-mono text-[14px] placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000]"
               />
               <button
                 type="submit"
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] text-white font-bold shadow-lg hover:shadow-[#8B5CF6]/20 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-none bg-[#FFE600] text-black border-2 border-black font-mono font-black uppercase tracking-wider shadow-[4px_4px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[6px_6px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000000] transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Sparkles size={18} />
-                Invite Bot to Meeting
+                <Sparkles size={18} strokeWidth={2.5} />
+                DISPATCH BOT TO MEETING
               </button>
             </form>
           </div>
@@ -407,29 +401,29 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
       {(view === "loading" || view === "processing") && (
         <div className="relative z-10 flex flex-col items-center justify-center h-[500px]">
           <div className="relative mb-8">
-            <div className="w-24 h-24 border-4 border-[#3B82F6]/20 border-t-[#3B82F6] rounded-full animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center text-[#3B82F6]">
-              <Loader2 size={32} className="animate-pulse" />
+            <div className="w-20 h-20 border-4 border-black border-t-[#FFE600] rounded-none animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center text-[#FFE600]">
+              <Loader2 size={28} className="animate-spin" />
             </div>
           </div>
-          <h3 className="text-white font-bold text-[20px] mb-2">
+          <h3 className="text-white font-mono font-black text-[20px] uppercase tracking-wider mb-2">
             {view === "loading"
-              ? "Analyzing Meeting Content"
-              : "Bot is Recording Live"}
+              ? "// ANALYZING AUDIO STREAM"
+              : "// RECON BOT ACTIVE IN MEETING"}
           </h3>
-          <p className="text-slate-400 text-[14px] text-center max-w-sm">
+          <p className="text-neutral-400 font-mono text-[12px] text-center max-w-sm uppercase tracking-wider">
             {view === "loading"
-              ? "Our AI is transcribing audio and extracting key decision points. Please wait..."
-              : "The AI bot is currently in your meeting. Once the meeting ends, analysis will appear here automatically."}
+              ? "Gemini 2.5 Flash is extracting audio decisions, MoM, and generating task payloads."
+              : "Bot is recording live audio. When the meeting ends, analysis will render here automatically."}
           </p>
           {view === "processing" && (
             <div className="mt-8 flex gap-3">
-              <div className="px-3 py-1 bg-red-500/10 text-red-500 text-[10px] font-bold rounded-full border border-red-500/20 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+              <div className="px-3 py-1 bg-[#EF4444] text-white text-[10px] font-mono font-black rounded-none border-2 border-black flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000]">
+                <div className="w-2 h-2 rounded-none bg-white animate-ping" />
                 LIVE RECORDING
               </div>
-              <div className="px-3 py-1 bg-[#3B82F6]/10 text-[#3B82F6] text-[10px] font-bold rounded-full border border-[#3B82F6]/20">
-                POLLING FOR END
+              <div className="px-3 py-1 bg-[#FFE600] text-black text-[10px] font-mono font-black rounded-none border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
+                POLLING FOR RESULTS
               </div>
             </div>
           )}
@@ -437,19 +431,19 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
       )}
 
       {view === "result" && result && (
-        <div className="relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div className="relative z-10 animate-in fade-in duration-200">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 pb-4 border-b-2 border-neutral-800">
             <div>
               <button
                 onClick={() => setView("choice")}
-                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-[13px] mb-2"
+                className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-mono text-[11px] font-bold uppercase tracking-wider mb-2 cursor-pointer"
               >
-                <ArrowLeft size={14} /> Back to Selection
+                <ArrowLeft size={14} /> // BACK TO SELECTION
               </button>
-              <h2 className="text-[24px] font-bold text-white flex items-center gap-3">
+              <h2 className="text-[24px] font-mono font-black uppercase tracking-wide text-white flex items-center gap-3">
                 {result.mom.judul_meeting}
-                <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 uppercase tracking-widest">
-                  Analyzed
+                <span className="text-[10px] font-mono font-black bg-[#22C55E] text-black px-2 py-0.5 rounded-none border border-black uppercase tracking-widest shadow-[1px_1px_0px_0px_#000000]">
+                  ANALYZED
                 </span>
               </h2>
             </div>
@@ -457,26 +451,26 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
               <button
                 onClick={syncToProject}
                 disabled={syncing || synced || result.tasks.length === 0}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-[13px] transition-all shadow-lg ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-none font-mono font-black uppercase text-[12px] tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer ${
                   synced
-                    ? "bg-green-500 text-white"
-                    : "bg-[#3B82F6] text-white hover:bg-[#2563EB] hover:scale-105 active:scale-95 disabled:opacity-50"
+                    ? "bg-[#22C55E] text-black"
+                    : "bg-[#FFE600] text-black hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50"
                 }`}
               >
                 {syncing ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Syncing Board...</span>
+                    <span>SYNCING BOARD...</span>
                   </>
                 ) : synced ? (
                   <>
-                    <CheckCircle2 size={16} />
-                    <span>Board Synced!</span>
+                    <CheckCircle2 size={16} strokeWidth={3} />
+                    <span>BOARD SYNCED!</span>
                   </>
                 ) : (
                   <>
-                    <Save size={16} />
-                    <span>Commit Tasks to Board</span>
+                    <Save size={16} strokeWidth={2.5} />
+                    <span>COMMIT TASKS TO BOARD</span>
                   </>
                 )}
               </button>
@@ -486,44 +480,38 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* MoM Section */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-[#1F2937]/30 border border-[#374151] rounded-2xl p-6">
-                <h4 className="text-[#3B82F6] text-[11px] font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Sparkles size={14} /> Executive Summary
+              <div className="bg-[#141619] border-2 border-black rounded-none p-6 shadow-[4px_4px_0px_0px_#000000]">
+                <h4 className="text-[#FFE600] font-mono text-[11px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Sparkles size={14} /> // EXECUTIVE SUMMARY
                 </h4>
-                <p className="text-slate-300 leading-relaxed text-[15px]">
+                <p className="text-neutral-300 font-mono text-[13px] leading-relaxed">
                   {result.mom.ringkasan_eksekutif}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-[#1F2937]/30 border border-[#374151] rounded-2xl p-6">
-                  <h4 className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-4">
-                    Key Discussion Points
+                <div className="bg-[#141619] border-2 border-black rounded-none p-6 shadow-[4px_4px_0px_0px_#000000]">
+                  <h4 className="text-white font-mono text-[11px] font-black uppercase tracking-widest mb-4">
+                    // KEY DISCUSSION POINTS
                   </h4>
-                  <ul className="space-y-3">
+                  <ul className="space-y-3 font-mono text-[12px] text-neutral-300">
                     {result.mom.poin_diskusi.map((pt, i) => (
-                      <li
-                        key={i}
-                        className="flex gap-3 text-[13px] text-slate-300"
-                      >
-                        <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3B82F6] shrink-0" />
-                        {pt}
+                      <li key={i} className="flex gap-2.5">
+                        <span className="text-[#FFE600] font-black">→</span>
+                        <span>{pt}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div className="bg-[#1F2937]/30 border border-[#374151] rounded-2xl p-6">
-                  <h4 className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-4">
-                    Final Decisions
+                <div className="bg-[#141619] border-2 border-black rounded-none p-6 shadow-[4px_4px_0px_0px_#000000]">
+                  <h4 className="text-white font-mono text-[11px] font-black uppercase tracking-widest mb-4">
+                    // FINAL DECISIONS
                   </h4>
-                  <ul className="space-y-3">
+                  <ul className="space-y-3 font-mono text-[12px] text-neutral-300">
                     {result.mom.keputusan_final.map((dec, i) => (
-                      <li
-                        key={i}
-                        className="flex gap-3 text-[13px] text-slate-300"
-                      >
-                        <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                        {dec}
+                      <li key={i} className="flex gap-2.5">
+                        <span className="text-[#22C55E] font-black">✓</span>
+                        <span>{dec}</span>
                       </li>
                     ))}
                   </ul>
@@ -533,67 +521,65 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
 
             {/* Tasks Section */}
             <div className="space-y-6">
-              <div className="bg-[#1F2937]/50 border border-[#374151] rounded-2xl p-6 flex flex-col h-full min-h-[400px]">
-                <div className="flex justify-between items-center mb-6">
-                  <h4 className="text-white font-bold text-[16px]">
-                    Proposed Tasks
+              <div className="bg-[#121417] border-2 border-black rounded-none p-6 flex flex-col h-full min-h-[400px] shadow-[4px_4px_0px_0px_#000000]">
+                <div className="flex justify-between items-center mb-6 pb-2 border-b-2 border-neutral-800">
+                  <h4 className="text-white font-mono font-black text-[14px] uppercase tracking-wider">
+                    // PROPOSED TASKS
                   </h4>
-                  <span className="bg-[#3B82F6]/10 text-[#3B82F6] text-[10px] px-2 py-0.5 rounded-full border border-[#3B82F6]/20">
-                    {result.tasks.length} Items
+                  <span className="bg-[#FFE600] text-black font-mono font-black text-[10px] px-2 py-0.5 rounded-none border border-black shadow-[1px_1px_0px_0px_#000000]">
+                    {result.tasks.length} ITEMS
                   </span>
                 </div>
 
                 <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar max-h-[460px]">
                   {result.tasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-2">
+                    <div className="flex flex-col items-center justify-center py-12 text-neutral-500 font-mono text-[12px] gap-2">
                       <CheckCircle2 size={32} className="opacity-20" />
-                      <p className="text-[12px]">
-                        All clear! No tasks identified.
-                      </p>
+                      <p>// NO TASKS IDENTIFIED.</p>
                     </div>
                   ) : (
                     result.tasks.map((task) => (
                       <div
                         key={task.id}
-                        className={`group relative p-4 rounded-xl border border-[#374151] transition-all hover:bg-[#1F2937] ${
-                          task.completed ? "opacity-50" : "bg-[#0B0E14]/40"
+                        className={`group relative p-3.5 rounded-none border-2 border-black transition-all shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] ${
+                          task.completed ? "opacity-50 bg-black" : "bg-[#181B20]"
                         }`}
                       >
                         <div className="flex items-start gap-3">
                           <button
                             onClick={() => toggleTask(task.id)}
-                            className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                            className={`mt-0.5 w-5 h-5 rounded-none border-2 border-black flex items-center justify-center transition-all cursor-pointer ${
                               task.completed
-                                ? "bg-green-500 border-green-500 text-white"
-                                : "border-[#374151] hover:border-[#3B82F6]"
+                                ? "bg-[#22C55E] text-black"
+                                : "bg-white hover:bg-[#FFE600]"
                             }`}
                           >
-                            {task.completed && <CheckCircle2 size={12} />}
+                            {task.completed && <CheckCircle2 size={12} strokeWidth={3} />}
                           </button>
                           <div className="flex-1 min-w-0">
                             <p
-                              className={`text-[13px] font-semibold text-white leading-snug ${
+                              className={`text-[13px] font-mono font-bold text-white leading-snug ${
                                 task.completed
-                                  ? "line-through text-slate-500"
+                                  ? "line-through text-neutral-500"
                                   : ""
                               }`}
                             >
                               {task.title}
                             </p>
-                            <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-500">
-                              <span className="flex items-center gap-1">
+                            <div className="mt-2 flex items-center gap-2 text-[10px] font-mono text-neutral-400 flex-wrap">
+                              <span className="flex items-center gap-1 bg-black px-1.5 py-0.5 border border-neutral-700">
                                 <User size={10} /> {task.pic}
                               </span>
-                              <span className="flex items-center gap-1">
+                              <span className="flex items-center gap-1 bg-black px-1.5 py-0.5 border border-neutral-700">
                                 <Calendar size={10} /> {task.due_date}
                               </span>
                               <span
-                                className={`px-1.5 py-0.5 rounded border ${
+                                className={`px-1.5 py-0.5 rounded-none border border-black font-black uppercase ${
                                   task.priority === "high"
-                                    ? "bg-red-500/10 text-red-400 border-red-500/20"
+                                    ? "bg-[#EF4444] text-white"
                                     : task.priority === "medium"
-                                    ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-                                    : "bg-green-500/10 text-green-500 border-green-500/20"
+                                    ? "bg-[#F59E0B] text-black"
+                                    : "bg-[#22C55E] text-black"
                                 }`}
                               >
                                 {task.priority}
@@ -602,7 +588,8 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
                           </div>
                           <button
                             onClick={() => deleteTask(task.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-500 transition-all"
+                            className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-[#EF4444] transition-all cursor-pointer"
+                            title="Delete"
                           >
                             <Trash2 size={14} />
                           </button>

@@ -56,69 +56,74 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-[#151A22] border border-[#374151] rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none" onClick={onClose}>
+            <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-2xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
-                <div className="flex items-start flex-col gap-3 p-6 border-b border-[#374151] relative">
-                    <button onClick={onClose} className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors p-1"><X size={20} /></button>
-                    <div className="flex items-center gap-3 w-full pr-10">
-                        <div className="p-2 rounded-lg bg-[#1F2937] text-[#3B82F6] border border-[#374151] shrink-0">
-                            <CheckSquare size={20} />
+                <div className="flex items-start flex-col gap-3 p-6 border-b-2 border-black relative bg-[#181B20]">
+                    <button 
+                        onClick={onClose} 
+                        className="absolute top-6 right-6 p-1.5 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer"
+                    >
+                        <X size={18} strokeWidth={3} />
+                    </button>
+                    <div className="flex items-center gap-3 w-full pr-12">
+                        <div className="p-2 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0">
+                            <CheckSquare size={18} strokeWidth={2.5} />
                         </div>
                         <input
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Task Title"
-                            className="bg-transparent text-white font-bold text-xl w-full focus:outline-none focus:ring-1 focus:ring-[#3B82F6] rounded px-2 py-1 -ml-2 transition-all"
+                            placeholder="TASK TITLE"
+                            className="bg-transparent text-white font-mono font-black uppercase text-lg w-full focus:outline-none focus:border-b-2 focus:border-[#FFE600] rounded-none px-2 py-1 -ml-2 transition-all"
                         />
                     </div>
-                    <div className="flex items-center gap-2 text-[12px] text-slate-400 ml-12">
-                        <span>In project list</span>
-                        <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                        <span>Task ID: #{String(task.id)}</span>
+                    <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-400 ml-11 uppercase">
+                        <span>// PROJECT PIPELINE</span>
+                        <span className="w-1.5 h-1.5 bg-[#FFE600]"></span>
+                        <span>TASK ID: #{String(task.id)}</span>
                     </div>
                 </div>
 
                 {/* Form Body - Scrollable */}
-                <form id="task-detail-form" onSubmit={handleSave} className="p-6 flex-1 overflow-y-auto flex gap-8">
+                <form id="task-detail-form" onSubmit={handleSave} className="p-6 flex-1 overflow-y-auto flex flex-col md:flex-row gap-8 font-mono">
 
                     {/* Main Content (Left) */}
-                    <div className="flex-1 space-y-8">
+                    <div className="flex-1 space-y-6">
                         {/* Description */}
                         <div>
-                            <div className="flex items-center gap-2 mb-3 text-slate-300 font-semibold">
-                                <AlignLeft size={16} />
-                                <h3>Description</h3>
+                            <div className="flex items-center gap-2 mb-2 text-white font-black text-[12px] uppercase">
+                                <AlignLeft size={14} />
+                                <h3>// DESCRIPTION</h3>
                             </div>
                             <textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Add a more detailed description..."
-                                className="w-full h-32 bg-[#0B0E14] border border-[#374151] rounded-lg px-4 py-3 text-[13px] text-white placeholder-slate-600 focus:outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] transition-all resize-y"
+                                placeholder="ENTER TECHNICAL SPECIFICATIONS OR REQUIREMENTS..."
+                                className="w-full h-32 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-3 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-all resize-y"
                             />
                         </div>
 
                         {/* Git Branch / PR */}
                         <div>
-                            <div className="flex items-center gap-2 mb-3 text-slate-300 font-semibold">
-                                <GitPullRequest size={16} />
-                                <h3>Development</h3>
+                            <div className="flex items-center gap-2 mb-2 text-white font-black text-[12px] uppercase">
+                                <GitPullRequest size={14} />
+                                <h3>// DEVELOPMENT PIPELINE</h3>
                             </div>
-                            <div className="bg-[#0B0E14] border border-[#374151] rounded-lg p-4 space-y-3">
+                            <div className="bg-[#0B0E14] border-2 border-black rounded-none p-4 space-y-3 shadow-[2px_2px_0px_0px_#000000]">
                                 <div>
-                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Branch Name</label>
+                                    <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">BRANCH NAME</label>
                                     <input
                                         value={branchName}
                                         onChange={(e) => setBranchName(e.target.value)}
-                                        placeholder="e.g. feature/auth-roles"
-                                        className="w-full bg-[#151A22] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white placeholder-slate-600 focus:outline-none focus:border-[#3B82F6] transition-all"
+                                        placeholder="feature/auth-roles"
+                                        className="w-full bg-[#121417] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] transition-all"
                                     />
                                 </div>
                                 {task.prUrl && (
-                                    <div className="text-[12px]">
-                                        <span className="text-slate-400">Pull Request: </span>
-                                        <a href={task.prUrl} target="_blank" rel="noopener noreferrer" className="text-[#3B82F6] hover:underline">{task.prUrl}</a>
+                                    <div className="text-[11px] font-mono">
+                                        <span className="text-neutral-400 uppercase">PULL REQUEST: </span>
+                                        <a href={task.prUrl} target="_blank" rel="noopener noreferrer" className="text-[#FFE600] hover:underline font-bold">{task.prUrl}</a>
                                     </div>
                                 )}
                             </div>
@@ -126,15 +131,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     </div>
 
                     {/* Sidebar (Right) */}
-                    <div className="w-64 space-y-6 shrink-0">
+                    <div className="w-full md:w-64 space-y-5 shrink-0">
 
                         {/* Bucket (State) */}
                         <div>
-                            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Activity size={14} /> State Group</label>
+                            <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><Activity size={13} /> STATE GROUP</label>
                             <select
                                 value={bucketId ? String(bucketId) : ''}
                                 onChange={(e) => setBucketId(e.target.value ? Number(e.target.value) : undefined)}
-                                className="w-full bg-[#0B0E14] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white focus:outline-none focus:border-[#3B82F6] transition-colors"
+                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                             >
                                 <option value="" disabled>Select Bucket...</option>
                                 {buckets.map(b => (
@@ -145,11 +150,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                         {/* Type */}
                         <div>
-                            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Tag size={14} /> Type</label>
+                            <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><Tag size={13} /> TASK TYPE</label>
                             <select
                                 value={type}
                                 onChange={(e) => setType(e.target.value as TaskType)}
-                                className="w-full bg-[#0B0E14] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white focus:outline-none focus:border-[#3B82F6] transition-colors"
+                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                             >
                                 {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
@@ -157,25 +162,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                         {/* Weight */}
                         <div>
-                            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Weight / Story Points</label>
+                            <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">WEIGHT / FIBONACCI</label>
                             <select
                                 value={weight}
                                 onChange={(e) => setWeight(Number(e.target.value))}
-                                className="w-full bg-[#0B0E14] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white focus:outline-none focus:border-[#3B82F6] transition-colors"
+                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                             >
-                                {TASK_WEIGHTS.map(w => <option key={w} value={w}>{w} Points</option>)}
+                                {TASK_WEIGHTS.map(w => <option key={w} value={w}>{w} POINTS</option>)}
                             </select>
                         </div>
 
                         {/* Lead Assignee */}
                         <div>
-                            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Lead Assignee</label>
+                            <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">LEAD ASSIGNEE</label>
                             <select
                                 value={leadAssigneeId ? String(leadAssigneeId) : ''}
                                 onChange={(e) => setLeadAssigneeId(e.target.value ? Number(e.target.value) : undefined)}
-                                className="w-full bg-[#0B0E14] border border-[#374151] rounded-lg px-3 py-2 text-[13px] text-white focus:outline-none focus:border-[#3B82F6] transition-colors"
+                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                             >
-                                <option value="">Unassigned</option>
+                                <option value="">UNASSIGNED</option>
                                 {members.map(m => (
                                     <option key={String(m.id)} value={m.id ? String(m.id) : ''}>{m.gh_username || `Member #${m.user_id}`}</option>
                                 ))}
@@ -186,17 +191,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </form>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-[#374151] flex justify-end gap-3 bg-[#111827] rounded-b-2xl">
-                    <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-[13px] font-semibold text-slate-300 hover:text-white hover:bg-[#1F2937] transition-all">
+                <div className="p-4 border-t-2 border-black flex justify-end gap-3 bg-[#0E1012] rounded-none">
+                    <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="px-5 py-2.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[12px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    >
                         Cancel
                     </button>
                     <button
                         type="submit"
                         form="task-detail-form"
                         disabled={saving || !title.trim()}
-                        className="px-6 py-2 rounded-lg text-[13px] font-bold bg-[#3B82F6] text-white hover:bg-[#2563EB] shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50"
+                        className="px-6 py-2.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-50 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
-                        {saving ? 'Saving Changes...' : 'Save Changes'}
+                        {saving ? 'SAVING...' : 'SAVE CHANGES'}
                     </button>
                 </div>
 

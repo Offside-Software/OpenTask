@@ -35,38 +35,43 @@ export const WorkspacesPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500 max-w-[1400px] mx-auto w-full">
+    <div className="space-y-10 animate-in fade-in duration-200 max-w-[1400px] mx-auto w-full select-none">
 
       {/* Header */}
-      <div className="flex justify-between items-end">
+      <div className="flex justify-between items-end border-b-2 border-neutral-800 pb-6">
         <div>
-          <span className="text-[#3B82F6] text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 mb-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" /> My Project • Workspaces Hub
+          <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[10px] font-black uppercase tracking-wider mb-2 inline-block">
+            // WORKSPACES HUB
           </span>
-          <h1 className="text-[32px] font-bold text-white leading-tight">Workspaces</h1>
+          <h1 className="text-[32px] font-black text-white font-mono uppercase tracking-tight leading-tight">WORKSPACES</h1>
+          <p className="text-[12px] font-mono text-neutral-400 uppercase tracking-wider mt-1">
+            MANAGED PROJECTS & CODE REVIEW PIPELINES
+          </p>
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3B82F6] text-white text-[13px] font-semibold hover:bg-[#2563EB] transition-all"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-none bg-[#FFE600] text-black border-2 border-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000000] transition-all cursor-pointer"
         >
-          <Plus size={16} /> New Project
+          <Plus size={16} strokeWidth={3} /> NEW PROJECT
         </button>
       </div>
 
       {/* Projects */}
       <section>
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-1.5 bg-[#3B82F6]/10 rounded"><Briefcase size={16} className="text-[#3B82F6]" /></div>
-          <h2 className="text-white font-bold text-[14px] uppercase tracking-wider">
-            Projects<span className="text-slate-400 normal-case font-medium text-[12px] ml-2"></span>
+          <div className="p-2 bg-black text-[#FFE600] border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
+            <Briefcase size={16} strokeWidth={2.5} />
+          </div>
+          <h2 className="text-white font-mono font-black text-[14px] uppercase tracking-wider">
+            // ACTIVE PROJECTS
           </h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
           {loading ? (
-            <div className="text-slate-500 text-[12px]">Loading projects...</div>
+            <div className="text-neutral-500 font-mono text-[12px] py-8">// LOADING PROJECTS...</div>
           ) : projects.length === 0 ? (
-            <div className="col-span-2 text-center py-16 text-slate-500 text-[13px] border border-dashed border-[#374151] rounded-xl">
-              No projects. <button onClick={openCreate} className="text-[#3B82F6] hover:underline">Create one.</button>
+            <div className="col-span-2 text-center py-16 text-neutral-400 font-mono text-[13px] border-2 border-dashed border-black bg-[#121417] rounded-none shadow-[4px_4px_0px_0px_#000000]">
+              NO PROJECTS FOUND. <button onClick={openCreate} className="text-[#FFE600] hover:underline font-bold ml-1">CREATE ONE NOW.</button>
             </div>
           ) : projects.map(p => (
             <div key={p.id} className="relative group">
@@ -79,9 +84,10 @@ export const WorkspacesPage: React.FC = () => {
               <button
                 onClick={(e) => { e.stopPropagation(); handleDelete(p.id!); }}
                 disabled={String(deletingId) === String(p.id)}
-                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-[#1F2937] text-slate-500 hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-all z-10"
+                className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-white hover:bg-[#EF4444] shadow-[2px_2px_0px_0px_#000000] transition-all z-10 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                title="Delete project"
               >
-                <Trash2 size={12} />
+                <Trash2 size={14} />
               </button>
             </div>
           ))}

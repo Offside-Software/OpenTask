@@ -20,40 +20,40 @@ export const AlertDetailModal: React.FC<AlertDetailModalProps> = ({
   onResolve
 }) => {
   return createPortal(
-    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0B0E14] border border-[#374151] rounded-2xl w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 select-none animate-in fade-in duration-100">
+      <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-lg shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono">
         
         {/* Header */}
-        <div className={`p-6 border-b border-[#374151] flex items-start gap-4 ${alert.severity === 'critical' ? 'bg-[#EF4444]/10' : 'bg-[#F59E0B]/10'}`}>
-          <div className={`p-3 rounded-xl ${alert.severity === 'critical' ? 'bg-[#EF4444]/20 text-[#EF4444]' : 'bg-[#F59E0B]/20 text-[#F59E0B]'}`}>
-            <AlertTriangle size={24} />
+        <div className={`p-6 border-b-2 border-black flex items-start gap-4 ${alert.severity === 'critical' ? 'bg-[#EF4444]/15' : 'bg-[#F59E0B]/15'}`}>
+          <div className={`p-3 rounded-none border-2 border-black shadow-[2px_2px_0px_0px_#000000] ${alert.severity === 'critical' ? 'bg-[#EF4444] text-white' : 'bg-[#F59E0B] text-black'}`}>
+            <AlertTriangle size={22} strokeWidth={2.5} />
           </div>
-          <div className="flex-1 mt-1">
+          <div className="flex-1 mt-0.5">
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant={alert.severity === 'critical' ? 'critical' : 'warning'} className="uppercase">
+              <Badge variant={alert.severity === 'critical' ? 'critical' : 'warning'} className="uppercase font-mono">
                 {alert.severity}
               </Badge>
-              <span className="text-slate-400 text-[12px] font-medium">{projectName}</span>
+              <span className="text-neutral-400 font-mono text-[11px] font-bold uppercase tracking-wider">{projectName}</span>
             </div>
-            <h2 className="text-white text-[20px] font-bold leading-tight">{alert.title}</h2>
+            <h2 className="text-white font-mono font-black text-[18px] uppercase tracking-wide leading-tight">{alert.title}</h2>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-[#1F2937] rounded-lg transition-colors">
-            <X size={20} />
+          <button onClick={onClose} className="p-1 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer">
+            <X size={18} strokeWidth={3} />
           </button>
         </div>
 
         {/* Body */}
         <div className="p-6">
-          <p className="text-slate-300 text-[14px] leading-relaxed mb-6">
+          <p className="text-neutral-300 font-mono text-[13px] leading-relaxed mb-6">
             {alert.description}
           </p>
 
-          <div className="bg-[#151A22] rounded-xl border border-[#374151] p-4 mb-8">
-            <h4 className="text-white text-[12px] font-bold uppercase tracking-wider mb-3">Suggested Actions</h4>
+          <div className="bg-[#0E1012] rounded-none border-2 border-black p-4 mb-6 shadow-[3px_3px_0px_0px_#000000]">
+            <h4 className="text-white font-mono text-[11px] font-black uppercase tracking-wider mb-3">// SUGGESTED ACTIONS</h4>
             <ul className="space-y-2">
               {alert.suggested_actions.map((action, idx) => (
-                <li key={idx} className="flex items-start gap-3 text-[13px] text-slate-400">
-                  <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#3B82F6] flex-shrink-0" />
+                <li key={idx} className="flex items-start gap-2.5 text-[12px] text-neutral-300">
+                  <span className="text-[#FFE600] font-black">→</span>
                   {action}
                 </li>
               ))}
@@ -61,18 +61,18 @@ export const AlertDetailModal: React.FC<AlertDetailModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex gap-3 justify-end">
+          <div className="flex gap-3 justify-end pt-3 border-t-2 border-neutral-800">
              <button
                onClick={() => { onResolve(); onClose(); }}
-               className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1F2937] text-[13px] font-semibold transition-colors"
+               className="flex items-center gap-2 px-4 py-2 rounded-none text-neutral-300 border-2 border-black bg-[#1E2227] text-[12px] font-black uppercase tracking-wider hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
              >
-               <CheckCircle2 size={16} /> Dismiss
+               <CheckCircle2 size={16} strokeWidth={2.5} /> Dismiss
              </button>
              <button
                onClick={() => { onNavigate(); onClose(); }}
-               className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#3B82F6] text-white text-[13px] font-semibold hover:bg-[#2563EB] transition-colors"
+               className="flex items-center gap-2 px-5 py-2 rounded-none bg-[#FFE600] text-black border-2 border-black text-[12px] font-black uppercase tracking-wider hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] shadow-[3px_3px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
              >
-               View Project <ArrowRight size={16} />
+               View Project <ArrowRight size={16} strokeWidth={3} />
              </button>
           </div>
         </div>
