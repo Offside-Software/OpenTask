@@ -5,6 +5,7 @@ import { useMeetings } from '../controllers/useMeetings';
 import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
+import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
 import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2 } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
@@ -92,6 +93,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     onBucketsSynced: () => refreshDashboard(true),
     debounceMs: 250,
   });
+
+  // Auto-scrolling during drag operations (vertical on <main>, horizontal on board)
+  const boardScrollRef = React.useRef<HTMLDivElement>(null);
+  useDragAutoScroll({ boardRef: boardScrollRef });
 
   const [deletingTaskIds, setDeletingTaskIds] = useState<Set<string | number>>(new Set());
 
@@ -369,7 +374,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
             {tasksLoading || bucketsLoading ? (
               <div className="flex-1 flex items-center justify-center text-slate-500 text-[14px]">Loading board state...</div>
             ) : (
-              <div className="flex gap-4 overflow-x-auto pb-4 flex-1 no-scrollbar items-start">
+              <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4 flex-1 no-scrollbar items-start">
                 {buckets.map(bucket => {
                   const colTasks = tasks.filter(t => String(t.bucket_id) === String(bucket.id));
                   return (
