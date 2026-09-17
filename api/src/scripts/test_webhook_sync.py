@@ -76,7 +76,7 @@ class TestWebhookSync(unittest.IsolatedAsyncioTestCase):
         # 2. Bucket should be inserted
         mock_cur.execute.assert_any_call(
             "INSERT INTO opentask.buckets (id, project_id, name, state, is_system_locked, order_idx) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;",
-            (unittest.mock.ANY, unittest.mock.ANY, "AI Drafts", "DRAFT", True, 0)
+            (unittest.mock.ANY, unittest.mock.ANY, "TODO", "DRAFT", True, 0)
         )
         
         # 3. Tasks should be inserted

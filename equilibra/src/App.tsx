@@ -11,6 +11,7 @@ import { NotificationsPage } from "./pages/Notifications";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPrompt";
 import { useState } from "react";
+import { ThemeProvider } from "./context/themeContext";
 import "./App.css";
 
 function AppShell() {
@@ -21,7 +22,7 @@ function AppShell() {
   if (!user) return <LoginPage />;
 
   return (
-    <div className="h-screen w-full bg-[#0B0E14] text-slate-300 font-sans flex overflow-hidden selection:bg-[#3B82F6]/30">
+    <div className="h-screen w-full bg-[var(--cmd-app-bg)] text-[var(--cmd-text-body)] font-sans flex overflow-hidden selection:bg-[#FFE600]/30 transition-colors duration-150">
       <Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
 
       <main className="flex-1 overflow-y-auto no-scrollbar p-8 pb-32 bg-dots">
@@ -60,11 +61,13 @@ import { ToastProvider } from './design-system/Toast';
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppShell />
-        </ToastProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppShell />
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

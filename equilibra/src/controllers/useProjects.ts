@@ -4,27 +4,54 @@ import { projectService } from "../services/projectService";
 import { userService } from "../services/userService";
 import { useToast } from "../design-system/Toast";
 import { useAuth } from "../auth/useAuth";
+import { getCached, setCached } from "../utils/cache";
 
 export const useProjects = () => {
   const { user, isLoading } = useAuth();
   const { showToast } = useToast();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [memberships, setMemberships] = useState<ProjectMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const userId = user?.db_user?.id;
+
+  const [projects, setProjects] = useState<Project[]>(() => {
+    if (!userId) return [];
+    return getCached<Project[]>(`opentask_projects_${userId}`) || [];
+  });
+  const [memberships, setMemberships] = useState<ProjectMember[]>(() => {
+    if (!userId) return [];
+    return getCached<ProjectMember[]>(`opentask_memberships_${userId}`) || [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (!userId) return true;
+    const hasCache = !!getCached<Project[]>(`opentask_projects_${userId}`);
+    return !hasCache;
+  });
   const [error, setError] = useState<string | null>(null);
 
+  // Sync cache if userId wasn't ready during initial state setup
+  useEffect(() => {
+    if (!userId) return;
+    const cachedP = getCached<Project[]>(`opentask_projects_${userId}`);
+    const cachedM = getCached<ProjectMember[]>(`opentask_memberships_${userId}`);
+    if (cachedP && cachedP.length > 0) {
+      setProjects(cachedP);
+      setLoading(false);
+    }
+    if (cachedM && cachedM.length > 0) {
+      setMemberships(cachedM);
+    }
+  }, [userId]);
+
   const fetchProjects = useCallback(async () => {
-    const userId = user?.db_user?.id;
     if (!userId) return;
 
     try {
-      setLoading(true);
       const [data, mems] = await Promise.all([
         projectService.getMyProjects(),
         userService.getMembershipsForUser(),
       ]);
       setProjects(data);
       setMemberships(mems);
+      setCached(`opentask_projects_${userId}`, data);
+      setCached(`opentask_memberships_${userId}`, mems);
       setError(null);
     } catch (err) {
       console.error(err);
@@ -33,7 +60,7 @@ export const useProjects = () => {
     } finally {
       setLoading(false);
     }
-  }, [showToast, user?.db_user?.id]);
+  }, [showToast, userId]);
 
   useEffect(() => {
     if (isLoading) return;

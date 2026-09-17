@@ -90,11 +90,31 @@ export const useBuckets = (projectId: string | number) => {
     [projectId, fetchBuckets],
   );
 
+  const updateBucket = useCallback(
+    async (bucketId: number | string, data: Partial<Bucket>) => {
+      try {
+        setBuckets((prev) =>
+          prev.map((b) =>
+            String(b.id) === String(bucketId) ? { ...b, ...data } : b,
+          ),
+        );
+        const updated = await bucketService.updateBucket(projectId, bucketId, data);
+        return updated;
+      } catch (err) {
+        console.error("Failed to update bucket", err);
+        fetchBuckets();
+        throw err;
+      }
+    },
+    [projectId, fetchBuckets],
+  );
+
   return {
     buckets,
     loading,
     error,
     createBucket,
+    updateBucket,
     reorderBuckets,
     deleteBucket,
     refreshBuckets: fetchBuckets,

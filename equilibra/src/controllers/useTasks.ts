@@ -48,11 +48,9 @@ export const useTasks = (projectId?: string | number) => {
     }) => {
       try {
         const created = await taskService.createTask(data);
-        // Re-fetch to guarantee the new task appears in the correct bucket.
-        // Optimistic prepend alone can silently fail when BigInt IDs don't
-        // match the bucket filter after JSON parsing.
-        await fetchTasks();
-        showToast("Task created and assigned", "success");
+        showToast("Task created", "success");
+        // Refetch tasks in background without blocking immediate return
+        fetchTasks().catch(console.error);
         return created;
       } catch (err) {
         console.error(err);

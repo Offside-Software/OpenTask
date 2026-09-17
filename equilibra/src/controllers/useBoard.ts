@@ -2,32 +2,35 @@ import { useState, useEffect, useCallback } from "react";
 import type { Bucket, Task } from "../models";
 import { apiFetch } from "../services/apiClient";
 import { useToast } from "../design-system/Toast";
+import { removeCached } from "../utils/cache";
 
 interface BoardData {
   buckets: Bucket[];
   tasks: Task[];
 }
 
-/**
- * Unified hook that fetches both buckets and tasks in a single request to
- * GET /api/projects/{id}/board — the strict Kanban Data Contract endpoint.
- *
- * The board endpoint only returns the minimal fields needed by the UI
- * (no description, no branch_name, etc.).  Use the existing taskService /
- * bucketService methods for mutation operations (create, update, delete, reorder).
- */
 export const useBoard = (projectId: string | number) => {
   const { showToast } = useToast();
+
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Clear any legacy cached board data to prevent stale tasks/descriptions
+  useEffect(() => {
+    if (projectId) {
+      removeCached(`opentask_board_${projectId}`);
+    }
+  }, [projectId]);
 
   const fetchBoard = useCallback(
     async (silent = false) => {
       if (!projectId) return;
       try {
-        if (!silent) setLoading(true);
+        if (!silent) {
+          setLoading(true);
+        }
         const data = await apiFetch<BoardData>(`/projects/${projectId}/board`);
         const sortedBuckets = [...(data.buckets ?? [])].sort(
           (a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0),
@@ -43,7 +46,7 @@ export const useBoard = (projectId: string | number) => {
         setError("Failed to load board data");
         if (!silent) showToast("Error loading board", "error");
       } finally {
-        if (!silent) setLoading(false);
+        setLoading(false);
       }
     },
     [projectId, showToast],
@@ -54,8 +57,17 @@ export const useBoard = (projectId: string | number) => {
   }, [fetchBoard]);
 
   /**
+   * Optimistically update full tasks array (used for drag and drop)
+   */
+  const setTasksOptimistically = useCallback(
+    (newTasks: Task[]) => {
+      setTasks(newTasks);
+    },
+    [],
+  );
+
+  /**
    * Optimistically update a task's bucket_id in local state
-   * (called after a successful reorder/move API call).
    */
   const moveTaskLocally = useCallback(
     (taskId: number | string, newBucketId: number | string) => {
@@ -84,6 +96,69 @@ export const useBoard = (projectId: string | number) => {
     [],
   );
 
+  /**
+   * Optimistically update a bucket in local state
+   */
+  const updateBucketLocally = useCallback(
+    (bucketId: number | string, patch: Partial<Bucket>) => {
+      setBuckets((prev) =>
+        prev.map((b) =>
+          String(b.id) === String(bucketId) ? { ...b, ...patch } : b,
+        ),
+      );
+    },
+    [],
+  );
+
+  /**
+   * Optimistically set full buckets array (e.g. for column reordering)
+   */
+  const setBucketsOptimistically = useCallback(
+    (newBuckets: Bucket[]) => {
+      setBuckets(newBuckets);
+    },
+    [],
+  );
+
+  /**
+   * Optimistically add a bucket to local state
+   */
+  const addBucketLocally = useCallback(
+    (newBucket: Bucket) => {
+      setBuckets((prev) => [...prev, newBucket]);
+    },
+    [],
+  );
+
+  /**
+   * Optimistically remove a bucket from local state
+   */
+  const removeBucketLocally = useCallback(
+    (bucketId: number | string) => {
+      setBuckets((prev) => prev.filter((b) => String(b.id) !== String(bucketId)));
+    },
+    [],
+  );
+
+  /**
+   * Optimistically add a task to local state
+   */
+  const addTaskLocally = useCallback((newTask: Task) => {
+    setTasks((prev) => {
+      if (prev.some((t) => String(t.id) === String(newTask.id))) {
+        return prev;
+      }
+      return [...prev, newTask];
+    });
+  }, []);
+
+  /**
+   * Optimistically remove a task from local state
+   */
+  const removeTaskLocally = useCallback((taskId: number | string) => {
+    setTasks((prev) => prev.filter((t) => String(t.id) !== String(taskId)));
+  }, []);
+
   return {
     buckets,
     tasks,
@@ -92,5 +167,12 @@ export const useBoard = (projectId: string | number) => {
     refreshBoard: fetchBoard,
     moveTaskLocally,
     updateTaskLocally,
+    updateBucketLocally,
+    setTasksOptimistically,
+    setBucketsOptimistically,
+    addBucketLocally,
+    removeBucketLocally,
+    addTaskLocally,
+    removeTaskLocally,
   };
 };

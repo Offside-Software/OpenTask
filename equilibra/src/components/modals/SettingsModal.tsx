@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Send, ExternalLink, Shield, Bell, User } from 'lucide-react';
+import { X, Send, ExternalLink, Shield, Bell, User, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { updateTelegramChatId } from '../../auth/api';
+import { useTheme } from '../../context/themeContext';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -10,6 +11,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     const { user, refreshUser } = useAuth();
+    const { theme, setTheme } = useTheme();
     const [chatId, setChatId] = useState(user?.db_user?.telegram_chat_id || '');
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -67,6 +69,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                 <h3 className="text-white font-black uppercase truncate text-[14px]">{user?.name || user?.login}</h3>
                                 <p className="text-neutral-400 text-[11px] truncate mt-0.5">{user?.email || 'NO EMAIL CONFIGURED'}</p>
                             </div>
+                        </div>
+                    </section>
+
+                    {/* Theme Section */}
+                    <section>
+                        <h4 className="text-[#FFE600] text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Sun size={12} /> // INTERFACE THEME
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setTheme('dark')}
+                                className={`p-3 rounded-none border-2 flex items-center justify-center gap-2 text-[11px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                    theme === 'dark'
+                                        ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
+                                        : 'bg-[#0B0E14] text-neutral-400 border-neutral-800 hover:border-white hover:text-white'
+                                }`}
+                            >
+                                <Moon size={14} strokeWidth={2.5} /> DARK MODE
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTheme('light')}
+                                className={`p-3 rounded-none border-2 flex items-center justify-center gap-2 text-[11px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                    theme === 'light'
+                                        ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
+                                        : 'bg-[#0B0E14] text-neutral-400 border-neutral-800 hover:border-white hover:text-white'
+                                }`}
+                            >
+                                <Sun size={14} strokeWidth={2.5} /> LIGHT MODE
+                            </button>
                         </div>
                     </section>
 

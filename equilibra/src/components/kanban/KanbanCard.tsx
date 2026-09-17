@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
-import { Clock, GitPullRequest, MoreHorizontal, User } from 'lucide-react';
+import { Clock, GitPullRequest, MoreHorizontal, User, Trash2 } from 'lucide-react';
 import type { TaskType } from '../../models';
 
 interface KanbanCardProps {
@@ -15,6 +15,7 @@ interface KanbanCardProps {
   pr?: boolean;
   onDropTask?: (draggedTaskId: string | number, targetTaskId?: string | number) => void;
   onClick?: () => void;
+  onDelete?: () => void;
   description?: string;
 }
 
@@ -29,6 +30,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   pr,
   onDropTask,
   onClick,
+  onDelete,
   description
 }) => {
   const [isOver, setIsOver] = React.useState(false);
@@ -81,9 +83,24 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         <h4 className="text-white text-[13px] font-bold leading-tight flex-1">
           {title}
         </h4>
-        <span className="font-mono text-[10px] text-neutral-500 font-bold">
-          #{String(id).slice(-4)}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0 -mt-0.5">
+          <span className="font-mono text-[10px] text-neutral-500 font-bold">
+            #{String(id).slice(-4)}
+          </span>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded-none bg-black border border-neutral-700 text-neutral-400 hover:text-white hover:bg-[#EF4444] hover:border-[#EF4444] transition-all cursor-pointer flex items-center justify-center shadow-[1px_1px_0px_0px_#000000]"
+              title="Delete task"
+            >
+              <Trash2 size={11} />
+            </button>
+          )}
+        </div>
       </div>
 
       {description && (

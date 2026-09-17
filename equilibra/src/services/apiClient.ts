@@ -12,6 +12,9 @@ export async function apiFetch<T>(
   const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const method = (options.method || "GET").toUpperCase();
+  if (method !== "GET") {
+    pendingGetRequests.clear();
+  }
   const cacheKey = method === "GET" ? url : null;
 
   // Deduplicate identical simultaneous GET requests to prevent "multiple getter" loops and StrictMode duplicate calls

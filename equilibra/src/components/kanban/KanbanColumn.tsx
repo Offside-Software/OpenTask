@@ -1,10 +1,11 @@
 import React from 'react';
-import { CheckCircle2, Trash2, Plus } from 'lucide-react';
+import { CheckCircle2, Trash2, Plus, Settings2 } from 'lucide-react';
 import { Badge } from '../../design-system/Badge';
 
 interface KanbanColumnProps {
   id: number | string;
   name: string;
+  description?: string;
   colorClass: string;
   statusText: string;
   taskCount: number;
@@ -13,12 +14,14 @@ interface KanbanColumnProps {
   onDropColumn?: (e: React.DragEvent<HTMLDivElement>, targetColumnId: number | string) => void;
   onAddTask?: (bucketId: number | string) => void;
   onDeleteBucket?: (bucketId: number | string) => void;
+  onEditBucket?: (bucketId: number | string) => void;
   children: React.ReactNode;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   id,
   name,
+  description,
   colorClass,
   statusText,
   taskCount,
@@ -27,6 +30,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onDropColumn,
   onAddTask,
   onDeleteBucket,
+  onEditBucket,
   children
 }) => {
   const [isOver, setIsOver] = React.useState(false);
@@ -78,16 +82,25 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       {/* Column Header */}
       <div className="p-3.5 border-b-2 border-neutral-700 bg-[#141619] select-none">
         <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-2">
-            <div className={`w-2.5 h-2.5 rounded-none border border-black ${colorClass}`} />
-            <h3 className="text-white font-mono font-black text-[13px] uppercase tracking-wider">
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <div className={`w-2.5 h-2.5 rounded-none border border-black shrink-0 ${colorClass}`} />
+            <h3 className="text-white font-mono font-black text-[13px] uppercase tracking-wider truncate" title={name}>
               <span className="text-[#FFE600] mr-1">//</span>{name}
             </h3>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <span className="px-1.5 py-0.5 rounded-none bg-black text-[#FFE600] border border-neutral-700 font-mono text-[10px] font-black">
               {String(taskCount).padStart(2, '0')}
             </span>
+            {onEditBucket && (
+              <button
+                onClick={() => onEditBucket(id)}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded-none hover:bg-[#FFE600] hover:text-black text-neutral-400 border border-transparent hover:border-black transition-all cursor-pointer"
+                title="Column settings"
+              >
+                <Settings2 size={13} />
+              </button>
+            )}
             {onDeleteBucket && (
               <button
                 onClick={() => onDeleteBucket(id)}
@@ -99,6 +112,12 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             )}
           </div>
         </div>
+
+        {description && (
+          <p className="text-[11px] font-mono text-neutral-400 line-clamp-1 mb-2">
+            {description}
+          </p>
+        )}
 
         <div className="flex items-center gap-2">
           <Badge 

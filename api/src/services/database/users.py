@@ -79,8 +79,8 @@ def db_get_users(username: Optional[str] = None):
         if username:
             search = f"%{username}%"
             cur.execute(
-                "SELECT id, display_name, created_at, gh_username, gh_id, email FROM opentask.users WHERE gh_username ILIKE %s;",
-                (search,)
+                "SELECT id, display_name, created_at, gh_username, gh_id, email FROM opentask.users WHERE gh_username ILIKE %s OR display_name ILIKE %s OR email ILIKE %s;",
+                (search, search, search)
             )
         else:
             cur.execute(

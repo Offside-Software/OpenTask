@@ -18,18 +18,13 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [taskTitle, setTaskTitle] = useState(initial.title ?? '');
   const [type, setType] = useState<TaskType>(initial.type ?? 'CODE');
   const [weight, setWeight] = useState(initial.weight ?? 3);
-  const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskTitle.trim()) return;
-    setSaving(true);
-    await onSubmit({ project_id: projectId, title: taskTitle.trim(), type, weight, bucket_id: initial.bucket_id });
-    setSaving(false);
     onClose();
+    await onSubmit({ project_id: projectId, title: taskTitle.trim(), type, weight, bucket_id: initial.bucket_id });
   };
-
-
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none" onClick={onClose}>
@@ -95,10 +90,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={saving || !taskTitle.trim()}
+              disabled={!taskTitle.trim()}
               className="flex-1 py-2.5 rounded-none text-[12px] font-mono font-black uppercase tracking-wider bg-[#FFE600] text-black border-2 border-black shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
             >
-              {saving ? 'SAVING…' : title}
+              {title}
             </button>
           </div>
         </form>

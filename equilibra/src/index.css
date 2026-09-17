@@ -106,13 +106,19 @@
 body {
   margin: 0;
   min-width: 320px;
-  background-color: #0B0E14;
+  background-color: var(--cmd-app-bg);
   color: var(--cmd-text-body);
 }
 
 .bg-dots {
-  background-color: #0B0E14;
+  background-color: var(--cmd-app-bg);
   background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+:root[data-theme="light"] .bg-dots {
+  background-color: var(--cmd-app-bg);
+  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 0);
   background-size: 24px 24px;
 }
 

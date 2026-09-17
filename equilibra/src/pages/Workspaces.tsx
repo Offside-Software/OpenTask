@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Briefcase, Plus, Trash2 } from 'lucide-react';
+import { Briefcase, Plus } from 'lucide-react';
 import { ProjectCard } from '../components/dashboard/ProjectCard';
 import { useProjects } from '../controllers/useProjects';
 import { ProjectFormModal } from '../components/modals/ProjectFormModal';
@@ -10,23 +10,13 @@ import { useNavigate } from 'react-router-dom';
 type ModalMode = 'create' | 'edit' | null;
 
 export const WorkspacesPage: React.FC = () => {
-  const { projects, loading, createProject, deleteProject } = useProjects();
+  const { projects, loading, createProject } = useProjects();
   const navigate = useNavigate();
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editTarget, setEditTarget] = useState<Partial<Project>>({});
-  const [deletingId, setDeletingId] = useState<number | string | null>(null);
 
   const handleCreate = async (data: Pick<Project, 'name' | 'gh_repo_url'> & Partial<Project>) => {
     await createProject(data);
-  };
-
-  const handleDelete = async (id: number | string) => {
-    if (!window.confirm("Are you sure you want to delete this project? All associated tasks, buckets, and data will be permanently removed.")) {
-      return;
-    }
-    setDeletingId(id);
-    await deleteProject(id);
-    setDeletingId(null);
   };
 
   const openCreate = () => {
@@ -74,22 +64,13 @@ export const WorkspacesPage: React.FC = () => {
               NO PROJECTS FOUND. <button onClick={openCreate} className="text-[#FFE600] hover:underline font-bold ml-1">CREATE ONE NOW.</button>
             </div>
           ) : projects.map(p => (
-            <div key={p.id} className="relative group">
-              <ProjectCard
-                title={p.name}
-                desc={p.issue || "System operating within normal parameters."}
-                progress={p.progress}
-                onClick={() => navigate(`/projects/${p.id}`)}
-              />
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(p.id!); }}
-                disabled={String(deletingId) === String(p.id)}
-                className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-white hover:bg-[#EF4444] shadow-[2px_2px_0px_0px_#000000] transition-all z-10 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                title="Delete project"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
+            <ProjectCard
+              key={p.id}
+              title={p.name}
+              desc={p.issue || "System operating within normal parameters."}
+              progress={p.progress}
+              onClick={() => navigate(`/projects/${p.id}`)}
+            />
           ))}
         </div>
       </section>

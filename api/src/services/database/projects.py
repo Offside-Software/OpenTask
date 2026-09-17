@@ -221,17 +221,17 @@ def db_delete_project(project_id: int):
 
 # ---------------------------------------------------------------------------
 # GET /projects/{project_id}/board  — Kanban Data Contract
-# Returns ONLY the fields the UI needs. No description, no branch_name.
+# Returns all fields the UI needs including description and branch_name.
 # ---------------------------------------------------------------------------
 @db_router.get("/projects/{project_id}/board", response_model=BoardResponse)
-def db_get_project_board_data(project_id: int):
+def db_get_project_board_data(project_id: SafeId):
     conn = _get_conn()
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute(
-            "SELECT id, name, state, order_idx, is_system_locked "
+            "SELECT id, project_id, name, description, state, order_idx, is_system_locked, created_at, updated_at "
             "FROM opentask.buckets WHERE project_id = %s "
             "ORDER BY order_idx ASC;",
             (project_id,)
@@ -239,8 +239,9 @@ def db_get_project_board_data(project_id: int):
         buckets = cur.fetchall()
 
         cur.execute(
-            "SELECT id, bucket_id, title, type, weight, "
-            "lead_assignee_id, suggested_assignee_id, last_activity_at, order_idx "
+            "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, "
+            "suggested_assignee_id, title, description, type, weight, branch_name, "
+            "last_activity_at, order_idx, created_at, updated_at "
             "FROM opentask.tasks WHERE project_id = %s "
             "ORDER BY order_idx ASC;",
             (project_id,)

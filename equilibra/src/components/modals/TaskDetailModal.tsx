@@ -7,7 +7,7 @@ interface TaskDetailModalProps {
     buckets: Bucket[];
     members: ProjectMember[];
     onClose: () => void;
-    onUpdate: (taskId: number, data: Partial<Task>) => Promise<void>;
+    onUpdate: (taskId: string | number, data: Partial<Task>) => Promise<void>;
 }
 
 const TASK_TYPES: TaskType[] = ['CODE', 'REQUIREMENT', 'DESIGN', 'NON-CODE', 'OTHER'];
@@ -20,20 +20,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [description, setDescription] = useState(task.description || '');
     const [type, setType] = useState<TaskType>(task.type);
     const [weight, setWeight] = useState<number>(task.weight);
-    const [bucketId, setBucketId] = useState<number | undefined>(task.bucket_id ? Number(task.bucket_id) : undefined);
-    const [leadAssigneeId, setLeadAssigneeId] = useState<number | undefined>(task.lead_assignee_id ? Number(task.lead_assignee_id) : undefined);
+    const [bucketId, setBucketId] = useState<string | undefined>(task.bucket_id ? String(task.bucket_id) : undefined);
+    const [leadAssigneeId, setLeadAssigneeId] = useState<string | undefined>(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
 
     const [branchName, setBranchName] = useState(task.branch_name || '');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setTitle(task.title);
         setDescription(task.description || '');
         setType(task.type);
         setWeight(task.weight);
-        setBucketId(task.bucket_id ? Number(task.bucket_id) : undefined);
-        setLeadAssigneeId(task.lead_assignee_id ? Number(task.lead_assignee_id) : undefined);
+        setBucketId(task.bucket_id ? String(task.bucket_id) : undefined);
+        setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
         setBranchName(task.branch_name || '');
     }, [task]);
 
@@ -42,17 +41,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         if (!title.trim() || !task.id) return;
 
         setSaving(true);
-        await onUpdate(Number(task.id), {
+        const updatePayload: Partial<Task> = {
             title: title.trim(),
             description: description.trim() || undefined,
             type,
             weight: Number(weight),
-            bucket_id: bucketId ? String(bucketId) : undefined,
-            lead_assignee_id: leadAssigneeId ? String(leadAssigneeId) : undefined,
+            bucket_id: bucketId || undefined,
+            lead_assignee_id: leadAssigneeId || undefined,
             branch_name: branchName.trim() || undefined,
-        });
-        setSaving(false);
-        onClose();
+        };
+        try {
+            await onUpdate(task.id, updatePayload);
+            onClose();
+        } catch (err) {
+            console.error("Failed to update task", err);
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -137,13 +142,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <div>
                             <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><Activity size={13} /> STATE GROUP</label>
                             <select
-                                value={bucketId ? String(bucketId) : ''}
-                                onChange={(e) => setBucketId(e.target.value ? Number(e.target.value) : undefined)}
+                                value={bucketId || ''}
+                                onChange={(e) => setBucketId(e.target.value || undefined)}
                                 className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                             >
                                 <option value="" disabled>Select Bucket...</option>
                                 {buckets.map(b => (
-                                    <option key={String(b.id)} value={b.id ? String(b.id) : ''}>{b.state}</option>
+                                    <option key={String(b.id)} value={String(b.id)}>{b.name} ({b.state})</option>
                                 ))}
                             </select>
                         </div>
@@ -176,13 +181,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <div>
                             <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">LEAD ASSIGNEE</label>
                             <select
-                                value={leadAssigneeId ? String(leadAssigneeId) : ''}
-                                onChange={(e) => setLeadAssigneeId(e.target.value ? Number(e.target.value) : undefined)}
+                                value={leadAssigneeId || ''}
+                                onChange={(e) => setLeadAssigneeId(e.target.value || undefined)}
                                 className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                             >
                                 <option value="">UNASSIGNED</option>
                                 {members.map(m => (
-                                    <option key={String(m.id)} value={m.id ? String(m.id) : ''}>{m.gh_username || `Member #${m.user_id}`}</option>
+                                    <option key={String(m.user_id)} value={String(m.user_id)}>{m.gh_username || `Member #${m.user_id}`}</option>
                                 ))}
                             </select>
                         </div>

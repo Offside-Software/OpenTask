@@ -35,15 +35,28 @@ def db_create_member(project_id: SafeId, member: DatabaseProjectMember):
         print(f"[DEBUG] db_create_member called - project_id={project_id} user_id={member.user_id}")
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+        user_id = member.user_id
+        gh_username = member.gh_username
+
+        if not user_id and gh_username:
+            user_row = get_or_create_user(username=gh_username)
+            if user_row:
+                user_id = str(user_row["id"])
+        elif user_id and not gh_username:
+            cur.execute("SELECT gh_username FROM opentask.users WHERE id = %s;", (user_id,))
+            u_row = cur.fetchone()
+            if u_row:
+                gh_username = u_row.get("gh_username")
+
         mapping = {
             "id": _generator.generate(),
-            "user_id": member.user_id,
+            "user_id": user_id,
             "project_id": project_id,
             "role": member.role,
             "kpi_score": member.kpi_score,
             "max_capacity": member.max_capacity,
             "current_load": member.current_load,
-            "gh_username": member.gh_username,
+            "gh_username": gh_username,
         }
 
         columns = []

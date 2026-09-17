@@ -15,6 +15,7 @@ export interface Bucket {
   id?: number | string;
   project_id: number | string;
   name: string;
+  description?: string;
   state: BucketState;
   is_system_locked?: boolean;
   order_idx: number;

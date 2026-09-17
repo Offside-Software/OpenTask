@@ -152,6 +152,15 @@ def create_pool(minconn: int = 1, maxconn: int = 10):
                 dsn=dsn,
             )
             print("[DATABASE] Connected to PostgreSQL pool.")
+            # Ensure schema migrations
+            try:
+                mig_conn = _pool.getconn()
+                with mig_conn.cursor() as cur:
+                    cur.execute("ALTER TABLE opentask.buckets ADD COLUMN IF NOT EXISTS description TEXT;")
+                mig_conn.commit()
+                _pool.putconn(mig_conn)
+            except Exception as mig_err:
+                print(f"[DATABASE MIGRATION NOTICE] {mig_err}")
         except Exception as e:
             print(f"[DATABASE WARNING] Could not connect to PostgreSQL on startup: {e}")
             print("[DATABASE INFO] Set POSTGRESQL_DATABASE_URL in api/.env to connect to database features.")

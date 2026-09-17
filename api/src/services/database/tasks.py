@@ -122,7 +122,7 @@ def db_get_tasks():
 
 
 @db_router.get("/tasks/{task_id}")
-def db_get_task_by_id(task_id: int):
+def db_get_task_by_id(task_id: SafeId):
     conn = _get_conn()
     cur = None
     try:
@@ -157,7 +157,7 @@ class TaskUpdate(BaseModel):
     order_idx: Optional[int] = None
 
 @db_router.put("/tasks/{task_id}")
-def db_update_task(task_id: int, task_data: TaskUpdate, background_tasks: BackgroundTasks):
+def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: BackgroundTasks):
     conn = _get_conn()
     cur = None
     try:
@@ -193,7 +193,7 @@ def db_update_task(task_id: int, task_data: TaskUpdate, background_tasks: Backgr
 
 
 @db_router.delete("/tasks/{task_id}")
-def db_delete_task(task_id: int):
+def db_delete_task(task_id: SafeId):
     """Hard delete a task."""
     conn = _get_conn()
     cur = None
@@ -218,7 +218,7 @@ def db_delete_task(task_id: int):
 
 
 @db_router.put("/projects/{project_id}/buckets/{bucket_id}/tasks/reorder")
-def db_reorder_tasks(project_id: int, bucket_id: int, task_ids: list[int], background_tasks: BackgroundTasks):
+def db_reorder_tasks(project_id: SafeId, bucket_id: SafeId, task_ids: list[SafeId], background_tasks: BackgroundTasks):
     """Batch reorder tasks inside a specific bucket."""
     conn = _get_conn()
     cur = None
@@ -230,29 +230,34 @@ def db_reorder_tasks(project_id: int, bucket_id: int, task_ids: list[int], backg
             return {"status": "success", "order": [], "bucket_id": bucket_id}
 
         format_strings = ','.join(['%s'] * len(task_ids))
+        # Lock rows in consistent sorted order to eliminate deadlocks with concurrent deletes/updates
+        sorted_ids = sorted(task_ids, key=lambda x: int(x))
         cur.execute(
-            f"SELECT id FROM opentask.tasks WHERE project_id = %s AND id IN ({format_strings});",
-            tuple([project_id] + task_ids)
+            f"SELECT id FROM opentask.tasks WHERE project_id = %s AND id IN ({format_strings}) ORDER BY id FOR UPDATE;",
+            tuple([project_id] + sorted_ids)
         )
-        valid_tasks = set(row['id'] for row in cur.fetchall())
-        invalid_tasks = set(task_ids) - valid_tasks
+        valid_tasks = {str(row['id']) for row in cur.fetchall()}
+        invalid_tasks = {str(t) for t in task_ids} - valid_tasks
         if invalid_tasks:
             raise HTTPException(status_code=400, detail=f"Invalid task IDs for this project: {invalid_tasks}")
             
-        # Step 1: Push out of the valid constraint range to avoid conflicts
+        # Update all tasks in a single atomic CASE statement
+        cases = " ".join(["WHEN id = %s THEN %s" for _ in task_ids])
+        params = []
         for idx, t_id in enumerate(task_ids):
-            cur.execute(
-                "UPDATE opentask.tasks SET order_idx = %s, bucket_id = %s WHERE id = %s AND project_id = %s;",
-                (-(idx + 1000), bucket_id, t_id, project_id)
-            )
+            params.extend([t_id, idx])
+        params.append(bucket_id)
+        params.append(project_id)
+        params.extend(task_ids)
 
-        # Step 2: Set absolute new order_idx within the same bucket
-        for idx, t_id in enumerate(task_ids):
-            cur.execute(
-                "UPDATE opentask.tasks SET order_idx = %s, updated_at = NOW() WHERE id = %s AND project_id = %s;",
-                (idx, t_id, project_id)
-            )
-
+        query = f"""
+            UPDATE opentask.tasks
+            SET order_idx = CASE {cases} ELSE order_idx END,
+                bucket_id = %s,
+                updated_at = NOW()
+            WHERE project_id = %s AND id IN ({format_strings});
+        """
+        cur.execute(query, tuple(params))
         conn.commit()
         
         from services.github_sync import sync_task_to_github_branch
@@ -260,6 +265,9 @@ def db_reorder_tasks(project_id: int, bucket_id: int, task_ids: list[int], backg
             background_tasks.add_task(sync_task_to_github_branch, t_id, bucket_id)
             
         return {"status": "success", "order": task_ids, "bucket_id": bucket_id}
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))

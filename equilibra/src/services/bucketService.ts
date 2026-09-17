@@ -34,6 +34,20 @@ export const bucketService = {
     );
   },
 
+  updateBucket: async (
+    projectId: string | number,
+    bucketId: string | number,
+    data: Partial<Bucket>,
+  ): Promise<Bucket> => {
+    return await apiFetch<Bucket>(
+      `/projects/${projectId}/buckets/${bucketId}`,
+      {
+        method: "PUT",
+        body: JSONBig.stringify(data),
+      },
+    );
+  },
+
   deleteBucket: async (
     projectId: string | number,
     bucketId: string | number,

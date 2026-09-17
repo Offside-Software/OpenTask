@@ -14,6 +14,7 @@ class DatabaseBucket(BaseModel):
     id: Optional[SafeId] = None
     project_id: Optional[SafeId] = None
     name: Optional[str] = ""
+    description: Optional[str] = None
     state: Optional[str] = ""
     is_system_locked: Optional[bool] = False
     created_at: Optional[datetime] = None
@@ -41,6 +42,7 @@ def db_create_bucket(item: DatabaseBucket):
             "id": _generator.generate(),
             "project_id": item.project_id,
             "name": item.name or item.state or "Untitled",
+            "description": item.description,
             "state": item.state,
             "is_system_locked": item.is_system_locked if item.is_system_locked is not None else False,
             "created_at": item.created_at,
@@ -61,7 +63,7 @@ def db_create_bucket(item: DatabaseBucket):
         
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO opentask.buckets ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx;"
+        sql = f"INSERT INTO opentask.buckets ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, name, description, state, is_system_locked, created_at, updated_at, order_idx;"
 
         cur.execute(sql, params)
         conn.commit()
@@ -87,7 +89,7 @@ def db_get_buckets(project_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx FROM opentask.buckets WHERE project_id = %s ORDER BY order_idx ASC;",
+            "SELECT id, project_id, name, description, state, is_system_locked, created_at, updated_at, order_idx FROM opentask.buckets WHERE project_id = %s ORDER BY order_idx ASC;",
             (project_id,)
         )
         rows = cur.fetchall()
@@ -105,7 +107,7 @@ def db_get_bucket_by_id(project_id: int, bucket_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, project_id, name, state, is_system_locked, created_at, updated_at, order_idx FROM opentask.buckets WHERE id = %s AND project_id = %s LIMIT 1;",
+            "SELECT id, project_id, name, description, state, is_system_locked, created_at, updated_at, order_idx FROM opentask.buckets WHERE id = %s AND project_id = %s LIMIT 1;",
             (bucket_id, project_id),
         )
         row = cur.fetchone()
@@ -118,29 +120,78 @@ def db_get_bucket_by_id(project_id: int, bucket_id: int):
         _put_conn(conn)
 
 
+class BucketUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    state: Optional[str] = None
+
+
 @db_router.put("/projects/{project_id}/buckets/reorder")
-def db_reorder_buckets(project_id: int, bucket_ids: list[SafeId]):
+def db_reorder_buckets(project_id: SafeId, bucket_ids: list[SafeId]):
     conn = _get_conn()
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        
-        # Step 1: Set order_idx to negative equivalents to avoid unique constraint violations during swap
-        for idx, b_id in enumerate(bucket_ids):
-            cur.execute(
-                "UPDATE opentask.buckets SET order_idx = %s WHERE id = %s AND project_id = %s;",
-                (-(idx + 1000), b_id, project_id)
-            )
-            
-        # Step 2: Set absolute new order_idx
-        for idx, b_id in enumerate(bucket_ids):
-            cur.execute(
-                "UPDATE opentask.buckets SET order_idx = %s, updated_at = NOW() WHERE id = %s AND project_id = %s;",
-                (idx, b_id, project_id)
-            )
+        if bucket_ids:
+            cases = " ".join(["WHEN id = %s THEN %s" for _ in bucket_ids])
+            params = []
+            for idx, b_id in enumerate(bucket_ids):
+                params.extend([b_id, idx])
+            params.append(project_id)
+            params.extend(bucket_ids)
 
-        conn.commit()
+            in_placeholders = ",".join(["%s"] * len(bucket_ids))
+            query = f"""
+                UPDATE opentask.buckets
+                SET order_idx = CASE {cases} ELSE order_idx END,
+                    updated_at = NOW()
+                WHERE project_id = %s AND id IN ({in_placeholders});
+            """
+            cur.execute(query, tuple(params))
+            conn.commit()
         return {"status": "success", "order": bucket_ids}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+
+
+@db_router.put("/projects/{project_id}/buckets/{bucket_id}")
+@db_router.put("/buckets/{bucket_id}")
+def db_update_bucket(bucket_id: SafeId, item: BucketUpdate, project_id: Optional[SafeId] = None):
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        update_data = item.dict(exclude_unset=True)
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No data provided for update")
+
+        set_clause = ", ".join([f"{k} = %s" for k in update_data.keys()])
+        params = list(update_data.values())
+        params.append(bucket_id)
+
+        if project_id is not None:
+            params.append(project_id)
+            sql = f"UPDATE opentask.buckets SET {set_clause}, updated_at = NOW() WHERE id = %s AND project_id = %s RETURNING id, project_id, name, description, state, is_system_locked, created_at, updated_at, order_idx;"
+        else:
+            sql = f"UPDATE opentask.buckets SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, project_id, name, description, state, is_system_locked, created_at, updated_at, order_idx;"
+
+        cur.execute(sql, params)
+        conn.commit()
+        row = cur.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Bucket not found")
+        return row
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
