@@ -1,6 +1,7 @@
 import React from 'react';
-import { CheckCircle2, Trash2, Plus, Settings2 } from 'lucide-react';
+import { CheckCircle2, Plus, Settings2 } from 'lucide-react';
 import { Badge } from '../../design-system/Badge';
+import { TrashButton } from '../../design-system/TrashButton';
 
 interface KanbanColumnProps {
   id: number | string;
@@ -102,13 +103,11 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               </button>
             )}
             {onDeleteBucket && (
-              <button
-                onClick={() => onDeleteBucket(id)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded-none hover:bg-[#FF3333] hover:text-white text-neutral-400 border border-transparent hover:border-black transition-all cursor-pointer"
-                title="Delete column"
-              >
-                <Trash2 size={13} />
-              </button>
+              <TrashButton 
+                onClick={() => {
+                  onDeleteBucket(id)
+                }}
+                ></TrashButton>
             )}
           </div>
         </div>

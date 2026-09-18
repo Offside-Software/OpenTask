@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus } from 'lucide-react';
+import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus } from 'lucide-react';
 import type { Task, Bucket, ProjectMember } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
+import { CloseButton } from '../../design-system/CloseButton';
+import { useToast } from '../../design-system/Toast';
+import { Badge } from '../../design-system/Badge';
 
 interface TaskDetailModalProps {
     task: Task;
@@ -28,6 +31,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [availableTypes, setAvailableTypes] = useState<string[]>(() => getAllTaskTypes([task.type]));
     const [isAddingType, setIsAddingType] = useState(false);
     const [customTypeInput, setCustomTypeInput] = useState('');
+    const { showToast } = useToast();
 
     const handleToggleType = (t: string) => {
         setSelectedTypes(prev => {
@@ -120,19 +124,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         }
     };
 
+    const handleCopyIdToClipboard = async(taskId: string) => {
+        try {
+            await navigator.clipboard.writeText(taskId);
+            showToast(`Task ID '${taskId}' Copied to Clipboard`, 'success');
+        }
+        catch {
+            showToast("Task ID Copied to Clipboard", 'warning');
+        }
+    }
+
     return (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none" onClick={onClose}>
             <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-2xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
-                <div className="flex items-start flex-col gap-3 p-6 border-b-2 border-black relative bg-[#181B20]">
-                    <button 
-                        onClick={onClose} 
-                        className="absolute top-6 right-6 p-1.5 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer"
-                    >
-                        <X size={18} strokeWidth={3} />
-                    </button>
-                    <div className="flex items-center gap-3 w-full pr-12">
+                <div className="flex items-start flex-col gap-3 p-6 border-b-2 border-black bg-[#181B20]">
+                    <div className="flex items-center gap-3 w-full">
                         <div className={`p-2 rounded-none ${isCompleted ? 'bg-[#00FF66]' : 'bg-[#FFE600]'} text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0 transition-colors`}>
                             <CheckSquare size={18} strokeWidth={2.5} />
                         </div>
@@ -142,12 +150,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             placeholder="TASK TITLE"
                             className={`bg-transparent ${isCompleted ? 'text-neutral-400 line-through' : 'text-white'} font-mono font-black uppercase text-lg w-full focus:outline-none focus:border-b-2 focus:border-[#FFE600] rounded-none px-2 py-1 -ml-2 transition-all`}
                         />
+                        <CloseButton onClick={onClose} size='md'/>
                     </div>
-                    <div className="flex items-center justify-between w-full pr-12 flex-wrap gap-2">
+                    <div className="flex items-center justify-between w-full flex-wrap gap-2">
                         <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-400 uppercase">
                             <span>// PROJECT PIPELINE</span>
                             <span className="w-1.5 h-1.5 bg-[#FFE600]"></span>
-                            <span>TASK ID: #{String(task.id)}</span>
+                            <button type='button' onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyIdToClipboard(String(task.id));
+                                }}
+                                className="font-mono text-[13px] px-2 text-neutral-500 font-bold hover:bg-[#00FF66] hover:text-black hover:border-black hover:border hover:shadow-[1.5px_1.5px_0px_0px_#000000]">
+                                TASK ID: #{String(task.id)}
+                            </button>
                         </div>
 
                         {/* Mark as Complete Checkbox in Header */}
@@ -156,8 +171,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             onClick={() => handleToggleComplete(!isCompleted)}
                             className={`flex items-center gap-2 cursor-pointer select-none px-3 py-1 border-2 transition-all active:translate-x-[1px] active:translate-y-[1px] ${
                                 isCompleted
-                                    ? 'bg-[#00FF66]/15 border-[#00FF66] shadow-[2px_2px_0px_0px_#00FF66]'
-                                    : 'bg-[#0E1012] border-black hover:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000]'
+                                    ? 'bg-[#00FF66] border-black shadow-[2px_2px_0px_0px_#000000]'
+                                    : 'hover:bg-[#00FF66] border-black shadow-[2px_2px_0px_0px_#000000]'
                             }`}
                         >
                             <div className={`w-4 h-4 rounded-none border-2 flex items-center justify-center transition-all ${
@@ -168,7 +183,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 {isCompleted && <Check size={11} strokeWidth={3.5} />}
                             </div>
                             <span className={`text-[11px] font-mono font-black tracking-wider uppercase ${
-                                isCompleted ? 'text-[#00FF66]' : 'text-neutral-300'
+                                isCompleted ? 'text-white' : 'text-neutral-300'
                             }`}>
                                 {isCompleted ? 'COMPLETED' : 'MARK AS COMPLETE'}
                             </span>
@@ -223,37 +238,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                     {/* Sidebar (Right) */}
                     <div className="w-full md:w-64 space-y-5 shrink-0">
-
-                        {/* Mark as Complete Sidebar Card */}
-                        <div
-                            onClick={() => handleToggleComplete(!isCompleted)}
-                            className={`p-3 border-2 transition-all cursor-pointer select-none ${
-                                isCompleted
-                                    ? 'bg-[#00FF66]/10 border-[#00FF66] shadow-[2px_2px_0px_0px_#00FF66]'
-                                    : 'bg-[#0B0E14] border-black hover:border-neutral-500 shadow-[2px_2px_0px_0px_#000000]'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`w-5 h-5 rounded-none border-2 flex items-center justify-center transition-all shrink-0 ${
-                                    isCompleted
-                                        ? 'bg-[#00FF66] border-black text-black shadow-[1.5px_1.5px_0px_0px_#000000]'
-                                        : 'bg-[#121417] border-neutral-600'
-                                }`}>
-                                    {isCompleted && <Check size={13} strokeWidth={3.5} />}
-                                </div>
-                                <div>
-                                    <div className={`text-[11px] font-mono font-black uppercase tracking-wider ${
-                                        isCompleted ? 'text-[#00FF66]' : 'text-white'
-                                    }`}>
-                                        {isCompleted ? 'TASK COMPLETED' : 'MARK AS COMPLETE'}
-                                    </div>
-                                    <div className="text-[9px] font-mono text-neutral-400 mt-0.5">
-                                        {isCompleted ? 'In Completed column' : 'Move to Completed column'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* Bucket (State) */}
                         <div>
                             <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><Activity size={13} /> STATE GROUP</label>
@@ -277,9 +261,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setIsAddingType(true)}
-                                        className="text-[10px] font-mono font-bold text-[#FFE600] hover:underline flex items-center gap-1 cursor-pointer"
+                                        className="text-[10px] font-mono font-bold text-white hover:underline flex items-center gap-1 cursor-pointer"
                                     >
-                                        <Plus size={11} /> NEW
+                                        <Plus size={11}/>NEW
                                     </button>
                                 )}
                             </div>
@@ -287,25 +271,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             {/* Selected Type Badges */}
                             <div className="flex flex-wrap gap-1.5 min-h-[28px] mb-2 p-1.5 bg-[#0B0E14] border-2 border-black">
                                 {selectedTypes.map(t => (
-                                    <span
-                                        key={t}
-                                        className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-white"
-                                    >
-                                        <span className={getTaskTypeVariant(t) === 'critical' ? 'text-[#FF3333]' : getTaskTypeVariant(t) === 'warning' ? 'text-[#FFE600]' : getTaskTypeVariant(t) === 'success' ? 'text-[#00FF66]' : 'text-[#00E5FF]'}>
-                                            ●
-                                        </span>
+                                    <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.5 !px-1.5 !text-[11px]">
                                         {t}
                                         {selectedTypes.length > 1 && (
                                             <button
-                                                type="button"
-                                                onClick={() => handleToggleType(t)}
-                                                className="hover:text-[#FF3333] cursor-pointer ml-0.5"
-                                                title={`Remove ${t}`}
-                                            >
-                                                ✕
+                                            type="button"
+                                            onClick={() => handleToggleType(t)}
+                                            className="hover:text-[#FF3333] cursor-pointer ml-0.5"
+                                            title={`Remove ${t}`}
+                                            >✕
                                             </button>
                                         )}
-                                    </span>
+                                    </Badge>
                                 ))}
                             </div>
 

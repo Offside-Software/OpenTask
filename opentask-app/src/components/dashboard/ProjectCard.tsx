@@ -25,7 +25,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       <div className="p-2.5 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
         <Briefcase size={20} strokeWidth={2.5} />
       </div>
-      <span className="font-mono text-[10px] font-bold uppercase tracking-wider bg-black text-neutral-300 border border-neutral-700 px-2 py-0.5">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-wider bg-black text-neutral-600 border border-neutral-700 px-2 py-0.5">
         // WS-PROJECT
       </span>
     </div>

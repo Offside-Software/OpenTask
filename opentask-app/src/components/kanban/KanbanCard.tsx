@@ -1,8 +1,10 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
-import { Clock, GitPullRequest, MoreHorizontal, Trash2, Check } from 'lucide-react';
+import { Clock, GitPullRequest, MoreHorizontal, Check } from 'lucide-react';
 import type { TaskType } from '../../models';
 import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
+import { TrashButton } from '../../design-system/TrashButton';
+import { useToast } from '../../design-system/Toast';
 
 interface KanbanCardProps {
   id: string | number;
@@ -53,6 +55,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   description
 }) => {
   const [isOver, setIsOver] = React.useState(false);
+  const { showToast } = useToast();
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('taskId', id.toString());
@@ -79,6 +82,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       }
     }
   };
+
+  const handleCopyIdToClipboard = async() => {
+    try {
+      const taskId = `#${String(id).slice(-4)}`;
+      await navigator.clipboard.writeText(taskId);
+      showToast(`Task ID '${taskId}' Copied to Clipboard`, 'success');
+    }
+    catch {
+      showToast("Task ID Copied to Clipboard", 'warning');
+    }
+  }
 
   return (
     <div
@@ -132,21 +146,21 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           {title}
         </h4>
         <div className="flex items-center gap-1.5 shrink-0 -mt-0.5">
-          <span className="font-mono text-[10px] text-neutral-500 font-bold">
+          <button type='button' onClick={(e) => {
+              e.stopPropagation();
+              handleCopyIdToClipboard();
+            }} 
+          className="font-mono text-[13px] px-2 text-neutral-500 font-bold hover:bg-[#00FF66] hover:text-black hover:border hover:shadow-[1.5px_1.5px_0px_0px_#000000]">
             #{String(id).slice(-4)}
-          </span>
+          </button>
+
           {onDelete && (
-            <button
-              type="button"
+            <TrashButton 
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
-              }}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded-none bg-black border border-neutral-700 text-neutral-400 hover:text-white hover:bg-[#EF4444] hover:border-[#EF4444] transition-all cursor-pointer flex items-center justify-center shadow-[1px_1px_0px_0px_#000000]"
-              title="Delete task"
-            >
-              <Trash2 size={11} />
-            </button>
+              }}>
+            </TrashButton>
           )}
         </div>
       </div>
@@ -160,16 +174,16 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {/* Tags & Weight */}
       <div className="flex gap-1.5 flex-wrap items-center mt-1">
         {isCompleted && (
-          <Badge variant="success" className="!py-0.5 !px-1.5 !text-[9px]">
+          <Badge variant="success" className="!py-0.5 !px-1.5 !text-[11px]">
             DONE
           </Badge>
         )}
         {parseTaskTypes(type).map((t) => (
-          <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.5 !px-1.5 !text-[9px]">
+          <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.5 !px-1.5 !text-[11px]">
             {t}
           </Badge>
         ))}
-        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-[#FFE600]">
+        <span className="font-mono self-end text-[11px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-[#FFE600]">
           {weight} PTS
         </span>
       </div>
@@ -190,7 +204,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {/* Card Footer */}
       <div className="mt-2 pt-2 border-t-2 border-neutral-800 flex items-center justify-between">
         {assignee ? (
-          <div className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[10px] font-black flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000000] max-w-[170px]">
+          <div className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[11px] font-black flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000000] max-w-[170px]">
             {assigneeAvatar ? (
               <img
                 src={assigneeAvatar}
@@ -213,7 +227,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             <span className="truncate">{assignee.toUpperCase()}</span>
           </div>
         ) : (
-          <div className="font-mono text-[10px] text-neutral-500 font-semibold uppercase">
+          <div className="font-mono text-[11px] text-neutral-500 font-semibold uppercase">
             [UNASSIGNED]
           </div>
         )}

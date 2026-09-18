@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { X, CheckSquare, Plus } from 'lucide-react';
+import { CheckSquare, Plus } from 'lucide-react';
+import { Badge } from '../../design-system/Badge';
 import type { Task, TaskType } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
+import { CloseButton } from '../../design-system/CloseButton';
 
 interface TaskFormModalProps {
   projectId: number | string;
@@ -64,9 +66,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </div>
             <h2 className="text-white font-mono font-black uppercase tracking-wider text-[15px]">{title}</h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer">
-            <X size={16} strokeWidth={3} />
-          </button>
+          <CloseButton onClick={onClose}></CloseButton>
         </div>
 
         {/* Form */}
@@ -101,13 +101,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               {/* Selected Type Badges */}
               <div className="flex flex-wrap gap-1.5 min-h-[28px] mb-2 p-1.5 bg-[#0B0E14] border-2 border-black">
                 {selectedTypes.map(t => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-white"
-                  >
-                    <span className={getTaskTypeVariant(t) === 'critical' ? 'text-[#FF3333]' : getTaskTypeVariant(t) === 'warning' ? 'text-[#FFE600]' : getTaskTypeVariant(t) === 'success' ? 'text-[#00FF66]' : 'text-[#00E5FF]'}>
-                      ●
-                    </span>
+                  
+                  <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.5 !px-1.5 !text-[11px]">
                     {t}
                     {selectedTypes.length > 1 && (
                       <button
@@ -115,11 +110,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         onClick={() => handleToggleType(t)}
                         className="hover:text-[#FF3333] cursor-pointer ml-0.5"
                         title={`Remove ${t}`}
-                      >
-                        ✕
+                      >✕
                       </button>
                     )}
-                  </span>
+
+                  </Badge>
                 ))}
               </div>
 

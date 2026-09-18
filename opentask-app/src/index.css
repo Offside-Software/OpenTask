@@ -1,0 +1,368 @@
+@import "tailwindcss";
+
+:root {
+  /* Brutalist Industrial Dark Palette (Default) */
+  --cmd-app-bg: #0C0D0E;
+  --cmd-surface: #141619;
+  --cmd-component: #1E2227;
+  --cmd-border: #2D3239;
+  --cmd-border-hard: #FFFFFF;
+  --cmd-primary: #FFE600;
+  --cmd-success: #00FF66;
+  --cmd-danger: #FF3333;
+  --cmd-warning: #FF9900;
+  --cmd-info: #00E5FF;
+  --cmd-magenta: #FF2A85;
+
+  /* Typography */
+  --cmd-font-stack: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cmd-font-mono: "JetBrains Mono", monospace;
+  
+  --cmd-text-h1: #FFFFFF;
+  --cmd-text-h2: #FFFFFF;
+  --cmd-text-body: #E5E7EB;
+  --cmd-text-meta: #9CA3AF;
+  --cmd-text-mono: #FFE600;
+
+  /* Brutal Shadows */
+  --brutal-shadow-color: #000000;
+  --brutal-shadow: 4px 4px 0px 0px var(--brutal-shadow-color);
+  --brutal-shadow-sm: 2px 2px 0px 0px var(--brutal-shadow-color);
+  --brutal-shadow-lg: 6px 6px 0px 0px var(--brutal-shadow-color);
+
+  color-scheme: dark;
+  font-family: var(--cmd-font-stack);
+  line-height: 1.4;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--cmd-text-body);
+  background: var(--cmd-app-bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+}
+
+:root[data-theme="light"],
+html[data-theme="light"],
+html.light {
+  --cmd-app-bg: #F4F4F0;
+  --cmd-surface: #FFFFFF;
+  --cmd-component: #EAEAE4;
+  --cmd-border: #000000;
+  --cmd-border-hard: #000000;
+  --cmd-primary: #FFE600;
+  --cmd-success: #00CC55;
+  --cmd-danger: #E60000;
+  --cmd-warning: #FF8800;
+  --cmd-info: #0088FF;
+  --cmd-magenta: #E60066;
+
+  --cmd-text-h1: #000000;
+  --cmd-text-h2: #000000;
+  --cmd-text-body: #111111;
+  --cmd-text-meta: #4B5563;
+  --cmd-text-mono: #000000;
+
+  --brutal-shadow-color: #000000;
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   NEO-BRUTALIST LIGHT MODE DESIGN SYSTEM OVERRIDES
+   ========================================================================== */
+
+[data-theme="light"] body {
+  background-color: var(--cmd-app-bg);
+  color: #111111;
+}
+
+/* Light mode blocky scrollbar */
+[data-theme="light"] * {
+  scrollbar-color: #9CA3AF #F4F4F0;
+}
+[data-theme="light"] *::-webkit-scrollbar-track {
+  background: #F4F4F0;
+  border: 1px solid #000000;
+}
+[data-theme="light"] *::-webkit-scrollbar-thumb {
+  background-color: #CBD5E1;
+  border: 1px solid #000000;
+}
+[data-theme="light"] *::-webkit-scrollbar-thumb:hover {
+  background-color: #FFE600;
+}
+
+/* Base Surfaces & Cards in Light Mode */
+[data-theme="light"] .bg-\[\#0C0D0E\],
+[data-theme="light"] .bg-\[\#0B0E14\],
+[data-theme="light"] .bg-\[\#0E1012\],
+[data-theme="light"] .bg-\[\#0a0c10\],
+[data-theme="light"] .bg-\[\#121417\],
+[data-theme="light"] .bg-\[\#141619\],
+[data-theme="light"] .bg-\[\#16191D\],
+[data-theme="light"] .bg-\[\#1E2227\],
+[data-theme="light"] .bg-\[\#1F242D\],
+[data-theme="light"] .bg-\[\#1a1d21\],
+[data-theme="light"] .bg-\[\#101214\],
+[data-theme="light"] .bg-neutral-900,
+[data-theme="light"] .bg-neutral-950 {
+  background-color: #FFFFFF !important;
+}
+
+/* Soft contrast backgrounds for inner sections & secondary boxes */
+[data-theme="light"] .bg-\[\#181B20\],
+[data-theme="light"] .bg-neutral-800 {
+  background-color: #F0F0EB !important;
+}
+
+/* Sidebar in Light Mode */
+[data-theme="light"] aside {
+  background-color: #FFFFFF !important;
+  border-right-color: #000000 !important;
+  box-shadow: 4px 0px 0px 0px #000000 !important;
+}
+[data-theme="light"] aside nav a:not([class*="bg-\[\#FFE600\]"]) {
+  background-color: #F4F4F0 !important;
+  border-color: #000000 !important;
+  color: #374151 !important;
+}
+[data-theme="light"] aside nav a:not([class*="bg-\[\#FFE600\]"]):hover {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  box-shadow: 2px 2px 0px 0px #000000 !important;
+}
+[data-theme="light"] aside nav a[class*="bg-\[\#FFE600\]"] {
+  background-color: #FFE600 !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+  box-shadow: 3px 3px 0px 0px #000000 !important;
+}
+[data-theme="light"] aside button {
+  background-color: #F4F4F0 !important;
+  border-color: #000000 !important;
+  color: #000000 !important;
+}
+[data-theme="light"] aside button:hover {
+  background-color: #FFFFFF !important;
+}
+
+/* Kanban Columns in Light Mode */
+[data-theme="light"] .group.min-w-\[316px\].bg-\[\#0E1012\],
+[data-theme="light"] .group.min-w-\[316px\] {
+  background-color: #EAEAE4 !important;
+  border-color: #000000 !important;
+}
+[data-theme="light"] .group.min-w-\[316px\] .bg-\[\#141619\] {
+  background-color: #FFFFFF !important;
+  border-color: #000000 !important;
+}
+
+/* Text Overrides for crisp readability */
+[data-theme="light"] .text-white:not(
+  .bg-\[\#FF3333\], .bg-\[\#EF4444\], .bg-\[\#DC2626\], .bg-red-500, .bg-red-600,
+  .bg-\[\#A855F7\], .bg-purple-600,
+  .bg-\[\#FF3333\] *, .bg-\[\#EF4444\] *, .bg-\[\#DC2626\] *, .bg-red-500 *, .bg-red-600 *,
+  .bg-\[\#A855F7\] *, .bg-purple-600 *
+) {
+  color: #000000 !important;
+}
+
+[data-theme="light"] .text-neutral-100,
+[data-theme="light"] .text-neutral-200 {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .text-neutral-300 {
+  color: #374151 !important;
+}
+
+[data-theme="light"] .text-neutral-400 {
+  color: #4B5563 !important;
+}
+
+[data-theme="light"] .text-neutral-500 {
+  color: #6B7280 !important;
+}
+
+[data-theme="light"] .text-neutral-600 {
+  color: #c1c5cc !important;
+}
+
+/* Borders in Light Mode */
+[data-theme="light"] .border-neutral-600,
+[data-theme="light"] .border-neutral-700,
+[data-theme="light"] .border-neutral-800,
+[data-theme="light"] .border-neutral-900 {
+  border-color: #000000 !important;
+}
+
+/* Inputs, Textareas, and Dropdowns in Light Mode */
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #9CA3AF !important;
+}
+
+/* Modals & Dialogs in Light Mode */
+[data-theme="light"] .fixed.inset-0.bg-black\/80 {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Neo-Brutalist Badges & Tags */
+[data-theme="light"] .bg-\[\#1E2227\].text-neutral-200 {
+  background-color: #EAEAE4 !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+/* Project Pulse SVG Chart in Light Mode */
+[data-theme="light"] svg line[stroke="#262626"] {
+  stroke: #E5E7EB !important;
+}
+[data-theme="light"] svg text[fill="#737373"] {
+  fill: #4B5563 !important;
+}
+
+/* Popovers & Tooltips in Light Mode */
+[data-theme="light"] .shadow-\[4px_4px_0px_0px_\#000000\].bg-\[\#121417\],
+[data-theme="light"] .shadow-\[4px_4px_0px_0px_\#000000\].bg-\[\#141619\] {
+  background-color: #FFFFFF !important;
+}
+
+/* Brutalist selection */
+::selection {
+  background: #FFE600;
+  color: #000000;
+}
+
+/* Sharp elements by default */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Blocky industrial scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 var(--cmd-app-bg);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--cmd-app-bg);
+  border: 1px solid var(--cmd-border);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #374151;
+  border-radius: 0px !important;
+  border: 1px solid #000000;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--cmd-primary);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background-color: var(--cmd-app-bg);
+  color: var(--cmd-text-body);
+}
+
+.bg-dots {
+  background-color: var(--cmd-app-bg);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+:root[data-theme="light"] .bg-dots {
+  background-color: var(--cmd-app-bg);
+  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* Brutalist Utility Classes */
+.brutal-border {
+  border: 2px solid #000000;
+}
+
+.brutal-border-white {
+  border: 2px solid #FFFFFF;
+}
+
+.brutal-card {
+  border: 2px solid #2D3239;
+  background-color: var(--cmd-surface);
+  box-shadow: 4px 4px 0px 0px #000000;
+  border-radius: 0px !important;
+}
+
+.brutal-card-highlight {
+  border: 2px solid #FFE600;
+  background-color: var(--cmd-surface);
+  box-shadow: 4px 4px 0px 0px #FFE600;
+  border-radius: 0px !important;
+}
+
+.brutal-btn {
+  font-family: var(--cmd-font-stack);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 2px solid #000000;
+  box-shadow: 3px 3px 0px 0px #000000;
+  border-radius: 0px !important;
+  transition: transform 60ms ease, box-shadow 60ms ease;
+  cursor: pointer;
+}
+
+.brutal-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px 0px #000000;
+}
+
+.brutal-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0px 0px 0px 0px #000000 !important;
+}
+
+.brutal-mono {
+  font-family: var(--cmd-font-mono);
+}
+
+.brutal-tag {
+  font-family: var(--cmd-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1.5px solid #000000;
+  box-shadow: 1.5px 1.5px 0px 0px #000000;
+  border-radius: 0px !important;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cmd-animate-spin {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  transform-origin: center;
+}

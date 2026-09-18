@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Send, ExternalLink, Shield, Bell, User, Sun, Moon } from 'lucide-react';
+import { Send, ExternalLink, Shield, Bell, User, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { updateTelegramChatId } from '../../auth/api';
 import { useTheme } from '../../context/themeContext';
+import { CloseButton } from '../../design-system/CloseButton';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -51,17 +52,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             <p className="text-neutral-400 text-[11px] uppercase tracking-wider">// PROFILE & DISPATCH CHANNELS</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer">
-                        <X size={18} strokeWidth={3} />
-                    </button>
+                    <CloseButton onClick={onClose} size='md'/>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 space-y-6">
                     {/* User Info Section */}
                     <section>
-                        <h4 className="text-[#FFE600] text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <User size={12} /> // PROFILE SPECIFICATION
+                        <h4 className="text-white text-[13px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <User size={12} /> 
+                            <span className="text-[#FFE600] mr-1.5">//</span>PROFILE SPECIFICATION
                         </h4>
                         <div className="bg-[#0B0E14] border-2 border-black rounded-none p-4 flex items-center gap-4 shadow-[2px_2px_0px_0px_#000000]">
                             <img src={user?.avatar_url} alt="Avatar" className="w-12 h-12 rounded-none border-2 border-black" />
@@ -74,8 +74,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
                     {/* Theme Section */}
                     <section>
-                        <h4 className="text-[#FFE600] text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Sun size={12} /> // INTERFACE THEME
+                        <h4 className="text-white text-[13px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Sun size={12} />
+                            <div>
+                                <span className="text-[#FFE600] mr-1.5">//</span>INTERFACE THEME
+                            </div>
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <button
@@ -105,8 +108,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
                     {/* Telegram Section */}
                     <section>
-                        <h4 className="text-[#FFE600] text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Bell size={12} /> // TELEGRAM DISPATCH PIPELINE
+                        <h4 className="text-white text-[13px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Bell size={12} />
+                            <span className="text-[#FFE600] mr-1.5">//</span>TELEGRAM DISPATCH PIPELINE
                         </h4>
 
                         <div className="space-y-4">

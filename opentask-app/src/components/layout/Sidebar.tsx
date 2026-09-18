@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { LayoutDashboard, Briefcase, Bell, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Bell, Settings, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
+import { useTheme } from '../../context/themeContext';
 import { getDisplayName } from '../../auth/displayName';
 import logo from '../../assets/logo.png';
 import { useAlerts } from '../../controllers/useAlerts';
@@ -19,6 +20,7 @@ interface SidebarProps {
 
 export function Sidebar({ onOpenSettings }: SidebarProps) {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const { alerts } = useAlerts();
@@ -101,6 +103,26 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
 
           {/* Bottom Actions */}
           <div className="mt-auto w-full flex flex-col gap-2.5">
+            {/* Quick Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
+            >
+              <div className="w-10 h-full flex items-center justify-center shrink-0">
+                {theme === 'dark' ? (
+                  <Sun size={18} strokeWidth={2.5} className="text-[#FFE600]" />
+                ) : (
+                  <Moon size={18} strokeWidth={2.5} className="text-black" />
+                )}
+              </div>
+              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+                <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 whitespace-nowrap block">
+                  {theme === 'dark' ? 'LIGHT THEME' : 'DARK THEME'}
+                </span>
+              </div>
+            </button>
+
             <button
               onClick={onOpenSettings}
               title="System Settings"
