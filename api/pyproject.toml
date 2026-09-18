@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Evangelion Manuhutu", email = "evangelionxyz10@gmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
     "annotated-doc==0.0.4",
     "annotated-types==0.7.0",

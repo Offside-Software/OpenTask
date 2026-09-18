@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import "../MeetingAnalyzer.css"; // Reusing established styles
 import { useTasks } from "../../controllers/useTasks";
+import { resolveApiUrl } from "../../services/apiClient";
 
 interface Task {
   id: string;
@@ -65,7 +66,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
     if (view === "processing") {
       interval = setInterval(async () => {
         const response = await fetch(
-          `http://localhost:8000/meetings/poll-analysis`,
+          resolveApiUrl("/meetings/poll-analysis"),
           { credentials: "include" }
         );
         if (response.ok) {
@@ -127,8 +128,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
     formData.append("project_id", String(projectId));
 
     try {
-      // Hitting backend directly to avoid Vite proxy multipart form drop bugs
-      const response = await fetch("http://localhost:8000/analyze-meeting", {
+      const response = await fetch(resolveApiUrl("/analyze-meeting"), {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -180,9 +180,11 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
 
     try {
       const response = await fetch(
-        `http://localhost:8000/invite-bot?meeting_url=${encodeURIComponent(
-          meetingUrl
-        )}&project_id=${projectId}`,
+        resolveApiUrl(
+          `/invite-bot?meeting_url=${encodeURIComponent(
+            meetingUrl
+          )}&project_id=${projectId}`
+        ),
         {
           method: "POST",
           credentials: "include",

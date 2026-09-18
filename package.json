@@ -1,0 +1,7 @@
+{
+  "name": "opentask-workspace",
+  "private": true,
+  "scripts": {
+    "build": "cd opentask-app && bun install && bun run build"
+  }
+}

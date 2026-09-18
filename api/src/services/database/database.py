@@ -1,4 +1,5 @@
 import hashlib
+import os
 import socket
 import tempfile
 import psycopg2
@@ -140,18 +141,24 @@ def postgresql_dsn():
     return dsn
 
 
-def create_pool(minconn: int = 2, maxconn: int = 30):
+def create_pool(minconn: Optional[int] = None, maxconn: Optional[int] = None):
     """Create a threaded connection pool using the full Postgres URL from settings."""
     global _pool
     if _pool is None:
         try:
+            is_serverless = bool(os.getenv("VERCEL"))
+            default_min = 1 if is_serverless else 2
+            default_max = 3 if is_serverless else 30
+            actual_min = int(os.getenv("POSTGRESQL_POOL_MIN", str(minconn if minconn is not None else default_min)))
+            actual_max = int(os.getenv("POSTGRESQL_POOL_MAX", str(maxconn if maxconn is not None else default_max)))
+
             dsn = postgresql_dsn()
             _pool = psycopg2.pool.ThreadedConnectionPool(
-                minconn,
-                maxconn,
+                actual_min,
+                actual_max,
                 dsn=dsn,
             )
-            print("[DATABASE] Connected to PostgreSQL pool.")
+            print(f"[DATABASE] Connected to PostgreSQL pool (min={actual_min}, max={actual_max}).")
             # Ensure schema migrations
             try:
                 mig_conn = _pool.getconn()

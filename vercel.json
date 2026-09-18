@@ -1,8 +1,15 @@
 {
+  "version": 2,
+  "buildCommand": "cd opentask-app && bun install && bun run build",
+  "outputDirectory": "opentask-app/dist",
   "rewrites": [
     {
-      "source": "/opentask-app/(.*)",
-      "destination": "/opentask-app/index.html"
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

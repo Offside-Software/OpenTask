@@ -1,6 +1,20 @@
 import JSONBig from "json-bigint";
 
-const BASE_URL = "http://localhost:8000";
+export const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+
+export function resolveApiUrl(endpoint: string): string {
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  // If BASE_URL is "/api" and cleanEndpoint already starts with "/api/", avoid "/api/api/..."
+  if (BASE_URL === "/api" && cleanEndpoint.startsWith("/api/")) {
+    return cleanEndpoint;
+  }
+
+  const cleanBase = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
+  return `${cleanBase}${cleanEndpoint}`;
+}
 
 // Map to cleanly deduplicate concurrent identical GET requests
 const pendingGetRequests = new Map<string, Promise<unknown>>();
@@ -9,7 +23,7 @@ export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const url = resolveApiUrl(endpoint);
 
   const method = (options.method || "GET").toUpperCase();
   if (method !== "GET") {

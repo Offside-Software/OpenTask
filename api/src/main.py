@@ -33,9 +33,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Lunaris API", version="0.1.0", lifespan=lifespan)
 
+from config import settings
+
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+]
+if getattr(settings, "frontend_url", None):
+    fe_url = settings.frontend_url.rstrip("/")
+    if fe_url not in allowed_origins:
+        allowed_origins.append(fe_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8000"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

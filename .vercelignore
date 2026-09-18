@@ -1,0 +1,31 @@
+# Vercel Ignore file
+# Ignore Rust backend and local caches
+opentask-api
+opentask-api/**
+target
+target/**
+
+# Python virtualenvs and caches
+api/.venv
+api/.venv/**
+.venv
+.venv/**
+__pycache__
+__pycache__/**
+*.pyc
+
+# Local node_modules
+opentask-app/node_modules
+opentask-app/node_modules/**
+node_modules
+node_modules/**
+
+# Git and CI
+.git
+.github
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile
+api/Dockerfile
