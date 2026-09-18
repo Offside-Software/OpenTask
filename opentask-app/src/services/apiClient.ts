@@ -53,7 +53,8 @@ export async function apiFetch<T>(
 
   const fetchPromise = (async () => {
     let attempts = 0;
-    const maxAttempts = method === "GET" ? 2 : 1;
+    const isIdempotent = ["GET", "HEAD", "PUT", "DELETE"].includes(method);
+    const maxAttempts = isIdempotent ? 2 : 1;
 
     try {
       while (attempts < maxAttempts) {
@@ -62,8 +63,8 @@ export async function apiFetch<T>(
           const response = await fetch(url, config);
 
           if (!response.ok) {
-            // If server error on GET (e.g. cold start / transient pooler reset), retry once before failing
-            if (attempts < maxAttempts && response.status >= 500 && response.status <= 504) {
+            // If server error on idempotent request (e.g. cold start / pooler reset), retry once before failing
+            if (attempts < maxAttempts && isIdempotent && response.status >= 500 && response.status <= 504) {
               await new Promise((res) => setTimeout(res, 350));
               continue;
             }
@@ -85,7 +86,7 @@ export async function apiFetch<T>(
           const text = await response.text();
           return (text ? JSONBig({ storeAsString: true }).parse(text) : {}) as T;
         } catch (error) {
-          if (attempts < maxAttempts && method === "GET") {
+          if (attempts < maxAttempts && isIdempotent) {
             await new Promise((res) => setTimeout(res, 350));
             continue;
           }

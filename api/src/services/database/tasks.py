@@ -92,7 +92,6 @@ def db_create_task(task: DatabaseTask, current_user: dict | None = Depends(get_c
         sql = f"INSERT INTO opentask.tasks ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
 
         cur.execute(sql, params)
-        conn.commit()
         row = cur.fetchone()
 
         # Log project history & activity
@@ -108,8 +107,9 @@ def db_create_task(task: DatabaseTask, current_user: dict | None = Depends(get_c
             entity_id=row["id"],
             metadata={"title": task.title, "bucket_id": str(target_bucket_id), "type": task.type, "weight": task.weight},
             user_id=user_id,
+            conn=conn,
         )
-
+        conn.commit()
         return row
     except HTTPException:
         conn.rollback()
@@ -201,12 +201,10 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
         sql = f"UPDATE opentask.tasks SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
         
         cur.execute(sql, params)
-        conn.commit()
         row = cur.fetchone()
-        
-        if update_data.get("bucket_id") is not None: 
-            from services.github_sync import sync_task_to_github_branch
-            background_tasks.add_task(sync_task_to_github_branch, task_id, update_data["bucket_id"])
+        if row is None:
+            conn.rollback()
+            raise HTTPException(status_code=404, detail="Task not found")
 
         # Determine user identity
         user_id, user_name = resolve_user_info(cur, current_user, update_data.get("lead_assignee_id") or old_task.get("lead_assignee_id"))
@@ -234,6 +232,7 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
                     entity_id=task_id,
                     metadata={"title": title, "bucket_id": str(new_bucket_id), "bucket_name": b_name},
                     user_id=user_id,
+                    conn=conn,
                 )
             else:
                 record_project_event(
@@ -246,7 +245,14 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
                     entity_id=task_id,
                     metadata={"title": title, "bucket_id": str(new_bucket_id), "bucket_name": b_name},
                     user_id=user_id,
+                    conn=conn,
                 )
+
+            # Only sync to GitHub if moving to an active ONGOING branch and it is a CODE task
+            if b_state == "ONGOING" and row.get("type") == "CODE":
+                from services.github_sync import sync_task_to_github_branch
+                background_tasks.add_task(sync_task_to_github_branch, task_id, new_bucket_id)
+
         elif "lead_assignee_id" in update_data and update_data["lead_assignee_id"] != old_task.get("lead_assignee_id"):
             record_project_event(
                 project_id=row["project_id"],
@@ -258,6 +264,7 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
                 entity_id=task_id,
                 metadata={"title": title, "lead_assignee_id": str(update_data["lead_assignee_id"])},
                 user_id=user_id,
+                conn=conn,
             )
         elif "title" in update_data or "description" in update_data:
             record_project_event(
@@ -270,11 +277,17 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
                 entity_id=task_id,
                 metadata={"title": title},
                 user_id=user_id,
+                conn=conn,
             )
 
-        if row is None:
-            raise HTTPException(status_code=404, detail="Task not found")
+        conn.commit()
         return row
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if cur is not None:
             cur.close()
@@ -294,7 +307,6 @@ def db_delete_task(task_id: SafeId, current_user: dict | None = Depends(get_curr
             raise HTTPException(status_code=404, detail="Task not found")
 
         cur.execute("DELETE FROM opentask.tasks WHERE id = %s RETURNING id;", (task_id,))
-        conn.commit()
 
         user_id, user_name = resolve_user_info(cur, current_user, old_task.get("lead_assignee_id"))
 
@@ -308,7 +320,9 @@ def db_delete_task(task_id: SafeId, current_user: dict | None = Depends(get_curr
             entity_id=task_id,
             metadata={"title": old_task["title"]},
             user_id=user_id,
+            conn=conn,
         )
+        conn.commit()
 
         return {"id": task_id, "status": "deleted"}
     except HTTPException:
@@ -388,8 +402,7 @@ def db_reorder_tasks(
             WHERE project_id = %s AND id IN ({format_strings});
         """
         cur.execute(query, tuple(params))
-        conn.commit()
-        
+
         # Log project events for tasks that moved across buckets
         for m_task in moved_tasks:
             u_id, u_name = resolve_user_info(cur, current_user, m_task.get("lead_assignee_id"))
@@ -405,6 +418,7 @@ def db_reorder_tasks(
                     entity_id=m_task["id"],
                     metadata={"title": t_title, "bucket_id": str(bucket_id), "bucket_name": target_bucket_name},
                     user_id=u_id,
+                    conn=conn,
                 )
             else:
                 record_project_event(
@@ -417,12 +431,18 @@ def db_reorder_tasks(
                     entity_id=m_task["id"],
                     metadata={"title": t_title, "bucket_id": str(bucket_id), "bucket_name": target_bucket_name},
                     user_id=u_id,
+                    conn=conn,
                 )
 
-        from services.github_sync import sync_task_to_github_branch
-        for t_id in task_ids:
-            background_tasks.add_task(sync_task_to_github_branch, t_id, bucket_id)
-            
+        conn.commit()
+
+        # Only queue GitHub branch sync for CODE tasks that actually moved into an ONGOING bucket
+        if target_bucket_state == "ONGOING" and moved_tasks:
+            from services.github_sync import sync_task_to_github_branch
+            for m_task in moved_tasks:
+                if m_task.get("type") == "CODE":
+                    background_tasks.add_task(sync_task_to_github_branch, m_task["id"], bucket_id)
+
         return {"status": "success", "order": task_ids, "bucket_id": bucket_id}
     except HTTPException:
         conn.rollback()

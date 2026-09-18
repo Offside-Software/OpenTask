@@ -153,7 +153,7 @@ def create_pool(minconn: Optional[int] = None, maxconn: Optional[int] = None):
         try:
             is_serverless = bool(os.getenv("VERCEL"))
             default_min = 1 if is_serverless else 2
-            default_max = 3 if is_serverless else 30
+            default_max = 10 if is_serverless else 30
             actual_min = int(os.getenv("POSTGRESQL_POOL_MIN", str(minconn if minconn is not None else default_min)))
             actual_max = int(os.getenv("POSTGRESQL_POOL_MAX", str(maxconn if maxconn is not None else default_max)))
 
@@ -202,39 +202,60 @@ def _get_conn():
         )
 
     # In serverless environments, validate that the pooled connection is live
-    # (recovers seamlessly if Supabase pooler dropped the idle socket)
-    for attempt in range(2):
+    # (recovers seamlessly if Supabase pooler dropped an idle socket)
+    for attempt in range(3):
         conn = None
         try:
             conn = _pool.getconn()
             if conn.closed != 0:
                 raise psycopg2.OperationalError("Connection is closed")
 
-            # Fast ping to ensure connection didn't drop during idle lambda freeze
+            # Reset any uncommitted or error transaction state
+            if conn.get_transaction_status() != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+                conn.rollback()
+
+            # Fast ping to ensure connection didn't drop during idle freeze
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
+            conn.rollback()  # Crucial: restore to TRANSACTION_STATUS_IDLE after ping
             return conn
-        except (psycopg2.OperationalError, psycopg2.InterfaceError, Exception) as e:
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            # Stale / dead socket: discard this connection specifically, do NOT destroy the whole pool
             if conn is not None and _pool is not None:
                 try:
                     _pool.putconn(conn, close=True)
                 except Exception:
                     pass
-            if attempt == 0:
-                print(f"[DATABASE] Stale connection detected on checkout ({e}). Recycling pool...")
-                close_pool()
-                create_pool()
-            else:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Database connection error: {e}"
-                )
+            if attempt < 2:
+                continue
+            raise HTTPException(
+                status_code=503,
+                detail=f"Database connection error: {e}"
+            )
+        except Exception as e:
+            if conn is not None and _pool is not None:
+                try:
+                    _pool.putconn(conn, close=True)
+                except Exception:
+                    pass
+            raise HTTPException(
+                status_code=503,
+                detail=f"Database connection pool error: {e}"
+            )
 
 
 def _put_conn(conn):
     global _pool
     if _pool is not None and conn is not None:
         try:
+            if conn.closed == 0:
+                # Clean up any open or aborted transaction state before returning to pool
+                if conn.get_transaction_status() != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+                    conn.rollback()
             _pool.putconn(conn)
         except Exception:
-            pass
+            try:
+                _pool.putconn(conn, close=True)
+            except Exception:
+                pass
+

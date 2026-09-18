@@ -252,6 +252,10 @@ def db_get_project_board_data(project_id: SafeId):
             "buckets": [DatabaseBucket(**b) for b in buckets],
             "tasks": [DatabaseTask(**t) for t in tasks]
         }
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if cur is not None:
             cur.close()
@@ -369,6 +373,10 @@ def db_get_project_dashboard_data(project_id: int):
             "metrics": metrics,
             "activity": activities
         }
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if cur is not None:
             cur.close()

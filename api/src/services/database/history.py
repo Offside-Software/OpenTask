@@ -122,11 +122,17 @@ def record_project_event(
     metadata: Optional[Dict[str, Any]] = None,
     user_id: Optional[int | str] = None,
     created_at: Optional[datetime] = None,
+    conn: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Log an event into both opentask.project_history and opentask.activities.
+    Reuses provided connection if given to avoid nested pool checkouts.
     """
-    conn = _get_conn()
+    should_close_conn = False
+    if conn is None:
+        conn = _get_conn()
+        should_close_conn = True
+
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -172,16 +178,19 @@ def record_project_event(
         )
         act_row = cur.fetchone()
 
-        conn.commit()
-        return hist_row or act_row
+        if should_close_conn:
+            conn.commit()
+        return hist_row or act_row or {}
     except Exception as e:
-        conn.rollback()
+        if should_close_conn and conn:
+            conn.rollback()
         print(f"[ERROR] Failed to record project event: {e}")
         return {}
     finally:
         if cur is not None:
             cur.close()
-        _put_conn(conn)
+        if should_close_conn:
+            _put_conn(conn)
 
 
 @db_router.get("/projects/{project_id}/activities/timeline")

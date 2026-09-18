@@ -110,6 +110,10 @@ def db_get_alerts():
         )
         rows = cur.fetchall()
         return rows
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if cur is not None:
             cur.close()
@@ -134,6 +138,10 @@ def db_get_alerts_for_user(user_id: str):
         )
         rows = cur.fetchall()
         return rows
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if cur is not None:
             cur.close()
@@ -159,6 +167,14 @@ def db_get_alert_by_id(alert_id: int):
         if row is None:
             raise HTTPException(status_code=404, detail="Alert not found")
         return row
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if cur is not None:
             cur.close()

@@ -55,12 +55,6 @@ export const useAlerts = (
 
   useEffect(() => {
     fetchAlerts();
-
-    const intervalId = setInterval(() => {
-      fetchAlerts(true);
-    }, 5000);
-
-    return () => clearInterval(intervalId);
   }, [fetchAlerts]);
 
   const resolveAlert = useCallback(async (id: number | string) => {
