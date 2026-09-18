@@ -142,7 +142,6 @@ def send_push_notification(
         "icon": icon,
     })
 
-    vapid_claims = {"sub": settings.vapid_claim_email}
     sent_count = 0
 
     for sub in subscriptions:
@@ -159,7 +158,7 @@ def send_push_notification(
                 subscription_info=subscription_info,
                 data=payload,
                 vapid_private_key=settings.vapid_private_key,
-                vapid_claims=vapid_claims,
+                vapid_claims={"sub": settings.vapid_claim_email},
                 ttl=3600,
             )
             sent_count += 1
@@ -181,9 +180,63 @@ def notify_task_assigned(
     assignee_id: int | str,
     project_id: int | str,
     project_name: Optional[str] = None,
+    task_id: Optional[int | str] = None,
 ):
-    """Trigger Web Push notification when a task is assigned to a user."""
-    proj_text = f" in {project_name}" if project_name else ""
+    """
+    Trigger both a persistent DB Alert in opentask.alerts AND a Web Push notification
+    when a task is assigned to a user.
+    """
+    conn = _get_conn()
+    cur = None
+    resolved_project_name = project_name
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if not resolved_project_name:
+            cur.execute("SELECT name FROM opentask.projects WHERE id = %s LIMIT 1;", (int(project_id),))
+            p_row = cur.fetchone()
+            if p_row:
+                resolved_project_name = p_row.get("name")
+
+        proj_text = f" in {resolved_project_name}" if resolved_project_name else ""
+        alert_title = f"Task Assigned: {task_title}"
+        alert_body = f'You were assigned to "{task_title}"{proj_text}.'
+
+        alert_id = _generator.generate()
+        cur.execute(
+            """
+            INSERT INTO opentask.alerts (
+                id, user_id, context_id, project_id, title, description,
+                type, severity, suggested_actions, is_resolved, created_at, updated_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, FALSE, NOW(), NOW()
+            );
+            """,
+            (
+                alert_id,
+                int(assignee_id),
+                int(task_id) if task_id else int(project_id),
+                int(project_id),
+                alert_title,
+                alert_body,
+                "TASK_ASSIGNED",
+                "info",
+                ["View Task", "Go to Project"],
+            ),
+        )
+        conn.commit()
+        logger.info(f"[NOTIFICATIONS] Persistent alert {alert_id} created for assignee {assignee_id}.")
+    except Exception as db_err:
+        if conn:
+            conn.rollback()
+        logger.warning(f"[NOTIFICATIONS] Failed to record task assigned alert in DB: {db_err}")
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+
+    # Dispatch Web Push
+    proj_text = f" in {resolved_project_name}" if resolved_project_name else ""
     title = "🔔 Task Assigned"
     body = f'You were assigned to "{task_title}"{proj_text}.'
     url = f"/projects/{project_id}"

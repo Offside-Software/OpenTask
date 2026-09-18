@@ -5,12 +5,13 @@ import { alertService } from "../services/alertService";
 interface UseAlertsOptions {
   userId?: string | number;
   projectId?: string | number;
+  includeResolved?: boolean;
 }
 
 export const useAlerts = (
   projectIdOrOptions?: string | number | UseAlertsOptions,
 ) => {
-  // Support both legacy useAlerts(projectId) and new useAlerts({ userId, projectId })
+  // Support both legacy useAlerts(projectId) and new useAlerts({ userId, projectId, includeResolved })
   const options: UseAlertsOptions =
     typeof projectIdOrOptions === "object" &&
     projectIdOrOptions !== null &&
@@ -18,7 +19,7 @@ export const useAlerts = (
       ? projectIdOrOptions
       : { projectId: projectIdOrOptions as string | number | undefined };
 
-  const { userId, projectId } = options;
+  const { userId, projectId, includeResolved = false } = options;
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +31,10 @@ export const useAlerts = (
         if (!silent) setLoading(true);
 
         let data: Alert[];
-        if (userId) {
+        if (includeResolved) {
+          // Comprehensive path: fetches full alert entities with user filter
+          data = await alertService.getMyAlerts(userId);
+        } else if (userId) {
           // Strict data-contract path: only unresolved, user-scoped
           data = await alertService.getAlertsForUser(userId);
         } else {
@@ -50,7 +54,7 @@ export const useAlerts = (
         if (!silent) setLoading(false);
       }
     },
-    [userId, projectId],
+    [userId, projectId, includeResolved],
   );
 
   useEffect(() => {
@@ -59,13 +63,20 @@ export const useAlerts = (
 
   const resolveAlert = useCallback(async (id: number | string) => {
     await alertService.resolveAlert(id);
-    // Remove from list immediately since the new endpoint only returns unresolved
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+    setAlerts((prev) =>
+      includeResolved
+        ? prev.map((a) => (a.id === id ? { ...a, is_resolved: true } : a))
+        : prev.filter((a) => a.id !== id),
+    );
+  }, [includeResolved]);
 
-  // When using user-scoped endpoint, all returned alerts are already unresolved.
-  // For legacy path, still filter by is_resolved.
-  const activeAlerts = userId ? alerts : alerts.filter((a) => !a.is_resolved);
+  // When includeResolved is true, return full array so the caller can filter.
+  // For other callers, preserve existing active-only behavior.
+  const activeAlerts = includeResolved
+    ? alerts
+    : userId
+    ? alerts
+    : alerts.filter((a) => !a.is_resolved);
 
-  return { alerts: activeAlerts, loading, error, resolveAlert };
+  return { alerts: activeAlerts, loading, error, resolveAlert, refetch: fetchAlerts };
 };

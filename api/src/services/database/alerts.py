@@ -98,16 +98,24 @@ async def db_create_alert(alert_data: DatabaseAlert):
 
 # ---------------------------------------------------------------------------
 @db_router.get("/alerts")
-def db_get_alerts():
+def db_get_alerts(user_id: Optional[str] = None):
     conn = _get_conn()
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(
-            "SELECT id, user_id, project_id, title, description, type, severity, "
-            "suggested_actions, is_resolved, created_at, updated_at "
-            "FROM opentask.alerts ORDER BY created_at DESC;"
-        )
+        if user_id:
+            cur.execute(
+                "SELECT id, user_id, project_id, title, description, type, severity, "
+                "suggested_actions, is_resolved, created_at, updated_at "
+                "FROM opentask.alerts WHERE user_id = %s OR user_id IS NULL ORDER BY created_at DESC;",
+                (user_id,)
+            )
+        else:
+            cur.execute(
+                "SELECT id, user_id, project_id, title, description, type, severity, "
+                "suggested_actions, is_resolved, created_at, updated_at "
+                "FROM opentask.alerts ORDER BY created_at DESC;"
+            )
         rows = cur.fetchall()
         return rows
     except Exception as e:

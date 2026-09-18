@@ -116,7 +116,8 @@ def db_create_task(task: DatabaseTask, current_user: dict | None = Depends(get_c
                 notify_task_assigned(
                     task_title=task.title,
                     assignee_id=task.lead_assignee_id,
-                    project_id=task.project_id
+                    project_id=task.project_id,
+                    task_id=row["id"]
                 )
             except Exception as notify_err:
                 print(f"[WARN] Failed to trigger assignee push: {notify_err}")
@@ -282,7 +283,8 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
                     notify_task_assigned(
                         task_title=title,
                         assignee_id=update_data["lead_assignee_id"],
-                        project_id=row["project_id"]
+                        project_id=row["project_id"],
+                        task_id=task_id
                     )
                 except Exception as notify_err:
                     print(f"[WARN] Failed to trigger assignee push: {notify_err}")
