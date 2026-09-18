@@ -132,6 +132,11 @@ def postgresql_dsn():
             q["sslmode"] = "require"
         if ssl_root_cert and "sslrootcert" not in q:
             q["sslrootcert"] = ssl_root_cert
+        if "keepalives" not in q:
+            q["keepalives"] = "1"
+            q["keepalives_idle"] = "30"
+            q["keepalives_interval"] = "10"
+            q["keepalives_count"] = "3"
         new_query = urlencode(q)
         parts = parts._replace(query=new_query)
         dsn = urlunparse(parts)
@@ -195,7 +200,35 @@ def _get_conn():
             status_code=503,
             detail="Database connection is not available. Please check POSTGRESQL_DATABASE_URL in api/.env"
         )
-    return _pool.getconn()
+
+    # In serverless environments, validate that the pooled connection is live
+    # (recovers seamlessly if Supabase pooler dropped the idle socket)
+    for attempt in range(2):
+        conn = None
+        try:
+            conn = _pool.getconn()
+            if conn.closed != 0:
+                raise psycopg2.OperationalError("Connection is closed")
+
+            # Fast ping to ensure connection didn't drop during idle lambda freeze
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+            return conn
+        except (psycopg2.OperationalError, psycopg2.InterfaceError, Exception) as e:
+            if conn is not None and _pool is not None:
+                try:
+                    _pool.putconn(conn, close=True)
+                except Exception:
+                    pass
+            if attempt == 0:
+                print(f"[DATABASE] Stale connection detected on checkout ({e}). Recycling pool...")
+                close_pool()
+                create_pool()
+            else:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Database connection error: {e}"
+                )
 
 
 def _put_conn(conn):

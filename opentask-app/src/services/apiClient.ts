@@ -52,29 +52,48 @@ export async function apiFetch<T>(
   };
 
   const fetchPromise = (async () => {
+    let attempts = 0;
+    const maxAttempts = method === "GET" ? 2 : 1;
+
     try {
-      const response = await fetch(url, config);
-
-      if (!response.ok) {
-        let errorData: Record<string, unknown> = {};
+      while (attempts < maxAttempts) {
+        attempts++;
         try {
+          const response = await fetch(url, config);
+
+          if (!response.ok) {
+            // If server error on GET (e.g. cold start / transient pooler reset), retry once before failing
+            if (attempts < maxAttempts && response.status >= 500 && response.status <= 504) {
+              await new Promise((res) => setTimeout(res, 350));
+              continue;
+            }
+
+            let errorData: Record<string, unknown> = {};
+            try {
+              const text = await response.text();
+              errorData = text ? JSONBig({ storeAsString: true }).parse(text) : {};
+            } catch {
+              // ignore parsing error for error bodies
+            }
+
+            throw new Error(
+              (errorData.detail as string) ||
+              `API Error: ${response.status} ${response.statusText}`,
+            );
+          }
+
           const text = await response.text();
-          errorData = text ? JSONBig({ storeAsString: true }).parse(text) : {};
-        } catch {
-          // ignore parsing error for error bodies
+          return (text ? JSONBig({ storeAsString: true }).parse(text) : {}) as T;
+        } catch (error) {
+          if (attempts < maxAttempts && method === "GET") {
+            await new Promise((res) => setTimeout(res, 350));
+            continue;
+          }
+          console.error(`Fetch error at ${url}:`, error);
+          throw error;
         }
-
-        throw new Error(
-          (errorData.detail as string) ||
-          `API Error: ${response.status} ${response.statusText}`,
-        );
       }
-
-      const text = await response.text();
-      return (text ? JSONBig({ storeAsString: true }).parse(text) : {}) as T;
-    } catch (error) {
-      console.error(`Fetch error at ${url}:`, error);
-      throw error;
+      throw new Error(`Request failed after ${attempts} attempts`);
     } finally {
       // Remove from pending map shortly after resolving to allow for minor timing discrepancies
       // e.g React StrictMode or slightly delayed sibling component mounts.

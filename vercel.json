@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "regions": ["sin1", "bom1"],
   "buildCommand": "cd opentask-app && bun install && bun run build",
   "outputDirectory": "opentask-app/dist",
   "rewrites": [
