@@ -3,7 +3,7 @@ import { LayoutDashboard, Briefcase, Bell, Settings, LogOut, Sun, Moon } from 'l
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../context/themeContext';
 import { getDisplayName } from '../../auth/displayName';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/logo.svg';
 import { useAlerts } from '../../controllers/useAlerts';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ConfirmModal } from '../modals/ConfirmModal';

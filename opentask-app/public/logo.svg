@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- OpenTask Minimalist Monochrome Geometric Mark (Adaptive Favicon) -->
+  <style>
+    path {
+      fill: #000000;
+    }
+    @media (prefers-color-scheme: dark) {
+      path {
+        fill: #FFFFFF;
+      }
+    }
+  </style>
+  <g>
+    <!-- Top Face with Open Aperture (compound path) -->
+    <path
+      fill-rule="evenodd"
+      d="M 256 72 
+         L 416 164 
+         L 256 256 
+         L 96 164 
+         Z
+         M 256 126 
+         L 352 181 
+         L 256 236 
+         L 160 181 
+         Z"
+    />
+
+    <!-- Inner Core Glyph (Isometric Task Diamond) -->
+    <path
+      d="M 256 157 
+         L 297 181 
+         L 256 205 
+         L 215 181 
+         Z"
+    />
+
+    <!-- Left Face -->
+    <path
+      d="M 96 186 
+         L 244 271 
+         L 244 440 
+         L 96 355 
+         Z"
+    />
+
+    <!-- Right Face -->
+    <path
+      d="M 268 271 
+         L 416 186 
+         L 416 355 
+         L 268 440 
+         Z"
+    />
+  </g>
+</svg>

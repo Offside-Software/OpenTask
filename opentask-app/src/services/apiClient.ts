@@ -1,19 +1,21 @@
 import JSONBig from "json-bigint";
 
-export const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export function resolveApiUrl(endpoint: string): string {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
-  // If BASE_URL is "/api" and cleanEndpoint already starts with "/api/", avoid "/api/api/..."
-  if (BASE_URL === "/api" && cleanEndpoint.startsWith("/api/")) {
-    return cleanEndpoint;
+  if (BASE_URL) {
+    const cleanBase = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
+    return `${cleanBase}${cleanEndpoint}`;
   }
 
-  const cleanBase = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
-  return `${cleanBase}${cleanEndpoint}`;
+  // In standard browser environment (both local dev and prod):
+  // Ensure the endpoint starts with /api so Vite proxy (dev) and Vercel (prod) route it to FastAPI:
+  if (cleanEndpoint.startsWith("/api/")) {
+    return cleanEndpoint;
+  }
+  return `/api${cleanEndpoint}`;
 }
 
 // Map to cleanly deduplicate concurrent identical GET requests

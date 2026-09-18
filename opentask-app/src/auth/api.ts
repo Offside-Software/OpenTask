@@ -1,3 +1,5 @@
+import { resolveApiUrl } from "../services/apiClient"
+
 export interface DatabaseUser {
     id: number
     display_name: string
@@ -23,7 +25,7 @@ export interface GitHubUser {
 
 // Get current user
 export async function fetchCurrentUser(): Promise<GitHubUser | null> {
-    const resp = await fetch("/api/auth/me", { credentials: 'include' })
+    const resp = await fetch(resolveApiUrl('/api/auth/me'), { credentials: 'include' })
     if (resp.status === 401) return null
     if (!resp.ok) throw new Error(`Unexpected response from /auth/me: ${resp.status}`)
 
@@ -36,11 +38,11 @@ export async function fetchCurrentUser(): Promise<GitHubUser | null> {
 }
 
 export async function postLogout(): Promise<void> {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    await fetch(resolveApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' })
 }
 
 export async function postSyncUser(): Promise<DatabaseUser | null> {
-    const resp = await fetch('/api/auth/sync-user', { method: 'POST', credentials: 'include' })
+    const resp = await fetch(resolveApiUrl('/api/auth/sync-user'), { method: 'POST', credentials: 'include' })
     if (resp.status === 401) return null
     if (!resp.ok) throw new Error(`Unexpected response from /auth/sync-user: ${resp.status}`)
 
@@ -53,7 +55,7 @@ export async function postSyncUser(): Promise<DatabaseUser | null> {
 }
 
 export async function updateTelegramChatId(userId: number, chatId: string): Promise<DatabaseUser> {
-    const resp = await fetch(`/api/users/${userId}`, {
+    const resp = await fetch(resolveApiUrl(`/api/users/${userId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ telegram_chat_id: chatId }),

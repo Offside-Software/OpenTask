@@ -55,6 +55,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class StripApiPrefixMiddleware:
+    """
+    ASGI middleware to strip '/api' prefix for routes defined without it (e.g. /tasks, /auth),
+    while preserving routes defined with prefix (e.g. /api/v1/tasks).
+    Ensures seamless routing in both local development and production.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path.startswith("/api") and not path.startswith("/api/v1"):
+                new_path = path[4:]
+                if not new_path or not new_path.startswith("/"):
+                    new_path = "/" + new_path
+                scope = dict(scope)
+                scope["path"] = new_path
+                scope["raw_path"] = new_path.encode("latin-1")
+        await self.app(scope, receive, send)
+
+app.add_middleware(StripApiPrefixMiddleware)
+
 @app.get("/")
 def read_root():
     return {"Message": "FastAPI is running!"}

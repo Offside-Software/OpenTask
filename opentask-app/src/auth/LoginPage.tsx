@@ -1,4 +1,5 @@
 import './LoginPage.css';
+import logo from '../assets/logo.svg';
 
 function GitHubMark() {
   return (
@@ -12,6 +13,20 @@ export function LoginPage() {
   return (
     <div className="login-root">
       <div className="login-card">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+          <div style={{
+            width: '3.5rem',
+            height: '3.5rem',
+            border: '2px solid #000',
+            backgroundColor: '#FFE600',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '3px 3px 0px 0px #000'
+          }}>
+            <img src={logo} alt="OpenTask Logo" style={{ width: '2.25rem', height: '2.25rem', objectFit: 'contain' }} />
+          </div>
+        </div>
         <div className="login-title">
           <h2>ACCESS CONTROL // SIGN IN</h2>
           <p>AUTHENTICATE VIA GITHUB OAUTH PROTOCOL</p>
