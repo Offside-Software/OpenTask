@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/opentask-app/(.*)",
+      "destination": "/opentask-app/index.html"
+    }
+  ]
+}
