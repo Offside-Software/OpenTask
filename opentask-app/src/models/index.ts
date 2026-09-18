@@ -10,7 +10,7 @@ export type BucketState =
 
 export type DefaultTaskType = "CODE" | "REQUIREMENT" | "DESIGN" | "OTHER" | "NON-CODE";
 export type TaskType = DefaultTaskType | string;
-export type AlertType = "STAGNATION" | "REALLOCATION" | "DRAFT_APPROVAL";
+export type AlertType = "STAGNATION" | "REALLOCATION" | "DRAFT_APPROVAL" | "TASK_ASSIGNED" | "SYSTEM_TEST" | (string & {});
 
 export interface Bucket {
   id?: number | string;

@@ -2,9 +2,9 @@ import type { Alert, ExtractedTaskPayload } from "../models";
 import { apiFetch } from "./apiClient";
 
 export const alertService = {
-  /** Legacy: fetches all alerts (no user filter, includes resolved). */
-  getMyAlerts: async (): Promise<Alert[]> => {
-    return await apiFetch<Alert[]>("/alerts");
+  getMyAlerts: async (userId?: number | string): Promise<Alert[]> => {
+    const url = userId ? `/alerts?user_id=${userId}` : "/alerts";
+    return await apiFetch<Alert[]>(url);
   },
 
   /**

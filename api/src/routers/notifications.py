@@ -8,6 +8,7 @@ from services.notifications import (
     send_push_notification,
 )
 from services.database.database import _get_conn, _put_conn
+from services.database.id_generator import _generator
 import psycopg2.extras
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -108,6 +109,33 @@ async def test_push_notification(
         url=url,
         tag="test-alert",
     )
+
+    # Record in opentask.alerts so it appears in the in-app notifications log
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor()
+        test_alert_id = _generator.generate()
+        cur.execute(
+            """
+            INSERT INTO opentask.alerts (
+                id, user_id, context_id, project_id, title, description,
+                type, severity, suggested_actions, is_resolved, created_at, updated_at
+            ) VALUES (
+                %s, %s, NULL, NULL, %s, %s,
+                'SYSTEM_TEST', 'info', ARRAY['Acknowledge'], FALSE, NOW(), NOW()
+            );
+            """,
+            (test_alert_id, db_user_id, title, body),
+        )
+        conn.commit()
+    except Exception as err:
+        if conn:
+            conn.rollback()
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
 
     if total_subs == 0:
         return {

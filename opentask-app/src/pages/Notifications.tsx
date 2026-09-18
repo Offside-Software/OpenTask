@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
-import { Bell, Clock, CheckCircle2, ArrowRight, Sparkles, AlertTriangle, X, ExternalLink, Radio, Send } from 'lucide-react';
+import { Bell, Clock, CheckCircle2, ArrowRight, Sparkles, AlertTriangle, X, ExternalLink, Radio, Send, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../design-system/Badge';
 import { useAlerts } from '../controllers/useAlerts';
 import { useProjects } from '../controllers/useProjects';
 import { usePushNotifications } from '../controllers/usePushNotifications';
+import { useAuth } from '../auth/useAuth';
 import { LoadingScreen } from '../components/ui/LoadingScreen';
 import type { Alert } from '../models';
 
 export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { alerts, loading, resolveAlert } = useAlerts();
+  const { user } = useAuth();
+  const dbUserId = user?.db_user?.id;
+  const { alerts, loading, resolveAlert, refetch } = useAlerts({
+    userId: dbUserId,
+    includeResolved: true,
+  });
   const { isSupported, permission, loading: pushLoading, subscribe, sendTestAlert } = usePushNotifications();
   const { leadProjects, collaboratingProjects } = useProjects();
   const allProjects = [...leadProjects, ...collaboratingProjects];
@@ -18,7 +24,10 @@ export const NotificationsPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
 
-  const getProjectName = (id: number) => allProjects.find(p => p.id === id)?.name || `Project #${id}`;
+  const getProjectName = (id?: number | string | null) => {
+    if (!id) return 'SYSTEM // DISPATCH';
+    return allProjects.find(p => String(p.id) === String(id))?.name || `Project #${id}`;
+  };
 
   const getTimeAgo = (dateStr: string) => {
     // eslint-disable-next-line react-hooks/purity
@@ -38,13 +47,30 @@ export const NotificationsPage: React.FC = () => {
     setSelectedAlert(null);
   };
 
-  const getAlertIcon = (type: string) => {
+  const handleSendTestAlert = async () => {
+    const res = await sendTestAlert();
+    if (res) {
+      void refetch(true);
+    }
+  };
+
+  const getAlertIcon = (type?: string) => {
     if (type === 'DRAFT_APPROVAL') return <Sparkles size={22} />;
+    if (type === 'TASK_ASSIGNED') return <CheckCircle2 size={22} />;
+    if (type === 'SYSTEM_TEST') return <Bell size={22} />;
     return <AlertTriangle size={22} />;
   };
 
-  const getAlertColors = (type: string, severity: string) => {
+  const getAlertColors = (type?: string, severity?: string) => {
     if (type === 'DRAFT_APPROVAL') return {
+      bg: 'bg-[#FFE600]', border: 'border-black', text: 'text-black',
+      headerBg: 'bg-[#FFE600]/15'
+    };
+    if (type === 'TASK_ASSIGNED') return {
+      bg: 'bg-[#22C55E]', border: 'border-black', text: 'text-black',
+      headerBg: 'bg-[#22C55E]/15'
+    };
+    if (type === 'SYSTEM_TEST') return {
       bg: 'bg-[#FFE600]', border: 'border-black', text: 'text-black',
       headerBg: 'bg-[#FFE600]/15'
     };
@@ -63,7 +89,7 @@ export const NotificationsPage: React.FC = () => {
   return (
     <div className="max-w-[1000px] mx-auto animate-in fade-in duration-200 w-full select-none">
       {/* Header */}
-      <div className="mb-8 border-b-2 border-neutral-800 pb-6 flex justify-between items-end">
+      <div className="mb-8 border-b-2 border-neutral-800 pb-6 flex justify-between items-end flex-wrap gap-4">
         <div>
           <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[10px] font-black uppercase tracking-wider mb-2 inline-block">
             // SYSTEM DISPATCH • ALERTS
@@ -71,7 +97,16 @@ export const NotificationsPage: React.FC = () => {
           <h1 className="text-[32px] font-black text-white font-mono uppercase tracking-tight leading-tight">NOTIFICATIONS</h1>
           <p className="text-[12px] font-mono text-neutral-400 uppercase tracking-wider mt-1">// REAL-TIME PROJECT EVENT LOGS</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => refetch()}
+            disabled={loading}
+            className="px-3 py-2 rounded-none text-[11px] font-mono font-black uppercase tracking-wider transition-all duration-75 border-2 border-black bg-[#141619] text-neutral-400 hover:text-white hover:border-white shadow-[2px_2px_0px_0px_#000000] cursor-pointer flex items-center gap-1.5 active:translate-x-[1px] active:translate-y-[1px]"
+            title="Refresh Notifications"
+          >
+            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            <span>REFRESH</span>
+          </button>
           {(['all', 'unread'] as const).map(f => (
             <button
               key={f}
@@ -127,7 +162,7 @@ export const NotificationsPage: React.FC = () => {
             </button>
           ) : (
             <button
-              onClick={sendTestAlert}
+              onClick={handleSendTestAlert}
               disabled={pushLoading}
               className="px-4 py-2 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
@@ -161,7 +196,7 @@ export const NotificationsPage: React.FC = () => {
             return (
               <div
                 key={alert.id!}
-                className="bg-[#121417] border-2 border-black p-5 rounded-none flex gap-5 items-center hover:translate-x-[-2px] hover:translate-y-[-2px] shadow-[4px_4px_0px_0px_#000000] hover:shadow-[6px_6px_0px_0px_#000000] active:translate-x-[0px] active:translate-y-[0px] active:shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer group"
+                className={`bg-[#121417] border-2 border-black p-5 rounded-none flex gap-5 items-center hover:translate-x-[-2px] hover:translate-y-[-2px] shadow-[4px_4px_0px_0px_#000000] hover:shadow-[6px_6px_0px_0px_#000000] active:translate-x-[0px] active:translate-y-[0px] active:shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer group ${alert.is_resolved ? 'opacity-70' : ''}`}
                 onClick={() => {
                   if (!alert.is_resolved) resolveAlert(alert.id!);
                   setSelectedAlert(alert);
@@ -172,24 +207,42 @@ export const NotificationsPage: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <Badge variant={alert.type === 'DRAFT_APPROVAL' ? 'primary' : alert.severity === 'critical' ? 'critical' : 'warning'} className="!py-0.5 !text-[8px] uppercase font-mono">
+                    <Badge
+                      variant={
+                        alert.type === 'DRAFT_APPROVAL'
+                          ? 'primary'
+                          : alert.type === 'TASK_ASSIGNED'
+                          ? 'success'
+                          : alert.severity === 'critical'
+                          ? 'critical'
+                          : 'warning'
+                      }
+                      className="!py-0.5 !text-[8px] uppercase font-mono"
+                    >
                       {alert.type?.replace('_', ' ')}
                     </Badge>
+                    {alert.is_resolved && (
+                      <span className="px-1.5 py-0.5 bg-neutral-800 text-neutral-400 text-[8px] font-mono font-bold uppercase border border-neutral-700">
+                        RESOLVED
+                      </span>
+                    )}
                     <span className="text-[10px] text-neutral-400 font-mono font-medium flex items-center gap-1">
                       <Clock size={10} /> {getTimeAgo(alert.created_at!)}
                     </span>
-                    <span className="text-[#FFE600] font-mono text-[10px] font-bold uppercase tracking-wider">• {getProjectName(Number(alert.project_id))}</span>
+                    <span className="text-[#FFE600] font-mono text-[10px] font-bold uppercase tracking-wider">• {getProjectName(alert.project_id)}</span>
                   </div>
                   <h3 className="text-white font-mono font-black text-[15px] uppercase tracking-wide truncate group-hover:text-[#FFE600] transition-colors">{alert.title}</h3>
                   <p className="text-neutral-400 font-mono text-[12px] mt-0.5 line-clamp-1">{alert.description}</p>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={e => { e.stopPropagation(); resolveAlert(alert.id!); }}
-                    className="px-3 py-1.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                  >
-                    Dismiss
-                  </button>
+                  {!alert.is_resolved && (
+                    <button
+                      onClick={e => { e.stopPropagation(); resolveAlert(alert.id!); }}
+                      className="px-3 py-1.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                      Dismiss
+                    </button>
+                  )}
                   <button
                     onClick={e => {
                       e.stopPropagation();
@@ -224,10 +277,21 @@ export const NotificationsPage: React.FC = () => {
                 </div>
                 <div className="flex-1 mt-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge variant={isDraftApproval ? 'primary' : selectedAlert.severity === 'critical' ? 'critical' : 'warning'} className="uppercase font-mono">
+                    <Badge
+                      variant={
+                        isDraftApproval
+                          ? 'primary'
+                          : selectedAlert.type === 'TASK_ASSIGNED'
+                          ? 'success'
+                          : selectedAlert.severity === 'critical'
+                          ? 'critical'
+                          : 'warning'
+                      }
+                      className="uppercase font-mono"
+                    >
                       {selectedAlert.type?.replace('_', ' ')}
                     </Badge>
-                    <span className="text-neutral-400 font-mono text-[12px] font-bold uppercase tracking-wider">{getProjectName(Number(selectedAlert.project_id))}</span>
+                    <span className="text-neutral-400 font-mono text-[12px] font-bold uppercase tracking-wider">{getProjectName(selectedAlert.project_id)}</span>
                   </div>
                   <h2 className="text-white font-mono font-black text-[18px] uppercase tracking-wide leading-tight">{selectedAlert.title}</h2>
                 </div>
@@ -270,22 +334,26 @@ export const NotificationsPage: React.FC = () => {
 
                 {/* Footer Actions */}
                 <div className="flex gap-3 justify-end pt-2 border-t-2 border-neutral-800">
-                  <button
-                    onClick={() => { resolveAlert(selectedAlert.id!); setSelectedAlert(null); }}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[12px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                  >
-                    <CheckCircle2 size={16} strokeWidth={2.5} /> Dismiss
-                  </button>
-                  <button
-                    onClick={() => handleNavigateToProject(selectedAlert)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                  >
-                    {isDraftApproval ? (
-                      <><Sparkles size={14} strokeWidth={2.5} /> Review Meeting Tasks</>
-                    ) : (
-                      <><ExternalLink size={14} strokeWidth={2.5} /> View Project</>
-                    )}
-                  </button>
+                  {!selectedAlert.is_resolved && (
+                    <button
+                      onClick={() => { resolveAlert(selectedAlert.id!); setSelectedAlert(null); }}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[12px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                      <CheckCircle2 size={16} strokeWidth={2.5} /> Dismiss
+                    </button>
+                  )}
+                  {selectedAlert.project_id && (
+                    <button
+                      onClick={() => handleNavigateToProject(selectedAlert)}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                      {isDraftApproval ? (
+                        <><Sparkles size={14} strokeWidth={2.5} /> Review Meeting Tasks</>
+                      ) : (
+                        <><ExternalLink size={14} strokeWidth={2.5} /> View Project</>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
