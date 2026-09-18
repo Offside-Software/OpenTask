@@ -3,6 +3,7 @@ import { Briefcase, Plus } from 'lucide-react';
 import { ProjectCard } from '../components/dashboard/ProjectCard';
 import { useProjects } from '../controllers/useProjects';
 import { ProjectFormModal } from '../components/modals/ProjectFormModal';
+import { LoadingScreen } from '../components/ui/LoadingScreen';
 import type { Project } from '../models';
 
 import { useNavigate } from 'react-router-dom';
@@ -58,7 +59,13 @@ export const WorkspacesPage: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
           {loading ? (
-            <div className="text-neutral-500 font-mono text-[12px] py-8">// LOADING PROJECTS...</div>
+            <div className="col-span-2 py-12 flex items-center justify-center">
+              <LoadingScreen
+                fullscreen={false}
+                message="LOADING WORKSPACES…"
+                subtext="// DISCOVERING ACTIVE PIPELINES & REPOSITORIES"
+              />
+            </div>
           ) : projects.length === 0 ? (
             <div className="col-span-2 text-center py-16 text-neutral-400 font-mono text-[13px] border-2 border-dashed border-black bg-[#121417] rounded-none shadow-[4px_4px_0px_0px_#000000]">
               NO PROJECTS FOUND. <button onClick={openCreate} className="text-[#FFE600] hover:underline font-bold ml-1">CREATE ONE NOW.</button>

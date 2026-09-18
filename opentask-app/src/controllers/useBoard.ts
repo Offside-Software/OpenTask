@@ -54,6 +54,13 @@ export const useBoard = (projectId: string | number) => {
 
   useEffect(() => {
     fetchBoard();
+
+    // 5-minute auto-update interval for background task/board synchronization
+    const intervalId = setInterval(() => {
+      fetchBoard(true);
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
   }, [fetchBoard]);
 
   /**

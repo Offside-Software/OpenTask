@@ -2,7 +2,7 @@ import sys
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-from routers import auth, github, meetings, tasks, telegram
+from routers import auth, github, meetings, tasks, telegram, notifications
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -19,6 +19,7 @@ from services.database import alerts as _db_alerts
 from services.database import activities as _db_activities
 from services.database import meetings as _db_meetings
 from services.database import history as _db_history
+from services.notifications import init_push_notifications_table
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
     """Create the DB pool on startup and close it on shutdown."""
     create_pool()
     _db_history.init_project_history_table()
+    init_push_notifications_table()
     yield
     close_pool()
 
@@ -88,6 +90,7 @@ app.include_router(db_router)
 app.include_router(meetings.router)
 app.include_router(tasks.router)
 app.include_router(telegram.router)
+app.include_router(notifications.router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True, log_level="debug")

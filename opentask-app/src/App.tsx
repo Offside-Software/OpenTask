@@ -8,6 +8,7 @@ import { DashboardPage } from "./pages/Dashboard";
 import { WorkspacesPage } from "./pages/Workspaces";
 import { ProjectDetailsPage } from "./pages/ProjectDetails";
 import { NotificationsPage } from "./pages/Notifications";
+import { NotFoundPage } from "./pages/NotFound";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPrompt";
 import { useState } from "react";
@@ -33,7 +34,7 @@ function AppShell() {
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/projects/:projectId" element={<ProjectDetailsPageWrapper />} />
           <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
         </div>
       </main>

@@ -63,6 +63,20 @@ class Settings(BaseSettings):
     recall_api_key: Optional[str] = Field(None, validation_alias=AliasChoices("RECALL_API_KEY"))
     telegram_bot_token: Optional[str] = Field(None, validation_alias=AliasChoices("TELEGRAM_BOT_TOKEN"))
 
+    # Web Push (VAPID)
+    vapid_public_key: str = Field(
+        default="BFNGNl-sWQwDl1GTuh9-iM6bmHSVdosX8T7ax7hqLTPYzjM_G1DHrS0vwO1JRC75x9cOjvgybHK-19GbTWlrSN8",
+        validation_alias=AliasChoices("VAPID_PUBLIC_KEY")
+    )
+    vapid_private_key: str = Field(
+        default="u9WEYzZFke7f46Kkv5q98geTM08rAYQP8evwPxBp6G4",
+        validation_alias=AliasChoices("VAPID_PRIVATE_KEY")
+    )
+    vapid_claim_email: str = Field(
+        default="mailto:evangelionxyz10@gmail.com",
+        validation_alias=AliasChoices("VAPID_CLAIM_EMAIL")
+    )
+
     model_config = SettingsConfigDict(
         env_file=_env_files if _env_files else None,
         env_file_encoding="utf-8",

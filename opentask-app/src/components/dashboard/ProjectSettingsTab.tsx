@@ -7,6 +7,7 @@ import { userService } from '../../services/userService';
 import { searchGithubUsers } from '../../services/githubServices';
 import { useToast } from '../../design-system/Toast';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import { LoadingScreen } from '../ui/LoadingScreen';
 import { useNavigate } from 'react-router-dom';
 import { getCached, setCached } from '../../utils/cache';
 import type { Project, ProjectMember } from '../../models';
@@ -197,7 +198,15 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     };
 
     if (loading) {
-        return <div className="text-slate-500 py-10 text-center">Loading settings...</div>;
+        return (
+            <div className="w-full flex-1 flex items-center justify-center min-h-[calc(100vh-14rem)]">
+                <LoadingScreen
+                    fullscreen={false}
+                    message="LOADING SETTINGS…"
+                    subtext="// RETRIEVING PROJECT CONFIGURATION & PERMISSIONS"
+                />
+            </div>
+        );
     }
 
     return (

@@ -6,7 +6,7 @@ import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
 import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
-import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
 import { MeetingAccordion } from '../components/dashboard/MeetingAccordion';
@@ -27,6 +27,7 @@ import { useCurrentUserRole } from '../controllers/useCurrentUserRole';
 import { useProjectMembers } from '../controllers/useProjectMembers';
 import { projectService } from '../services/projectService';
 import { useNavigate } from 'react-router-dom';
+import { NotFoundPage } from './NotFound';
 
 import type { TaskType, Project, Task, Bucket, BucketState } from '../models';
 
@@ -54,11 +55,38 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const [project, setProject] = useState<Project | null>(null);
   const [selectedBucketForEdit, setSelectedBucketForEdit] = useState<Bucket | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [isRefreshingTasks, setIsRefreshingTasks] = useState(false);
+  const [projectNotFound, setProjectNotFound] = useState(false);
   const { showToast } = useToast();
 
   React.useEffect(() => {
-    projectService.getProjectById(projectId).then(p => setProject(p || null));
+    projectService.getProjectById(projectId)
+      .then(p => {
+        if (!p) {
+          setProjectNotFound(true);
+        } else {
+          setProject(p);
+          setProjectNotFound(false);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch project:", err);
+        setProjectNotFound(true);
+      });
   }, [projectId]);
+
+  const handleRefreshTasksOnly = async () => {
+    setIsRefreshingTasks(true);
+    try {
+      await refreshBoard(false);
+      showToast('Task list synchronized', 'info');
+    } catch (err) {
+      console.error('Failed to refresh tasks:', err);
+      showToast('Failed to refresh tasks', 'error');
+    } finally {
+      setIsRefreshingTasks(false);
+    }
+  };
 
   const { user } = useAuth();
   const dbUserId = user?.db_user?.id;
@@ -337,11 +365,29 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     ? ['Overview', 'Tasks', 'MoM & Meetings', 'Settings']
     : ['Overview', 'Tasks', 'MoM & Meetings'];
 
+  if (projectNotFound) {
+    return (
+      <NotFoundPage
+        type="project"
+        resourceId={projectId}
+        onRetry={() => {
+          setProjectNotFound(false);
+          projectService.getProjectById(projectId)
+            .then(p => {
+              if (p) setProject(p);
+              else setProjectNotFound(true);
+            })
+            .catch(() => setProjectNotFound(true));
+        }}
+      />
+    );
+  }
+
   const isLoading = (roleLoading || boardLoading || meetingsLoading) && buckets.length === 0 && !project;
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-[420px]">
+      <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-10rem)] w-full">
         <LoadingScreen
           fullscreen={false}
           message="SYNCING PERMISSIONS & DATA…"
@@ -414,7 +460,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         {/* Tasks — Kanban */}
         {activeTab === 'Tasks' && (
           <div className="bg-[#0C0D0E] border-2 border-neutral-700 rounded-none p-5 flex flex-col min-h-[600px] shadow-[6px_6px_0px_0px_#000000]">
-            <div className="flex justify-between items-start mb-5 pb-3 border-b-2 border-neutral-800">
+            <div className="flex justify-between items-center mb-5 pb-3 border-b-2 border-neutral-800 flex-wrap gap-3">
               <div>
                 <h2 className="text-[16px] font-mono font-black text-white uppercase tracking-wider">
                   <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
@@ -423,6 +469,15 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                   6-STAGE STACK ARCHITECTURE • DRAFT → COMPLETED
                 </p>
               </div>
+              <button
+                onClick={handleRefreshTasksOnly}
+                disabled={isRefreshingTasks}
+                className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+                title="Refresh tasks without reloading the web page"
+              >
+                <RefreshCw size={13} strokeWidth={2.5} className={isRefreshingTasks ? 'animate-spin text-black' : 'text-[#FFE600]'} />
+                <span>{isRefreshingTasks ? 'SYNCING...' : 'REFRESH TASKS'}</span>
+              </button>
             </div>
 
             {tasksLoading || bucketsLoading ? (

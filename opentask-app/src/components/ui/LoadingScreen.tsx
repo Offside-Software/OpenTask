@@ -15,7 +15,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   return (
     <div
       className={`${
-        fullscreen ? 'min-h-screen w-full fixed inset-0 z-50' : 'min-h-[360px] w-full'
+        fullscreen ? 'min-h-screen w-full fixed inset-0 z-50' : 'min-h-[calc(100vh-14rem)] w-full flex-1'
       } bg-dots text-white flex items-center justify-center p-4 font-mono select-none`}
     >
       <div className="w-full max-w-md bg-[#121417] border-3 border-black rounded-none shadow-[8px_8px_0px_0px_#000000] p-6 sm:p-8 flex flex-col items-center">
