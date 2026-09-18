@@ -27,6 +27,7 @@ __pycache__
 *.sw?
 
 # env and secrets files
+.env.prod
 .env.local
 .env
 .secrets

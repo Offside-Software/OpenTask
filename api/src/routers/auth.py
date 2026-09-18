@@ -85,36 +85,72 @@ async def get_current_user_optional(
         return None
 
 
+def _get_redirect_uri(request: Request) -> str:
+    configured = (settings.gh_oauth_redirect_uri or "").strip()
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    proto = request.headers.get("x-forwarded-proto", "https" if "vercel.app" in host else "http")
+
+    # If running on Vercel or production domain (non-localhost), dynamically use production host
+    if host and "localhost" not in host and "127.0.0.1" not in host:
+        return f"{proto}://{host}/api/auth/callback"
+
+    return configured or f"{proto}://{host}/api/auth/callback"
+
+
+def _get_frontend_url(request: Request) -> str:
+    configured = (settings.frontend_url or "").strip()
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    proto = request.headers.get("x-forwarded-proto", "https" if "vercel.app" in host else "http")
+
+    if host and "localhost" not in host and "127.0.0.1" not in host:
+        return f"{proto}://{host}"
+
+    return configured or f"{proto}://{host}"
+
+
 @router.get("/login")
-def auth_login():
+def auth_login(request: Request):
     """
     Redirect the browser to GitHub's OAuth authorization page.
     A random state token is generated to prevent CSRF.
+    Stored in an HTTP-only cookie to be reliable in serverless environments.
     """
     state = secrets.token_urlsafe(32)
     _pending_oauth_states.add(state)
+    redirect_uri = _get_redirect_uri(request)
     qs = urlencode({
         "client_id": settings.gh_app_client_id,
-        "redirect_uri": settings.gh_oauth_redirect_uri,
+        "redirect_uri": redirect_uri,
         "state": state,
     })
-    return RedirectResponse(f"https://github.com/login/oauth/authorize?{qs}")
+    is_https = "https" in redirect_uri
+    response = RedirectResponse(f"https://github.com/login/oauth/authorize?{qs}")
+    response.set_cookie(
+        key="oauth_state",
+        value=state,
+        httponly=True,
+        secure=is_https,
+        samesite="lax",
+        path="/",
+        max_age=600,
+    )
+    return response
 
 @router.get("/callback")
-async def auth_callback(code: str, state: str):
+async def auth_callback(request: Request, code: str, state: str):
     """
     Handle the GitHub OAuth callback.
     Validates the state token, exchanges the code for an access token,
     and returns basic user information.
     """
-    if state not in _pending_oauth_states:
+    cookie_state = request.cookies.get("oauth_state")
+    if (state not in _pending_oauth_states) and (cookie_state != state):
         raise HTTPException(status_code=400, detail="Invalid or expired state parameter")
     _pending_oauth_states.discard(state)
 
     client_id = settings.gh_app_client_id
     client_secret = settings.gh_app_client_secret
-    redirect_uri = settings.gh_oauth_redirect_uri
-
+    redirect_uri = _get_redirect_uri(request)
 
     # Exchange authorization code for access token
     async with httpx.AsyncClient() as http:
@@ -169,16 +205,19 @@ async def auth_callback(code: str, state: str):
         except Exception as err:
             print(f"[AUTH WARNING] Failed to persist user in database during callback: {err}")
 
-    response = RedirectResponse(url=settings.frontend_url or "/", status_code=302)
+    frontend_url = _get_frontend_url(request)
+    response = RedirectResponse(url=frontend_url or "/", status_code=302)
+    is_https = "https" in frontend_url or "https" in redirect_uri
     response.set_cookie(
         key=AUTH_COOKIE,
         value=access_token,
         httponly=True,
-        secure=False,   # set True in production (HTTPS only)
+        secure=is_https,
         samesite="lax",
         path="/",
         max_age=28800,  # 8 hours
     )
+    response.delete_cookie("oauth_state", path="/")
     return response
 
 @router.get("/me", response_model=AuthMeResponse)

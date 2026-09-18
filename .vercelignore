@@ -29,3 +29,10 @@ node_modules/**
 docker-compose.yml
 Dockerfile
 api/Dockerfile
+
+# Local environment files
+.env
+.env.*
+*.env
+*.env.*
+!*.env.example
