@@ -171,19 +171,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             onClick={() => handleToggleComplete(!isCompleted)}
                             className={`flex items-center gap-2 cursor-pointer select-none px-3 py-1 border-2 transition-all active:translate-x-[1px] active:translate-y-[1px] ${
                                 isCompleted
-                                    ? 'bg-[#00FF66] border-black shadow-[2px_2px_0px_0px_#000000]'
+                                    ? 'bg-[#00FF66] hover:bg-[#FF3333] border-black shadow-[2px_2px_0px_0px_#000000]'
                                     : 'hover:bg-[#00FF66] border-black shadow-[2px_2px_0px_0px_#000000]'
                             }`}
                         >
                             <div className={`w-4 h-4 rounded-none border-2 flex items-center justify-center transition-all ${
                                 isCompleted
-                                    ? 'bg-[#00FF66] border-black text-black shadow-[1px_1px_0px_0px_#000000]'
+                                    ? 'bg-transparent border-black text-black shadow-[1px_1px_0px_0px_#000000]'
                                     : 'bg-[#16191D] border-neutral-600'
                             }`}>
                                 {isCompleted && <Check size={11} strokeWidth={3.5} />}
                             </div>
                             <span className={`text-[11px] font-mono font-black tracking-wider uppercase ${
-                                isCompleted ? 'text-white' : 'text-neutral-300'
+                                isCompleted ? 'text-black' : 'text-neutral-300 hover:text-black'
                             }`}>
                                 {isCompleted ? 'COMPLETED' : 'MARK AS COMPLETE'}
                             </span>
