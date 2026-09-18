@@ -113,7 +113,6 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       >✕
                       </button>
                     )}
-
                   </Badge>
                 ))}
               </div>

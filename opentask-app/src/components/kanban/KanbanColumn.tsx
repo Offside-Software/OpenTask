@@ -125,6 +125,11 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           >
             <CheckCircle2 size={10} strokeWidth={2.5} /> {statusText}
           </Badge>
+          <button onClick={() => onAddTask && onAddTask(id)}
+            className='bg-black hover:bg-[#00FF00] text-[#FFE600] border border-neutral-700 shadow-[1.5px_1.5px_0px_0px_#000000] flex items-center px-1.5 py-0.5 hover:text-black font-mono text-[10px] font-bold uppercase tracking-wider gap-1.5'
+            >
+              <Plus size={12} strokeWidth={3}/> Add Task
+          </button>
         </div>
       </div>
 

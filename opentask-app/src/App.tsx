@@ -25,8 +25,9 @@ function AppShell() {
     <div className="h-screen w-full bg-[var(--cmd-app-bg)] text-[var(--cmd-text-body)] font-sans flex overflow-hidden selection:bg-[#FFE600]/30 transition-colors duration-150">
       <Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
 
-      <main className="flex-1 overflow-y-auto no-scrollbar p-8 pb-32 bg-dots">
-        <Routes>
+      <main className="flex-1 overflow-y-auto no-scrollbar bg-dots">
+        <div className="px-4 pt-8 pb-12">
+          <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
@@ -34,6 +35,7 @@ function AppShell() {
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </div>
       </main>
 
       <TelegramLinkPrompt onOpenSettings={() => setIsSettingsOpen(true)} />

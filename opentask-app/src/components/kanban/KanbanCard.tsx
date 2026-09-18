@@ -118,7 +118,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           ? 'border-[#FFE600] shadow-[3px_3px_0px_0px_#FFE600]'
           : isCompleted
           ? 'border-neutral-800 opacity-80 hover:opacity-100 shadow-[3px_3px_0px_0px_#000000] hover:border-neutral-600'
-          : 'border-black shadow-[3px_3px_0px_0px_#000000] hover:border-white hover:shadow-[4px_4px_0px_0px_#000000]'
+          : 'border-black shadow-[3px_3px_0px_0px_#000000] hover:border-[#FFE600] hover:shadow-[4px_4px_0px_0px_#000000]'
       }`}
     >
       <div className="flex items-start gap-2.5">
