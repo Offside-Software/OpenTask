@@ -31,24 +31,39 @@ def test_gemini_api_key(api_key: str) -> dict:
     cleaned_key = api_key.strip()
     try:
         test_client = genai.Client(api_key=cleaned_key)
-        # Lightweight test prompt
-        response = test_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="ping",
-            config=types.GenerateContentConfig(
-                max_output_tokens=10,
-                temperature=0.0
+        # Lightweight test prompt — try models in order of recency
+        ping_model = "gemini-3.6-flash"
+        try:
+            response = test_client.models.generate_content(
+                model=ping_model,
+                contents="ping",
+                config=types.GenerateContentConfig(
+                    max_output_tokens=10,
+                    temperature=0.0
+                )
             )
-        )
+        except Exception:
+            # Fallback to flash-lite if the primary ping model also fails
+            ping_model = "gemini-flash-lite-latest"
+            response = test_client.models.generate_content(
+                model=ping_model,
+                contents="ping",
+                config=types.GenerateContentConfig(
+                    max_output_tokens=10,
+                    temperature=0.0
+                )
+            )
         if response and (response.text is not None or response.candidates):
             return {
                 "valid": True,
+                "model": ping_model,
                 "message": "Google Gemini API key successfully verified and operational!",
                 "error": None
             }
         else:
             return {
                 "valid": False,
+                "model": None,
                 "error": "Gemini API responded but returned an empty response.",
                 "message": None
             }
