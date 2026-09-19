@@ -10,7 +10,18 @@ export type BucketState =
 
 export type DefaultTaskType = "CODE" | "REQUIREMENT" | "DESIGN" | "OTHER" | "NON-CODE";
 export type TaskType = DefaultTaskType | string;
-export type AlertType = "STAGNATION" | "REALLOCATION" | "DRAFT_APPROVAL" | "TASK_ASSIGNED" | "SYSTEM_TEST" | "PR_REVIEWED" | "FORGOTTEN_TASK" | (string & {});
+export type AlertType =
+  | "STAGNATION"
+  | "REALLOCATION"
+  | "DRAFT_APPROVAL"
+  | "TASK_ASSIGNED"
+  | "TASK_UNASSIGNED"
+  | "TASK_COMPLETED"
+  | "TASK_REOPENED"
+  | "SYSTEM_TEST"
+  | "PR_REVIEWED"
+  | "FORGOTTEN_TASK"
+  | (string & {});
 
 export interface Bucket {
   id?: number | string;
@@ -173,6 +184,7 @@ export interface TaskAssignee {
 export interface Alert {
   id?: number | string;
   user_id: number | string;
+  context_id?: number | string;
   project_id: number | string;
   title: string;
   description: string;

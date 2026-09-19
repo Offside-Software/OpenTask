@@ -27,7 +27,8 @@ import { useCurrentUserRole } from '../controllers/useCurrentUserRole';
 import { useProjectMembers } from '../controllers/useProjectMembers';
 import { projectService } from '../services/projectService';
 import { prReviewService } from '../services/prReviewService';
-import { useNavigate } from 'react-router-dom';
+import { taskService } from '../services/taskService';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { NotFoundPage } from './NotFound';
 
 import type { TaskType, Project, Task, Bucket, BucketState } from '../models';
@@ -47,7 +48,9 @@ const STATUS_COLORS: Record<BucketState, string> = {
 
 export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const taskIdParam = searchParams.get('taskId');
+  const [activeTab, setActiveTab] = useState(() => (taskIdParam ? 'Tasks' : 'Overview'));
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | null>(null);
   const [selectedBucketTarget, setSelectedBucketTarget] = useState<number | string | undefined>(undefined);
@@ -169,6 +172,48 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskBucketId, setCreatingTaskBucketId] = useState<string | number | undefined>(undefined);
   const [creatingTaskTitle, setCreatingTaskTitle] = useState('');
+
+  // Open / Close task modal with URL query param synchronization
+  const handleOpenTask = (task: Task) => {
+    setSelectedTaskForEdit(task);
+    if (task?.id) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('taskId', String(task.id));
+        return next;
+      }, { replace: true });
+    }
+  };
+
+  const handleCloseTask = () => {
+    setSelectedTaskForEdit(null);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.delete('taskId');
+      return next;
+    }, { replace: true });
+  };
+
+  // Auto-open task if ?taskId=... query param is present
+  React.useEffect(() => {
+    if (!taskIdParam) return;
+    const found = tasks.find(t => String(t.id) === String(taskIdParam));
+    if (found) {
+      setSelectedTaskForEdit(found);
+      setActiveTab('Tasks');
+    } else if (!boardLoading) {
+      taskService.getTaskById(taskIdParam)
+        .then(t => {
+          if (t && String(t.project_id) === String(projectId)) {
+            setSelectedTaskForEdit(t);
+            setActiveTab('Tasks');
+          }
+        })
+        .catch(err => {
+          console.warn("Could not find task for taskId query parameter:", taskIdParam, err);
+        });
+    }
+  }, [taskIdParam, tasks, boardLoading, projectId]);
 
   const handleCreateTask = async (data: { project_id: number | string; title: string; type: TaskType; weight: number; bucket_id?: number | string }) => {
     setIsCreatingTask(true);
@@ -582,7 +627,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                             isCompleted={isTaskCompleted}
                             onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
                             onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
-                            onClick={() => setSelectedTaskForEdit(task)}
+                            onClick={() => handleOpenTask(task)}
                             onDelete={() => handleDeleteTask(task.id!)}
                             onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
                           />
@@ -768,7 +813,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
           buckets={buckets}
           members={members}
           projectRepoUrls={project?.gh_repo_url || []}
-          onClose={() => setSelectedTaskForEdit(null)}
+          onClose={handleCloseTask}
           onUpdate={handleUpdateTask}
         />
       )}
@@ -809,7 +854,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         contextMenu={contextMenu}
         buckets={buckets}
         onClose={() => setContextMenu(null)}
-        onEdit={(t) => setSelectedTaskForEdit(t)}
+        onEdit={(t) => handleOpenTask(t)}
         onToggleComplete={(tId, completed) => handleToggleTaskComplete(tId, completed)}
         onMoveToBucket={handleMoveTaskToBucket}
         onDelete={(tId) => handleDeleteTask(tId)}

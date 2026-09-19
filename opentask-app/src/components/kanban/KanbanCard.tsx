@@ -87,7 +87,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 
   const handleCopyIdToClipboard = async() => {
     try {
-      const taskId = `#${String(id).slice(-4)}`;
+      const taskId = `[${title}](#${String(id)})`;
       await navigator.clipboard.writeText(taskId);
       showToast(`Task ID '${taskId}' Copied to Clipboard`, 'success');
     }

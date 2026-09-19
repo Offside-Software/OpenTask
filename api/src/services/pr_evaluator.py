@@ -506,7 +506,14 @@ CRITICAL REVIEW RULES:
         status_icon = "✅" if verdict == "PASS" else "❌"
         completeness_bar = "█" * (completeness_score // 10) + "░" * (10 - completeness_score // 10)
 
-        task_ref = f"**Matched Task:** `{matched_task_title}`" if matched_task_title else "**Matched Task:** No matching task found"
+        if matched_task_title and matched_task_id and project_id:
+            frontend_base = settings.frontend_url.rstrip("/")
+            task_direct_url = f"{frontend_base}/projects/{project_id}?taskId={matched_task_id}"
+            task_ref = f"**Matched Task:** [{matched_task_title}]({task_direct_url})"
+        elif matched_task_title:
+            task_ref = f"**Matched Task:** `{matched_task_title}`"
+        else:
+            task_ref = "**Matched Task:** No matching task found"
         suggestions_md = "\n".join([f"- {s}" for s in suggestions]) if suggestions else ""
         suggestions_section = f"\n\n**Suggestions:**\n{suggestions_md}" if suggestions_md else ""
 
@@ -561,6 +568,7 @@ CRITICAL REVIEW RULES:
                     pr_number=pr_number,
                     project_id=project_id,
                     extra_user_ids=list(target_user_ids),
+                    task_id=matched_task_id,
                 )
                 logger.info(f"✅ Dispatched review push notification to {len(target_user_ids)} users.")
             except Exception as e:

@@ -8,6 +8,7 @@ import { DashboardPage } from "./pages/Dashboard";
 import { WorkspacesPage } from "./pages/Workspaces";
 import { ProjectDetailsPage } from "./pages/ProjectDetails";
 import { NotificationsPage } from "./pages/Notifications";
+import { TaskRedirectPage } from "./pages/TaskRedirectPage";
 import { NotFoundPage } from "./pages/NotFound";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPrompt";
@@ -33,6 +34,7 @@ function AppShell() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/projects/:projectId" element={<ProjectDetailsPageWrapper />} />
+          <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
