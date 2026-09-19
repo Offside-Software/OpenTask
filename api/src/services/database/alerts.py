@@ -22,6 +22,7 @@ class DatabaseAlert(BaseModel):
     severity: Optional[str] = None     # critical | warning | info
     suggested_actions: Optional[List[str]] = None
     is_resolved: Optional[bool] = False
+    pr_url: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -51,10 +52,10 @@ async def db_create_alert(alert_data: DatabaseAlert):
 
         sql = (
             f"INSERT INTO opentask.alerts" 
-            f"(id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved)"
+            f"(id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved, pr_url)"
             f"VALUES" 
-            f"(%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)"
-            f"RETURNING id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved, created_at;"
+            f"(%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s)"
+            f"RETURNING id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved, pr_url, created_at;"
         )
         
         cur.execute(sql, (
@@ -66,7 +67,8 @@ async def db_create_alert(alert_data: DatabaseAlert):
             alert_data.description,
             alert_data.type,
             alert_data.severity or "info",
-            suggested_actions
+            suggested_actions,
+            alert_data.pr_url,
         ))
         
         row = cur.fetchone()
@@ -98,24 +100,32 @@ async def db_create_alert(alert_data: DatabaseAlert):
 
 # ---------------------------------------------------------------------------
 @db_router.get("/alerts")
-def db_get_alerts(user_id: Optional[str] = None):
+def db_get_alerts(
+    user_id: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = 0,
+):
     conn = _get_conn()
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        sql = (
+            "SELECT id, user_id, context_id, project_id, title, description, type, severity, "
+            "suggested_actions, is_resolved, pr_url, created_at, updated_at "
+            "FROM opentask.alerts "
+        )
+        params = []
         if user_id:
-            cur.execute(
-                "SELECT id, user_id, project_id, title, description, type, severity, "
-                "suggested_actions, is_resolved, created_at, updated_at "
-                "FROM opentask.alerts WHERE user_id = %s OR user_id IS NULL ORDER BY created_at DESC;",
-                (user_id,)
-            )
-        else:
-            cur.execute(
-                "SELECT id, user_id, project_id, title, description, type, severity, "
-                "suggested_actions, is_resolved, created_at, updated_at "
-                "FROM opentask.alerts ORDER BY created_at DESC;"
-            )
+            sql += "WHERE user_id = %s OR user_id IS NULL "
+            params.append(user_id)
+
+        sql += "ORDER BY created_at DESC "
+
+        if limit is not None:
+            sql += "LIMIT %s OFFSET %s "
+            params.extend([limit, offset or 0])
+
+        cur.execute(sql, tuple(params))
         rows = cur.fetchall()
         return rows
     except Exception as e:
@@ -139,7 +149,7 @@ def db_get_alerts_for_user(user_id: str):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, type, context_id, created_at "
+            "SELECT id, type, context_id, pr_url, created_at "
             "FROM opentask.alerts WHERE user_id = %s AND is_resolved = FALSE "
             "ORDER BY created_at DESC;",
             (user_id,)
@@ -166,8 +176,8 @@ def db_get_alert_by_id(alert_id: int):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, user_id, project_id, title, description, type, severity, "
-            "suggested_actions, is_resolved, created_at, updated_at "
+            "SELECT id, user_id, context_id, project_id, title, description, type, severity, "
+            "suggested_actions, is_resolved, pr_url, created_at, updated_at "
             "FROM opentask.alerts WHERE id = %s LIMIT 1;",
             (alert_id,),
         )
