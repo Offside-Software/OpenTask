@@ -147,12 +147,8 @@ def resolve_gemini_client(
                 cur.close()
             _put_conn(conn)
 
-    # 4. System Default Key
-    if settings.gemini_api_key and settings.gemini_api_key.strip():
-        try:
-            client = genai.Client(api_key=settings.gemini_api_key.strip())
-            return client, "system"
-        except Exception as e:
-            logger.error(f"Failed to initialize default system Gemini client: {e}")
-
+    # NOTE: System default key intentionally removed.
+    # AI features (PR reviews, meeting analysis, task evaluation) require
+    # each project or user to configure their own Google Gemini API key.
+    # Use Project Settings → Custom Integrated AI, or Account Settings → Personal AI Key.
     return None, "none"
