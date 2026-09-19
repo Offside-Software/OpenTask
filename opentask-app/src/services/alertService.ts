@@ -2,8 +2,17 @@ import type { Alert, ExtractedTaskPayload } from "../models";
 import { apiFetch } from "./apiClient";
 
 export const alertService = {
-  getMyAlerts: async (userId?: number | string): Promise<Alert[]> => {
-    const url = userId ? `/alerts?user_id=${userId}` : "/alerts";
+  getMyAlerts: async (
+    userId?: number | string,
+    limit?: number,
+    offset?: number
+  ): Promise<Alert[]> => {
+    const params = new URLSearchParams();
+    if (userId) params.set("user_id", String(userId));
+    if (limit !== undefined) params.set("limit", String(limit));
+    if (offset !== undefined) params.set("offset", String(offset));
+    const qs = params.toString();
+    const url = qs ? `/alerts?${qs}` : "/alerts";
     return await apiFetch<Alert[]>(url);
   },
 

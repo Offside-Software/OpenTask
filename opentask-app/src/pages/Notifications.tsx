@@ -13,9 +13,10 @@ export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const dbUserId = user?.db_user?.id;
-  const { alerts, loading, resolveAlert, refetch } = useAlerts({
+  const { alerts, loading, loadingMore, hasMore, loadMore, resolveAlert, refetch } = useAlerts({
     userId: dbUserId,
     includeResolved: true,
+    pageSize: 20,
   });
   const { isSupported, permission, loading: pushLoading, subscribe, sendTestAlert } = usePushNotifications();
   const { leadProjects, collaboratingProjects } = useProjects();
@@ -23,6 +24,24 @@ export const NotificationsPage: React.FC = () => {
 
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!sentinelRef.current || !hasMore || loading || loadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '200px', threshold: 0.1 }
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, loadMore]);
 
   const getProjectName = (id?: number | string | null) => {
     if (!id) return 'SYSTEM // DISPATCH';
@@ -255,6 +274,19 @@ export const NotificationsPage: React.FC = () => {
                       Dismiss
                     </button>
                   )}
+                  {alert.pr_url && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!alert.is_resolved) resolveAlert(alert.id!);
+                        window.open(alert.pr_url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="px-3 py-1.5 rounded-none border-2 border-black bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] transition-all flex items-center gap-1 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                      title="Open GitHub Pull Request in new tab"
+                    >
+                      <span>OPEN PR</span> <ExternalLink size={11} strokeWidth={2.5} />
+                    </button>
+                  )}
                   {alert.context_id && alert.project_id && (
                     <button
                       onClick={e => {
@@ -282,6 +314,24 @@ export const NotificationsPage: React.FC = () => {
               </div>
             );
           })
+        )}
+
+        {/* Sentinel for infinite scroll */}
+        <div ref={sentinelRef} className="h-4" />
+
+        {loadingMore && (
+          <div className="py-4 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#121417] border-2 border-black font-mono text-[11px] text-[#FFE600] uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000]">
+              <RefreshCw size={13} className="animate-spin text-[#FFE600]" />
+              <span>RETRIEVING NEXT 20 EVENT LOGS...</span>
+            </div>
+          </div>
+        )}
+
+        {!hasMore && displayed.length > 0 && !loading && (
+          <div className="py-6 text-center font-mono text-[11px] text-neutral-500 uppercase tracking-widest border-t border-neutral-800">
+            // END OF DISPATCH LOG STREAM • ALL EVENTS LOADED ({displayed.length} TOTAL)
+          </div>
         )}
       </div>
 
@@ -368,6 +418,16 @@ export const NotificationsPage: React.FC = () => {
                       className="flex items-center gap-2 px-4 py-2.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[12px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
                       <CheckCircle2 size={16} strokeWidth={2.5} /> Dismiss
+                    </button>
+                  )}
+                  {selectedAlert.pr_url && (
+                    <button
+                      onClick={() => {
+                        window.open(selectedAlert.pr_url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-none border-2 border-black bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                      <ExternalLink size={14} strokeWidth={2.5} /> Open Pull Request
                     </button>
                   )}
                   {selectedAlert.project_id && (

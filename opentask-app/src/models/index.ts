@@ -192,6 +192,7 @@ export interface Alert {
   severity: "critical" | "warning" | "info";
   suggested_actions: string[];
   is_resolved: boolean;
+  pr_url?: string;
   created_at?: string;
 }
 

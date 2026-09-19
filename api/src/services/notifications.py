@@ -522,8 +522,8 @@ def notify_pr_reviewed(
             cur.execute(
                 """
                 INSERT INTO opentask.alerts
-                    (id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE);
+                    (id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved, pr_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s);
                 """,
                 (
                     alert_id,
@@ -535,6 +535,7 @@ def notify_pr_reviewed(
                     "PR_REVIEWED",
                     "info" if verdict == "PASS" else "warning",
                     ["View Task", "View PR on GitHub"],
+                    pr_url,
                 )
             )
             conn.commit()
