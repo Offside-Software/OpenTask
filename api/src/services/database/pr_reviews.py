@@ -1,3 +1,5 @@
+import logging
+import httpx
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
@@ -8,6 +10,8 @@ import psycopg2.extras
 from services.database.database import _get_conn, _put_conn
 from services.database.database import router as db_router, SafeId
 from services.database.id_generator import _generator
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class DatabasePrReview(BaseModel):
