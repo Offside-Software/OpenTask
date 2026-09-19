@@ -268,6 +268,23 @@ async def on_pr_comment_created(payload: dict, event: str, pool=None):
         except Exception as e:
             logger.warning(f"⚠️ Failed to dispatch PR comment notification: {e}")
 
+    # Check for on-demand review trigger command in comment: /review, !review, @opentask review
+    cmd = comment_body.strip().lower()
+    if any(trigger in cmd for trigger in ("/review", "!review", "@opentask review", "@openequilibra review")):
+        logger.info(f"⚡ [WEBHOOK] Comment command '{comment_body.strip()[:30]}' detected on PR #{pr_number}. Triggering on-demand AI review...")
+        from services.pr_evaluator import process_task_aware_pr_evaluation
+        if installation_id and repo_full_name and pr_number:
+            try:
+                await process_task_aware_pr_evaluation(
+                    repo_full_name=repo_full_name,
+                    pr_number=pr_number,
+                    installation_id=installation_id,
+                    pr_title=pr_title,
+                    pr_body="",
+                )
+            except Exception as ev_err:
+                logger.error(f"Error in on-demand comment review for PR #{pr_number}: {ev_err}")
+
 
 async def on_pr_opened(payload: dict, pool=None):
     from services.pr_evaluator import process_task_aware_pr_evaluation

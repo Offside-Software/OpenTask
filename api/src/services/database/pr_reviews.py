@@ -144,6 +144,52 @@ class TriggerPrReviewRequest(BaseModel):
     task_id: Optional[SafeId] = None
 
 
+async def _resolve_installation_id(project_id: int, repo_full_name: Optional[str] = None) -> int:
+    """Dynamically resolve GitHub App installation ID from DB, settings, or GitHub API."""
+    from services.database.github_installations import _generate_app_jwt
+    from config import settings
+
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT installation_id FROM opentask.github_installations WHERE project_id = %s LIMIT 1;",
+            (project_id,)
+        )
+        row = cur.fetchone()
+        if row and row.get("installation_id"):
+            return row["installation_id"]
+    finally:
+        if cur:
+            cur.close()
+        _put_conn(conn)
+
+    if getattr(settings, "gh_app_installation_id", None):
+        return settings.gh_app_installation_id
+
+    # Dynamic lookup via GitHub App API using repo full name
+    if repo_full_name:
+        try:
+            jwt_token = _generate_app_jwt()
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"https://api.github.com/repos/{repo_full_name}/installation",
+                    headers={"Authorization": f"Bearer {jwt_token}", "Accept": "application/vnd.github.v3+json"}
+                )
+                if resp.status_code == 200:
+                    inst_id = resp.json().get("id")
+                    if inst_id:
+                        return inst_id
+        except Exception as e:
+            logger.warning(f"Dynamic installation lookup failed for {repo_full_name}: {e}")
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"GitHub App is not installed on repository '{repo_full_name or 'unknown'}'. Please install it via Project Settings."
+    )
+
+
 @db_router.post("/projects/{project_id}/pr-reviews/trigger")
 async def db_trigger_pr_review(project_id: int, req: TriggerPrReviewRequest):
     """
@@ -162,18 +208,7 @@ async def db_trigger_pr_review(project_id: int, req: TriggerPrReviewRequest):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # 1. Find installation ID for this project
-        cur.execute(
-            """
-            SELECT installation_id FROM opentask.github_installations
-            WHERE project_id = %s LIMIT 1;
-            """,
-            (project_id,)
-        )
-        inst_row = cur.fetchone()
-        installation_id = inst_row["installation_id"] if inst_row else None
-
-        # 2. Find connected repo from project if not provided
+        # 1. Find connected repo from project if not provided
         cur.execute("SELECT gh_repo_url FROM opentask.projects WHERE id = %s LIMIT 1;", (project_id,))
         proj_row = cur.fetchone()
         proj_repos = (proj_row.get("gh_repo_url") or []) if proj_row else []
@@ -183,7 +218,7 @@ async def db_trigger_pr_review(project_id: int, req: TriggerPrReviewRequest):
             if "github.com/" in first_url:
                 repo_full_name = first_url.split("github.com/")[-1]
 
-        # 3. If task_id provided, check task's repo_url and match PR by branch
+        # 2. If task_id provided, check task's repo_url and match PR by branch
         if task_id:
             cur.execute("SELECT branch_name, title, repo_url FROM opentask.tasks WHERE id = %s LIMIT 1;", (int(task_id),))
             t_row = cur.fetchone()
@@ -191,8 +226,8 @@ async def db_trigger_pr_review(project_id: int, req: TriggerPrReviewRequest):
                 repo_full_name = t_row["repo_url"].rstrip("/").split("github.com/")[-1]
 
             if repo_full_name and not pr_number:
-                inst_id_to_use = installation_id or 162827907
                 try:
+                    inst_id_to_use = await _resolve_installation_id(project_id, repo_full_name)
                     async with httpx.AsyncClient(timeout=15.0) as client:
                         token = await get_installation_token(inst_id_to_use, client)
                         headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
@@ -213,7 +248,7 @@ async def db_trigger_pr_review(project_id: int, req: TriggerPrReviewRequest):
                             if not pr_number and pulls:
                                 pr_number = pulls[0]["number"]
                 except Exception as ex:
-                    pass
+                    logger.warning(f"Error resolving PR for task {task_id}: {ex}")
 
     finally:
         if cur:
@@ -226,9 +261,7 @@ async def db_trigger_pr_review(project_id: int, req: TriggerPrReviewRequest):
             detail="Could not automatically identify repo_full_name or pr_number. Please provide them explicitly."
         )
 
-    if not installation_id:
-        from config import settings
-        installation_id = getattr(settings, "gh_app_installation_id", None) or 162827907
+    installation_id = await _resolve_installation_id(project_id, repo_full_name)
 
     # Run AI review immediately
     await process_task_aware_pr_evaluation(
@@ -288,19 +321,20 @@ async def db_sync_project_prs(project_id: int):
             cur.close()
         _put_conn(conn)
 
-    if not installation_id:
-        from config import settings
-        installation_id = getattr(settings, "gh_app_installation_id", None) or 162827907
-
     if not repos_to_scan:
         return {"scanned": 0, "reviews_triggered": 0, "message": "No repositories connected to this project."}
 
     triggered = []
     async with httpx.AsyncClient(timeout=20.0) as client:
-        token = await get_installation_token(installation_id, client)
-        headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-
         for repo_name in repos_to_scan:
+            try:
+                inst_id = await _resolve_installation_id(project_id, repo_name)
+                token = await get_installation_token(inst_id, client)
+                headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+            except Exception as ie:
+                logger.warning(f"Could not resolve installation for {repo_name}: {ie}")
+                continue
+
             resp = await client.get(f"https://api.github.com/repos/{repo_name}/pulls?state=open&per_page=10", headers=headers)
             pulls = resp.json() if resp.status_code == 200 else []
             if not pulls:
@@ -314,7 +348,7 @@ async def db_sync_project_prs(project_id: int):
                 await process_task_aware_pr_evaluation(
                     repo_full_name=repo_name,
                     pr_number=p_num,
-                    installation_id=installation_id,
+                    installation_id=inst_id,
                     pr_title=p_title,
                     pr_body=p.get("body") or "",
                     branch_name=p_branch,
@@ -341,14 +375,9 @@ async def db_get_project_pulls(project_id: int):
 
     conn = _get_conn()
     cur = None
-    installation_id = None
     repos_to_scan = []
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT installation_id FROM opentask.github_installations WHERE project_id = %s LIMIT 1;", (project_id,))
-        inst_row = cur.fetchone()
-        installation_id = inst_row["installation_id"] if inst_row else 162827907
-
         cur.execute("SELECT gh_repo_url FROM opentask.projects WHERE id = %s LIMIT 1;", (project_id,))
         proj_row = cur.fetchone()
         if proj_row and proj_row.get("gh_repo_url"):
@@ -361,12 +390,13 @@ async def db_get_project_pulls(project_id: int):
         _put_conn(conn)
 
     all_prs = []
-    if repos_to_scan and installation_id:
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                token = await get_installation_token(installation_id, client)
-                headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-                for repo_name in repos_to_scan:
+    if repos_to_scan:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            for repo_name in repos_to_scan:
+                try:
+                    inst_id = await _resolve_installation_id(project_id, repo_name)
+                    token = await get_installation_token(inst_id, client)
+                    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
                     resp = await client.get(f"https://api.github.com/repos/{repo_name}/pulls?state=all&per_page=15", headers=headers)
                     if resp.status_code == 200:
                         for p in resp.json():
@@ -381,7 +411,7 @@ async def db_get_project_pulls(project_id: int):
                                 "created_at": p.get("created_at"),
                                 "merged_at": p.get("merged_at"),
                             })
-        except Exception as e:
-            pass
+                except Exception as e:
+                    logger.warning(f"Error fetching PRs for repo {repo_name}: {e}")
 
     return {"pull_requests": all_prs}

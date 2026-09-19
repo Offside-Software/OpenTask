@@ -97,8 +97,8 @@ async def process_task_aware_pr_evaluation(
                 "X-GitHub-Api-Version": "2022-11-28"
             }
 
-            # 2. Fetch PR metadata & raw Git Diff
-            logger.info("📂 Fetching PR metadata and diff...")
+            # 2. Fetch PR metadata, changed files, and raw Git Diff
+            logger.info("📂 Fetching PR metadata, changed files, and diff...")
             pr_resp = await http_client.get(
                 f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}",
                 headers={**auth_headers, "Accept": "application/vnd.github.v3+json"}
@@ -110,16 +110,87 @@ async def process_task_aware_pr_evaluation(
                 pr_title = pr_data.get("title", "")
             if not pr_body:
                 pr_body = pr_data.get("body", "") or ""
+            head_ref = pr_data.get("head", {}).get("ref", "")
+            head_sha = pr_data.get("head", {}).get("sha", "")
             if not branch_name:
-                branch_name = pr_data.get("head", {}).get("ref", "")
+                branch_name = head_ref
             pr_author_gh = pr_data.get("user", {}).get("login", "")
 
-            diff_resp = await http_client.get(
-                f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}",
-                headers={**auth_headers, "Accept": "application/vnd.github.v3.diff"}
-            )
-            diff_resp.raise_for_status()
-            diff_text = diff_resp.text
+            # Fetch unified diff
+            diff_text = ""
+            try:
+                diff_resp = await http_client.get(
+                    f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}",
+                    headers={**auth_headers, "Accept": "application/vnd.github.v3.diff"}
+                )
+                diff_resp.raise_for_status()
+                diff_text = diff_resp.text
+            except Exception as de:
+                logger.warning(f"Could not fetch unified diff: {de}")
+
+            # Fetch structured file changes from PR files API
+            files_list = []
+            try:
+                files_resp = await http_client.get(
+                    f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files?per_page=100",
+                    headers={**auth_headers, "Accept": "application/vnd.github.v3+json"}
+                )
+                if files_resp.status_code == 200:
+                    files_list = files_resp.json()
+            except Exception as fe:
+                logger.warning(f"Could not fetch PR files list: {fe}")
+
+            IGNORED_EXTS = {".lock", ".map", ".min.js", ".min.css", ".ico", ".png", ".jpg", ".jpeg", ".svg", ".woff", ".woff2"}
+            IGNORED_FILENAMES = {"package-lock.json", "uv.lock", "yarn.lock", "pnpm-lock.yaml"}
+            CODE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".sql", ".html", ".css", ".json", ".yaml", ".yml", ".md"}
+
+            files_summary_lines = []
+            file_patches = []
+            actual_source_files = []
+            total_patch_chars = 0
+            MAX_PATCH_CHARS = 180000
+
+            for f in files_list:
+                fname = f.get("filename", "")
+                fstatus = f.get("status", "modified")
+                adds = f.get("additions", 0)
+                dels = f.get("deletions", 0)
+                files_summary_lines.append(f"- `{fname}` ({fstatus}, +{adds}/-{dels})")
+
+                base_name = fname.split("/")[-1]
+                ext = "." + fname.split(".")[-1] if "." in fname else ""
+                if base_name in IGNORED_FILENAMES or ext in IGNORED_EXTS:
+                    continue
+
+                patch = f.get("patch", "")
+                if patch:
+                    if total_patch_chars + len(patch) <= MAX_PATCH_CHARS:
+                        file_patches.append(f"--- FILE PATCH: {fname} ({fstatus}, +{adds}/-{dels}) ---\n{patch}\n")
+                        total_patch_chars += len(patch)
+                    else:
+                        file_patches.append(f"--- FILE PATCH: {fname} ({fstatus}) ---\n[Patch omitted due to size limit]\n")
+
+                # Fetch authoritative full source code for the key modified/added files from PR branch head
+                if ext in CODE_EXTENSIONS and fstatus in ("modified", "added") and len(actual_source_files) < 6:
+                    ref_to_query = head_sha or head_ref or branch_name
+                    try:
+                        raw_f_resp = await http_client.get(
+                            f"https://api.github.com/repos/{repo_full_name}/contents/{fname}?ref={ref_to_query}",
+                            headers={**auth_headers, "Accept": "application/vnd.github.v3.raw"}
+                        )
+                        if raw_f_resp.status_code == 200 and len(raw_f_resp.text) <= 60000:
+                            actual_source_files.append(
+                                f"--- COMPLETE ACTUAL SOURCE: {fname} ---\n{raw_f_resp.text}\n"
+                            )
+                    except Exception as ferr:
+                        logger.debug(f"Optional full content fetch for {fname}: {ferr}")
+
+            if not file_patches and diff_text:
+                file_patches.append(diff_text[:120000])
+
+            files_summary = "\n".join(files_summary_lines) if files_summary_lines else "Summary unavailable"
+            code_patches_text = "\n".join(file_patches) if file_patches else (diff_text[:120000] if diff_text else "No diff found.")
+            actual_files_text = "\n\n".join(actual_source_files) if actual_source_files else "Full file content omitted; evaluate patches directly."
 
             # 3. Optional sweep for openspec contracts (reference only, NOT mandatory)
             openspec_context = ""
@@ -303,28 +374,36 @@ CRITICAL REVIEW RULES:
    The primary source of truth is the === PROJECT TASKS === section from the OpenTask backlog.
    Any `openspec` directory or specification files are strictly OPTIONAL contextual reference and must NEVER cause the evaluation to fail if absent or incomplete.
 
-2. TASK IDENTIFICATION & SEMANTIC MATCHING:
+2. GIT DIFF VS. ACTUAL COMPLETE CODE (NEVER HALLUCINATE SYNTAX/TRUNCATION ERRORS):
+   - You are provided with:
+     a) Git Patches showing added (`+`) and deleted (`-`) lines.
+     b) ACTUAL COMPLETE SOURCE CODE for modified files as they exist on the PR branch.
+   - Diff hunks (`@@ -x,y +x,y @@`) only show localized changes and a few surrounding context lines. The end of a diff hunk does NOT mean the file ends or that brackets/tags/ternary operators are unclosed.
+   - You MUST cross-reference the === ACTUAL COMPLETE CODE OF MODIFIED FILES === before claiming any syntax error, unclosed JSX tag, unclosed block, missing bracket, or truncated code!
+   - NEVER report that code "ends abruptly", "is truncated", or "leaves tags unclosed" unless the syntax is truly broken in the actual complete file. If the file compiles and JSX tags/brackets are closed in the actual code, do NOT hallucinate a syntax or build failure.
+
+3. TASK IDENTIFICATION & SEMANTIC MATCHING:
    - Identify which task from === PROJECT TASKS === this Pull Request is attempting to fulfill.
    - Perform smart, flexible semantic matching:
-     * Match branch name (e.g., branch 'notification' matches task 'Add Web Push Notification' or 'Notification/Inbox Behavior').
+     * Match branch name (e.g. branch 'notification' matches 'Add Web Push Notification' or 'Notification/Inbox Behavior', branch 'github-integrations' matches 'Integrate GitHub Webhook Verification').
      * Match PR title and description keywords against task title and description.
-     * Match the functional scope of changes in the Git Diff.
+     * Match the functional scope of changes in the Git Patches.
    - If a task closely relates, set `matched_task_id` to that task's ID (as a string) and `matched_task_title` to the task title.
-   - If there is genuinely no matching task in the project, set `matched_task_id` to null and `matched_task_title` to null, and review based on general engineering best practices.
+   - If there is genuinely no matching task in the project, set `matched_task_id` to null and `matched_task_title` to null, and review based on general software engineering best practices.
 
-3. CODE EVALUATION:
+4. CODE EVALUATION:
    - Does the implementation achieve what the target task calls for?
    - Check architecture, readability, error handling, security, edge cases, and code style.
    - Highlight what is done well and identify specific areas for improvement.
 
-4. COMPLETENESS & VERDICT:
+5. COMPLETENESS & VERDICT:
    - Calculate `completeness_score` (integer 0-100) based on how thoroughly the PR addresses the task scope.
    - Verdict MUST be exactly 'PASS' or 'FAIL':
      * PASS: completeness_score >= 70 AND no critical bugs or vulnerabilities.
-     * FAIL: completeness_score < 70 OR critical bugs/vulnerabilities detected.
+     * FAIL: completeness_score < 70 OR critical logic bugs/security vulnerabilities detected.
 
-5. FEEDBACK FORMAT:
-   - Provide constructive, clear Markdown feedback in `feedback` citing relevant files or functions from the diff.
+6. FEEDBACK FORMAT:
+   - Provide constructive, clear Markdown feedback in `feedback` citing relevant files or functions.
    - Provide 2-4 concrete, actionable improvement points in `suggestions`.
 """
 
@@ -332,11 +411,13 @@ CRITICAL REVIEW RULES:
             f"PROJECT: {project_name or 'Unknown'}\n"
             f"REPOSITORY: {repo_full_name}\n"
             f"PR #{pr_number}: {pr_title}\n"
-            f"PR DESCRIPTION: {pr_body[:1000] if pr_body else 'None'}\n"
+            f"PR DESCRIPTION: {pr_body[:2000] if pr_body else 'None'}\n"
             f"BRANCH: {branch_name}\n\n"
             f"=== PROJECT TASKS (PRIMARY SPECIFICATIONS) ===\n{tasks_context}\n"
             f"{openspec_context}\n\n"
-            f"=== CODE CHANGES (Git Diff) ===\n{diff_text[:25000]}\n\n"
+            f"=== CHANGED FILES SUMMARY ===\n{files_summary}\n\n"
+            f"=== CODE CHANGES (Git Patches) ===\n{code_patches_text}\n\n"
+            f"=== ACTUAL COMPLETE CODE OF MODIFIED FILES (AUTHORITATIVE SOURCE) ===\n{actual_files_text}\n\n"
             f"Evaluate the Pull Request."
         )
 
@@ -489,3 +570,5 @@ CRITICAL REVIEW RULES:
         logger.error(f"⚠️ Network Error in task-aware PR eval #{pr_number}: {str(he)}")
     except Exception as e:
         logger.error(f"⚠️ Fatal Error in task-aware PR eval #{pr_number}: {str(e)}", exc_info=True)
+
+    return result_dict

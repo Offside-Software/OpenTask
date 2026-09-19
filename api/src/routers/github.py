@@ -149,41 +149,62 @@ async def verify_signature(
     request: Request,
     x_hub_signature_256: str | None = Header(default=None),
 ) -> dict:
+    import hmac
+    import hashlib
+    from config import settings
+
+    raw_body = await request.body()
+    secret = (settings.gh_webhook_secret or "").strip().strip("'\"")
+
+    if not secret:
+        # If no secret configured in environment, allow payload through with warning
+        logger.warning("[GITHUB_WEBHOOK] No GH_WEBHOOK_SECRET configured; processing payload without signature verification.")
+        try:
+            return json.loads(raw_body)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
     if not x_hub_signature_256:
         raise HTTPException(status_code=401, detail="Missing signature")
     
-    raw_body = await request.body()
-    expected = "sha256=" + __import__("hmac").new(
-        __import__("config").settings.gh_webhook_secret.encode(),
+    expected = "sha256=" + hmac.new(
+        secret.encode("utf-8"),
         raw_body,
-        __import__("hashlib").sha256,
+        hashlib.sha256,
     ).hexdigest()
 
-    if not __import__("hmac").compare_digest(expected, x_hub_signature_256):
-        logger.warning("Invalid webhook signature detected.")
+    if not hmac.compare_digest(expected, x_hub_signature_256):
+        logger.warning("[GITHUB_WEBHOOK] Invalid webhook signature detected.")
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     try:
-        return __import__("json").loads(raw_body)
-    except __import__("json").JSONDecodeError:
-        logger.error("Invalid JSON payload received.")
+        return json.loads(raw_body)
+    except json.JSONDecodeError:
+        logger.error("[GITHUB_WEBHOOK] Invalid JSON payload received.")
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
 
 @router.post("/github/webhook")
 async def github_webhook(
     request: Request,
-    background_tasks: BackgroundTasks,
     payload: dict = Depends(verify_signature),
     x_github_event: str | None = Header(default=None),
 ):
     """
     Receive and verify GitHub webhook payloads.
     Only processes events whose signature matches the webhook secret.
+    Directly awaits event processing so serverless environments (like Vercel)
+    keep the execution context alive until the evaluation and notifications finish.
     """
     event = x_github_event or "unknown"
+    action = payload.get("action", "")
+    logger.info(f"📥 [GITHUB_WEBHOOK] Received event '{event}' (action: '{action}')")
     
     from services.webhook_handlers import process_github_event
-    background_tasks.add_task(process_github_event, payload, event)
+    try:
+        await process_github_event(payload, event)
+    except Exception as e:
+        logger.error(f"[GITHUB_WEBHOOK] Error executing webhook event '{event}': {e}", exc_info=True)
     
     return {"status": "accepted"}
 
