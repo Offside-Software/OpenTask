@@ -205,7 +205,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             <span className="w-1.5 h-1.5 bg-[#FFE600]"></span>
                             <button type='button' onClick={(e) => {
                                     e.stopPropagation();
-                                    handleCopyIdToClipboard(String(task.id));
+                                    const clipboardStr = `[${title}](#${String(task.id)})`
+                                    handleCopyIdToClipboard(clipboardStr);
                                 }}
                                 className="font-mono text-[13px] px-2 text-neutral-500 font-bold hover:bg-[#00FF66] hover:text-black hover:border-black hover:border hover:shadow-[1.5px_1.5px_0px_0px_#000000]">
                                 TASK ID: #{String(task.id)}
