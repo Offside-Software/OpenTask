@@ -250,3 +250,209 @@ def notify_task_assigned(
         )
     except Exception as e:
         logger.warning(f"[NOTIFICATIONS] Failed to trigger task assigned push: {e}")
+
+
+def notify_pr_reviewed(
+    task_title: str,
+    assignee_id: Optional[int | str],
+    verdict: str,
+    pr_url: str,
+    pr_number: int,
+    project_id: Optional[int | str] = None,
+    extra_user_ids: Optional[List[int | str]] = None,
+):
+    """
+    Trigger a Web Push notification when an AI PR review verdict is ready.
+    The notification click redirects the user to the PR on GitHub.
+    Sends to assignee and any extra_user_ids (e.g. PR author, PMs).
+    """
+    verdict_icon = "✅" if verdict == "PASS" else "❌"
+    verdict_label = "PASSED" if verdict == "PASS" else "FAILED"
+
+    title = f"{verdict_icon} PR Review: {verdict_label}"
+    body = f'AI review for "{task_title}" — PR #{pr_number} {verdict_label}. Tap to view.'
+
+    all_users = set()
+    if assignee_id:
+        all_users.add(int(assignee_id))
+    if extra_user_ids:
+        for u in extra_user_ids:
+            if u:
+                all_users.add(int(u))
+
+    for uid in all_users:
+        conn = _get_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            alert_id = _generator.generate()
+            cur.execute(
+                """
+                INSERT INTO opentask.alerts
+                    (id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE);
+                """,
+                (
+                    alert_id,
+                    uid,
+                    int(project_id) if project_id else uid,
+                    int(project_id) if project_id else None,
+                    title,
+                    body,
+                    "PR_REVIEWED",
+                    "info" if verdict == "PASS" else "warning",
+                    ["View PR on GitHub", "Go to Task"],
+                )
+            )
+            conn.commit()
+            logger.info(f"[NOTIFICATIONS] PR review alert {alert_id} created for user {uid}.")
+        except Exception as db_err:
+            if conn:
+                conn.rollback()
+            logger.warning(f"[NOTIFICATIONS] Failed to record PR review alert for {uid}: {db_err}")
+        finally:
+            if cur is not None:
+                cur.close()
+            _put_conn(conn)
+
+        try:
+            send_push_notification(
+                user_id=uid,
+                title=title,
+                body=body,
+                url=pr_url,
+                tag=f"pr-review-{pr_number}",
+            )
+        except Exception as e:
+            logger.warning(f"[NOTIFICATIONS] Failed to trigger PR review push to {uid}: {e}")
+
+
+def notify_pr_opened(
+    pr_number: int,
+    pr_title: str,
+    pr_url: str,
+    author_gh: str,
+    repo_full_name: str,
+    target_user_ids: List[int | str],
+    project_id: Optional[int | str] = None,
+    matched_task_title: Optional[str] = None,
+):
+    """
+    Notify related users (project managers, assignees) that a new PR was opened.
+    Dispatches Web Push (clicking redirects to the GitHub PR) and records persistent alerts.
+    """
+    task_info = f' for "{matched_task_title}"' if matched_task_title else ""
+    title = f"📢 New PR #{pr_number}: {pr_title[:40]}"
+    body = f"@{author_gh} opened a PR in {repo_full_name}{task_info}. Tap to review."
+
+    unique_user_ids = list({int(uid) for uid in target_user_ids if uid})
+    for uid in unique_user_ids:
+        conn = _get_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            alert_id = _generator.generate()
+            cur.execute(
+                """
+                INSERT INTO opentask.alerts
+                    (id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE);
+                """,
+                (
+                    alert_id,
+                    uid,
+                    int(project_id) if project_id else uid,
+                    int(project_id) if project_id else None,
+                    title,
+                    body,
+                    "PR_OPENED",
+                    "info",
+                    ["View PR on GitHub"],
+                )
+            )
+            conn.commit()
+        except Exception as err:
+            if conn:
+                conn.rollback()
+            logger.warning(f"[NOTIFICATIONS] Failed to create PR_OPENED alert: {err}")
+        finally:
+            if cur is not None:
+                cur.close()
+            _put_conn(conn)
+
+        try:
+            send_push_notification(
+                user_id=uid,
+                title=title,
+                body=body,
+                url=pr_url,
+                tag=f"pr-opened-{pr_number}",
+            )
+        except Exception as e:
+            logger.warning(f"[NOTIFICATIONS] Failed to trigger PR opened push to {uid}: {e}")
+
+
+def notify_pr_comment(
+    pr_number: int,
+    pr_title: str,
+    pr_url: str,
+    commenter_gh: str,
+    comment_body: str,
+    target_user_ids: List[int | str],
+    project_id: Optional[int | str] = None,
+):
+    """
+    Notify related users when a comment is posted on a PR.
+    """
+    clean_body = (comment_body or "").strip()
+    preview = clean_body[:120] + ("..." if len(clean_body) > 120 else "")
+    title = f"💬 Comment on PR #{pr_number}"
+    body = f"@{commenter_gh}: {preview}"
+
+    unique_user_ids = list({int(uid) for uid in target_user_ids if uid})
+    for uid in unique_user_ids:
+        conn = _get_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            alert_id = _generator.generate()
+            cur.execute(
+                """
+                INSERT INTO opentask.alerts
+                    (id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE);
+                """,
+                (
+                    alert_id,
+                    uid,
+                    int(project_id) if project_id else uid,
+                    int(project_id) if project_id else None,
+                    title,
+                    body,
+                    "PR_COMMENT",
+                    "info",
+                    ["View Comment on GitHub"],
+                )
+            )
+            conn.commit()
+        except Exception as err:
+            if conn:
+                conn.rollback()
+            logger.warning(f"[NOTIFICATIONS] Failed to create PR_COMMENT alert: {err}")
+        finally:
+            if cur is not None:
+                cur.close()
+            _put_conn(conn)
+
+        try:
+            send_push_notification(
+                user_id=uid,
+                title=title,
+                body=body,
+                url=pr_url,
+                tag=f"pr-comment-{pr_number}",
+            )
+        except Exception as e:
+            logger.warning(f"[NOTIFICATIONS] Failed to trigger PR comment push to {uid}: {e}")
+
+

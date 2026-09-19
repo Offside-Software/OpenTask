@@ -36,6 +36,115 @@ def list_repos(installation_id: int | None = None):
     return {"repos": repos}
 
 
+@router.get("/github/installations")
+def list_github_installations():
+    """List all GitHub App installations accessible to this App (for the installation picker UI)."""
+    import jwt as _jwt
+    import time
+    from config import settings as _settings
+
+    private_key = _settings.gh_app_private_key.replace("\\n", "\n")
+    payload = {
+        "iat": int(time.time()) - 60,
+        "exp": int(time.time()) + (10 * 60),
+        "iss": str(_settings.gh_app_id)
+    }
+    jwt_token = _jwt.encode(payload, private_key, algorithm="RS256")
+
+    import httpx
+    with httpx.Client(timeout=15.0) as http:
+        resp = http.get(
+            "https://api.github.com/app/installations",
+            headers={
+                "Authorization": f"Bearer {jwt_token}",
+                "Accept": "application/vnd.github.v3+json"
+            },
+            params={"per_page": 100}
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Failed to list GitHub App installations")
+
+    installations = resp.json()
+    return {
+        "installations": [
+            {
+                "installation_id": inst["id"],
+                "account_login": inst["account"]["login"],
+                "account_type": inst["account"]["type"],
+                "account_avatar_url": inst["account"]["avatar_url"],
+                "app_install_url": f"https://github.com/apps/{inst.get('app_slug', 'openequilibra')}/installations/new",
+            }
+            for inst in installations
+        ]
+    }
+
+
+@router.get("/github/installations/{installation_id}/repos")
+def list_installation_repos(installation_id: int):
+    """List repos for a specific GitHub App installation."""
+    import jwt as _jwt
+    import time
+    from config import settings as _settings
+    import httpx
+
+    private_key = _settings.gh_app_private_key.replace("\\n", "\n")
+    payload = {
+        "iat": int(time.time()) - 60,
+        "exp": int(time.time()) + (10 * 60),
+        "iss": str(_settings.gh_app_id)
+    }
+    jwt_token = _jwt.encode(payload, private_key, algorithm="RS256")
+
+    with httpx.Client(timeout=15.0) as http:
+        # Get installation token
+        token_resp = http.post(
+            f"https://api.github.com/app/installations/{installation_id}/access_tokens",
+            headers={
+                "Authorization": f"Bearer {jwt_token}",
+                "Accept": "application/vnd.github.v3+json"
+            }
+        )
+        if token_resp.status_code != 201:
+            raise HTTPException(status_code=502, detail="Failed to get installation token")
+        inst_token = token_resp.json()["token"]
+
+        repos_resp = http.get(
+            "https://api.github.com/installation/repositories",
+            headers={
+                "Authorization": f"token {inst_token}",
+                "Accept": "application/vnd.github.v3+json"
+            },
+            params={"per_page": 100}
+        )
+        if repos_resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="Failed to list installation repos")
+
+    repos = repos_resp.json().get("repositories", [])
+    return {
+        "repos": [
+            {
+                "full_name": r["full_name"],
+                "html_url": r["html_url"],
+                "private": r["private"],
+                "description": r.get("description"),
+            }
+            for r in repos
+        ]
+    }
+
+
+@router.get("/github/app/install-url")
+def get_app_install_url():
+    """Return the GitHub App installation URL for connecting new orgs/accounts."""
+    gi = get_github_integration()
+    app_info = gi.get_app()
+    app_slug = getattr(app_info, 'slug', None) or app_info.name.lower().replace(' ', '-')
+    return {
+        "install_url": f"https://github.com/apps/{app_slug}/installations/new"
+    }
+
+
 async def verify_signature(
     request: Request,
     x_hub_signature_256: str | None = Header(default=None),

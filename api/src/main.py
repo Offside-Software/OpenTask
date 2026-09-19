@@ -19,6 +19,8 @@ from services.database import alerts as _db_alerts
 from services.database import activities as _db_activities
 from services.database import meetings as _db_meetings
 from services.database import history as _db_history
+from services.database import github_installations as _db_github_installations
+from services.database import pr_reviews as _db_pr_reviews
 from services.notifications import init_push_notifications_table
 
 if sys.platform == 'win32':
@@ -30,6 +32,7 @@ async def lifespan(app: FastAPI):
     create_pool()
     _db_history.init_project_history_table()
     init_push_notifications_table()
+    _db_github_installations._init_github_installations_table()
     yield
     close_pool()
 

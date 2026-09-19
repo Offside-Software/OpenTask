@@ -111,11 +111,10 @@ export const NotificationsPage: React.FC = () => {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-none text-[11px] font-mono font-black uppercase tracking-wider transition-all duration-75 border-2 border-black cursor-pointer ${
-                filter === f 
-                  ? 'bg-[#FFE600] text-black shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]' 
+              className={`px-4 py-2 rounded-none text-[11px] font-mono font-black uppercase tracking-wider transition-all duration-75 border-2 border-black cursor-pointer ${filter === f
+                  ? 'bg-[#FFE600] text-black shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]'
                   : 'bg-[#141619] text-neutral-400 hover:text-white hover:border-white shadow-[2px_2px_0px_0px_#000000]'
-              }`}
+                }`}
             >
               {f === 'all' ? '// ALL LOGS' : '// UNREAD ONLY'}
             </button>
@@ -132,13 +131,12 @@ export const NotificationsPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-white font-black text-[13px] uppercase tracking-wider">// WEB PUSH DISPATCH ENGINE</h3>
-              <span className={`px-2 py-0.5 text-[9px] font-black uppercase border border-black ${
-                permission === 'granted' 
-                  ? 'bg-[#22C55E] text-black' 
-                  : permission === 'denied' 
-                  ? 'bg-[#EF4444] text-white' 
-                  : 'bg-[#FFE600] text-black'
-              }`}>
+              <span className={`px-2 py-0.5 text-[9px] font-black uppercase border border-black ${permission === 'granted'
+                  ? 'bg-[#22C55E] text-black'
+                  : permission === 'denied'
+                    ? 'bg-[#EF4444] text-white'
+                    : 'bg-[#FFE600] text-black'
+                }`}>
                 {permission === 'granted' ? 'ACTIVE // GRANTED' : permission === 'denied' ? 'BLOCKED' : 'STANDBY'}
               </span>
             </div>
@@ -212,10 +210,10 @@ export const NotificationsPage: React.FC = () => {
                         alert.type === 'DRAFT_APPROVAL'
                           ? 'primary'
                           : alert.type === 'TASK_ASSIGNED'
-                          ? 'success'
-                          : alert.severity === 'critical'
-                          ? 'critical'
-                          : 'warning'
+                            ? 'success'
+                            : alert.severity === 'critical'
+                              ? 'critical'
+                              : 'warning'
                       }
                       className="!py-0.5 !text-[8px] uppercase font-mono"
                     >
@@ -282,10 +280,10 @@ export const NotificationsPage: React.FC = () => {
                         isDraftApproval
                           ? 'primary'
                           : selectedAlert.type === 'TASK_ASSIGNED'
-                          ? 'success'
-                          : selectedAlert.severity === 'critical'
-                          ? 'critical'
-                          : 'warning'
+                            ? 'success'
+                            : selectedAlert.severity === 'critical'
+                              ? 'critical'
+                              : 'warning'
                       }
                       className="uppercase font-mono"
                     >
@@ -295,8 +293,8 @@ export const NotificationsPage: React.FC = () => {
                   </div>
                   <h2 className="text-white font-mono font-black text-[18px] uppercase tracking-wide leading-tight">{selectedAlert.title}</h2>
                 </div>
-                <button 
-                  onClick={() => setSelectedAlert(null)} 
+                <button
+                  onClick={() => setSelectedAlert(null)}
                   className="p-1.5 rounded-none bg-black border-2 border-black text-neutral-300 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer"
                 >
                   <X size={18} strokeWidth={3} />
@@ -336,7 +334,10 @@ export const NotificationsPage: React.FC = () => {
                 <div className="flex gap-3 justify-end pt-2 border-t-2 border-neutral-800">
                   {!selectedAlert.is_resolved && (
                     <button
-                      onClick={() => { resolveAlert(selectedAlert.id!); setSelectedAlert(null); }}
+                      onClick={() => {
+                        resolveAlert(selectedAlert.id!);
+                        setSelectedAlert(null);
+                      }}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[12px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
                       <CheckCircle2 size={16} strokeWidth={2.5} /> Dismiss

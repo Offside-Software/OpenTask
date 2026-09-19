@@ -27,6 +27,10 @@ async def process_github_event(payload: dict, event: str, pool=None):
         if action == "submitted":
             await on_pr_review_submitted(payload, pool)
 
+    elif event in ("issue_comment", "pull_request_review_comment"):
+        if action == "created":
+            await on_pr_comment_created(payload, event, pool)
+
 async def sync_github_tasks(payload: dict):
     """Synchronization of tasks from GitHub tasks.md files to local DB."""
     repo_full_name = payload.get("repository", {}).get("full_name")
@@ -152,41 +156,230 @@ async def sync_github_tasks(payload: dict):
     except Exception as e:
         logger.error(f"Error fetching tasks from GitHub for {repo_full_name}: {e}")
 
+async def on_pr_comment_created(payload: dict, event: str, pool=None):
+    """
+    Handle new comments on PRs (both conversation issue comments and code review comments).
+    Dispatches push notifications to the PR author, assignees, and project managers.
+    """
+    from services.notifications import notify_pr_comment
+
+    comment = payload.get("comment", {})
+    repo = payload.get("repository", {})
+    installation_id = payload.get("installation", {}).get("id")
+
+    comment_user = comment.get("user", {})
+    commenter_gh = comment_user.get("login", "")
+    comment_body = comment.get("body", "")
+
+    # Ignore comments from GitHub App bots to prevent notification spam / loops
+    if not commenter_gh or comment_user.get("type") == "Bot" or commenter_gh.endswith("[bot]"):
+        logger.info(f"Skipping notification for bot comment by {commenter_gh}")
+        return
+
+    pr_number = None
+    pr_title = ""
+    pr_url = ""
+    pr_author_gh = ""
+
+    if event == "issue_comment":
+        issue = payload.get("issue", {})
+        if "pull_request" not in issue:
+            return  # Not a PR comment
+        pr_number = issue.get("number")
+        pr_title = issue.get("title", "")
+        pr_url = comment.get("html_url") or issue.get("html_url", "")
+        pr_author_gh = issue.get("user", {}).get("login", "")
+    elif event == "pull_request_review_comment":
+        pr = payload.get("pull_request", {})
+        pr_number = pr.get("number")
+        pr_title = pr.get("title", "")
+        pr_url = comment.get("html_url") or pr.get("html_url", "")
+        pr_author_gh = pr.get("user", {}).get("login", "")
+
+    if not pr_number or not comment_body:
+        return
+
+    repo_full_name = repo.get("full_name", "")
+    repo_url = repo.get("html_url") or f"https://github.com/{repo_full_name}"
+
+    target_user_ids = set()
+    project_id = None
+    commenter_user_id = None
+
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Match project
+        cur.execute("SELECT id FROM opentask.projects WHERE %s = ANY(gh_repo_url) LIMIT 1;", (repo_url,))
+        proj_row = cur.fetchone()
+        if not proj_row and installation_id:
+            cur.execute(
+                "SELECT project_id FROM opentask.github_installations WHERE installation_id = %s LIMIT 1;",
+                (installation_id,)
+            )
+            inst_row = cur.fetchone()
+            if inst_row:
+                project_id = inst_row["project_id"]
+        elif proj_row:
+            project_id = proj_row["id"]
+
+        # Add project members
+        if project_id:
+            cur.execute("SELECT user_id FROM opentask.project_member WHERE project_id = %s;", (project_id,))
+            for m in cur.fetchall():
+                if m.get("user_id"):
+                    target_user_ids.add(m["user_id"])
+
+        # Add PR author
+        if pr_author_gh:
+            cur.execute("SELECT id FROM opentask.users WHERE gh_username = %s LIMIT 1;", (pr_author_gh,))
+            author_row = cur.fetchone()
+            if author_row:
+                target_user_ids.add(author_row["id"])
+
+        # Exclude commenter
+        cur.execute("SELECT id FROM opentask.users WHERE gh_username = %s LIMIT 1;", (commenter_gh,))
+        commenter_row = cur.fetchone()
+        if commenter_row:
+            commenter_user_id = commenter_row["id"]
+            target_user_ids.discard(commenter_user_id)
+
+    except Exception as e:
+        logger.warning(f"Error resolving users for PR comment notification: {e}")
+    finally:
+        if cur:
+            cur.close()
+        _put_conn(conn)
+
+    if target_user_ids:
+        try:
+            notify_pr_comment(
+                pr_number=pr_number,
+                pr_title=pr_title,
+                pr_url=pr_url,
+                commenter_gh=commenter_gh,
+                comment_body=comment_body,
+                target_user_ids=list(target_user_ids),
+                project_id=project_id,
+            )
+            logger.info(f"✅ Dispatched PR comment notification to {len(target_user_ids)} users.")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to dispatch PR comment notification: {e}")
+
+
 async def on_pr_opened(payload: dict, pool=None):
-    # 1. AI Evaluation
-    from services.pr_evaluator import process_pr_evaluation
+    from services.pr_evaluator import process_task_aware_pr_evaluation
+    from services.notifications import notify_pr_opened
+
     pr = payload.get("pull_request", {})
     repo = payload.get("repository", {})
     installation_id = payload.get("installation", {}).get("id")
-    if all([pr.get("number"), repo.get("full_name"), installation_id]):
-        await process_pr_evaluation(repo["full_name"], pr["number"], installation_id)
-    
-    # 2. Task Synchronization (Placeholder)
+    repo_full_name = repo.get("full_name")
+    pr_number = pr.get("number")
+
+    # 1. Notify related users (project managers, assignees) that a new PR was opened
+    if pr_number and repo_full_name:
+        try:
+            repo_url = repo.get("html_url") or f"https://github.com/{repo_full_name}"
+            pr_url = pr.get("html_url") or f"https://github.com/{repo_full_name}/pull/{pr_number}"
+            pr_title = pr.get("title", "")
+            author_gh = pr.get("user", {}).get("login", "Unknown")
+
+            target_user_ids = set()
+            project_id = None
+            conn = _get_conn()
+            cur = None
+            try:
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute("SELECT id FROM opentask.projects WHERE %s = ANY(gh_repo_url) LIMIT 1;", (repo_url,))
+                proj_row = cur.fetchone()
+                if not proj_row and installation_id:
+                    cur.execute(
+                        "SELECT project_id FROM opentask.github_installations WHERE installation_id = %s LIMIT 1;",
+                        (installation_id,)
+                    )
+                    inst_row = cur.fetchone()
+                    if inst_row:
+                        project_id = inst_row["project_id"]
+                elif proj_row:
+                    project_id = proj_row["id"]
+
+                if project_id:
+                    cur.execute("SELECT user_id FROM opentask.project_member WHERE project_id = %s;", (project_id,))
+                    for m in cur.fetchall():
+                        if m.get("user_id"):
+                            target_user_ids.add(m["user_id"])
+            finally:
+                if cur:
+                    cur.close()
+                _put_conn(conn)
+
+            notify_pr_opened(
+                pr_number=pr_number,
+                pr_title=pr_title,
+                pr_url=pr_url,
+                author_gh=author_gh,
+                repo_full_name=repo_full_name,
+                target_user_ids=list(target_user_ids),
+                project_id=project_id,
+            )
+        except Exception as ne:
+            logger.warning(f"Failed to dispatch notify_pr_opened: {ne}")
+
+    # 2. Task-Aware AI Evaluation (evaluates against actual project backlog tasks)
+    if all([pr_number, repo_full_name, installation_id]):
+        await process_task_aware_pr_evaluation(
+            repo_full_name=repo_full_name,
+            pr_number=pr_number,
+            installation_id=installation_id,
+            pr_title=pr.get("title", ""),
+            pr_body=pr.get("body", "") or "",
+            branch_name=pr.get("head", {}).get("ref", ""),
+        )
+
+    # 3. Task Synchronization
     await sync_github_tasks(payload)
-    
-    # 3. Legacy State Management
+
+    # 4. State Management + Forgotten Task Detection
     await handle_pr_opened(payload)
+
 
 async def on_pr_reopened(payload: dict, pool=None):
-    # Similar to opened
-    from services.pr_evaluator import process_pr_evaluation
+    from services.pr_evaluator import process_task_aware_pr_evaluation
     pr = payload.get("pull_request", {})
     repo = payload.get("repository", {})
     installation_id = payload.get("installation", {}).get("id")
     if all([pr.get("number"), repo.get("full_name"), installation_id]):
-        await process_pr_evaluation(repo["full_name"], pr["number"], installation_id)
+        await process_task_aware_pr_evaluation(
+            repo_full_name=repo["full_name"],
+            pr_number=pr["number"],
+            installation_id=installation_id,
+            pr_title=pr.get("title", ""),
+            pr_body=pr.get("body", "") or "",
+            branch_name=pr.get("head", {}).get("ref", ""),
+        )
         
     await sync_github_tasks(payload)
     await handle_pr_opened(payload)
 
+
 async def on_pr_synchronize(payload: dict, pool=None):
-    from services.pr_evaluator import process_pr_evaluation
+    from services.pr_evaluator import process_task_aware_pr_evaluation
     pr = payload.get("pull_request", {})
     repo = payload.get("repository", {})
     installation_id = payload.get("installation", {}).get("id")
     if all([pr.get("number"), repo.get("full_name"), installation_id]):
-        await process_pr_evaluation(repo["full_name"], pr["number"], installation_id)
-        
+        await process_task_aware_pr_evaluation(
+            repo_full_name=repo["full_name"],
+            pr_number=pr["number"],
+            installation_id=installation_id,
+            pr_title=pr.get("title", ""),
+            pr_body=pr.get("body", "") or "",
+            branch_name=pr.get("head", {}).get("ref", ""),
+        )
+
     await sync_github_tasks(payload)
 
 async def on_pr_closed(payload: dict, pool=None):
@@ -428,20 +621,103 @@ async def handle_pr_opened(payload: dict):
     repo_url = payload.get("repository", {}).get("html_url")
     branch_name = pr.get("head", {}).get("ref")
     gh_username = pr.get("user", {}).get("login", "Unknown")
+    pr_number = pr.get("number", 0)
 
     if not repo_url or not branch_name:
         return
 
+    # Find the task by branch
     project_data = find_project_bucket_by_state(repo_url, "ON_REVIEW")
-    if not project_data: return
-    project_id, target_bucket_id = project_data
-    
-    if not target_bucket_id: 
-        logger.error(f"Project {project_id} is missing a bucket with state 'ON_REVIEW'")
+    if not project_data:
         return
+    project_id, target_bucket_id = project_data
 
     task = find_task_by_branch(project_id, branch_name)
     if not task:
+        return
+
+    # Check current task state
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT b.state, b.name, t.lead_assignee_id, pm.user_id as manager_id "
+            "FROM opentask.tasks t "
+            "JOIN opentask.buckets b ON t.bucket_id = b.id "
+            "LEFT JOIN opentask.project_member pm ON pm.project_id = t.project_id AND pm.role = 'MANAGER' "
+            "WHERE t.id = %s LIMIT 1;",
+            (task["id"],)
+        )
+        task_state_row = cur.fetchone()
+    finally:
+        if cur:
+            cur.close()
+        _put_conn(conn)
+
+    if task_state_row:
+        current_state = task_state_row.get("state", "")
+        current_bucket_name = task_state_row.get("name", "Unknown")
+        manager_id = task_state_row.get("manager_id")
+        task_title = task.get("title", "Task")
+
+        # FORGOTTEN TASK: task is in TODO or DRAFT but PR was opened
+        if current_state in ("TODO", "DRAFT", "PENDING"):
+            logger.warning(f"[FORGOTTEN TASK] PR #{pr_number} opened for task '{task_title}' still in {current_state}")
+
+            # Create alert for project manager
+            if manager_id:
+                try:
+                    alert_conn = _get_conn()
+                    alert_cur = None
+                    try:
+                        alert_cur = alert_conn.cursor()
+                        alert_id = _generator.generate()
+                        alert_cur.execute(
+                            """
+                            INSERT INTO opentask.alerts
+                                (id, user_id, context_id, project_id, title, description, type, severity, suggested_actions, is_resolved)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE);
+                            """,
+                            (
+                                alert_id,
+                                manager_id,
+                                task["id"],
+                                project_id,
+                                f"⚠️ Forgotten Task: {task_title}",
+                                f"{gh_username} opened PR #{pr_number} for task '{task_title}', but the task is still in '{current_bucket_name}'. The developer may have forgotten to move it to ONGOING.",
+                                "FORGOTTEN_TASK",
+                                "warning",
+                                ["Move task to ONGOING", "Review the PR", "Contact developer"]
+                            )
+                        )
+                        alert_conn.commit()
+                        logger.info(f"[FORGOTTEN TASK] Alert created for manager {manager_id}")
+                    except Exception as ae:
+                        alert_conn.rollback()
+                        logger.error(f"[FORGOTTEN TASK] Failed to create alert: {ae}")
+                    finally:
+                        if alert_cur:
+                            alert_cur.close()
+                        _put_conn(alert_conn)
+                except Exception as e:
+                    logger.error(f"[FORGOTTEN TASK] Error in alert creation: {e}")
+
+            # Log activity but DON'T auto-move task for forgotten tasks
+            try:
+                db_create_activity(DatabaseActivity(
+                    project_id=project_id,
+                    user_name=gh_username,
+                    action=f"opened PR #{pr_number} (⚠️ task still in {current_bucket_name})",
+                    target=task_title
+                ))
+            except Exception as e:
+                logger.error(f"[FORGOTTEN TASK] Failed to log activity: {e}")
+            return  # Don't auto-move
+
+    # Normal flow: task is ONGOING, move to ON_REVIEW
+    if not target_bucket_id:
+        logger.error(f"Project {project_id} is missing a bucket with state 'ON_REVIEW'")
         return
 
     try:
@@ -455,6 +731,7 @@ async def handle_pr_opened(payload: dict):
         ))
     except Exception as e:
         logger.error(f"Failed to move task {task['id']}: {e}")
+
 
 async def handle_pr_review_submitted(payload: dict):
     review = payload.get("review", {})

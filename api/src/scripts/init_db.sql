@@ -141,3 +141,36 @@ CREATE INDEX IF NOT EXISTS idx_project_history_project_id ON opentask.project_hi
 CREATE INDEX IF NOT EXISTS idx_project_history_created_at ON opentask.project_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_project_history_proj_created ON opentask.project_history(project_id, created_at DESC);
 
+-- 10. GitHub Installations Table (links GitHub App installations to projects)
+CREATE TABLE IF NOT EXISTS opentask.github_installations (
+    id BIGINT PRIMARY KEY,
+    project_id BIGINT REFERENCES opentask.projects(id) ON DELETE CASCADE,
+    installation_id BIGINT NOT NULL,
+    account_login TEXT NOT NULL,
+    account_type TEXT DEFAULT 'Organization',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_gh_installations_project ON opentask.github_installations(project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_gh_installations_unique ON opentask.github_installations(project_id, installation_id);
+
+-- 11. PR Reviews Table (persists AI verdict results per PR)
+CREATE TABLE IF NOT EXISTS opentask.pr_reviews (
+    id BIGINT PRIMARY KEY,
+    project_id BIGINT REFERENCES opentask.projects(id) ON DELETE CASCADE,
+    task_id BIGINT REFERENCES opentask.tasks(id) ON DELETE SET NULL,
+    repo_full_name TEXT NOT NULL,
+    pr_number INT NOT NULL,
+    pr_title TEXT,
+    pr_url TEXT,
+    verdict TEXT NOT NULL,
+    feedback TEXT,
+    matched_task_title TEXT,
+    completeness_score INT DEFAULT 0,
+    reviewed_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pr_reviews_project ON opentask.pr_reviews(project_id);
+CREATE INDEX IF NOT EXISTS idx_pr_reviews_task ON opentask.pr_reviews(task_id);
+
+-- Migration: Add repo_url to tasks table
+ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS repo_url TEXT;
+CREATE INDEX IF NOT EXISTS idx_tasks_repo_url ON opentask.tasks(repo_url);

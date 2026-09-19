@@ -25,6 +25,7 @@ class DatabaseTask(BaseModel):
     type: str  # CODE, REQUIREMENT, DESIGN, OTHER
     weight: int  # Points (1-8)
     branch_name: Optional[str] = None
+    repo_url: Optional[str] = None
     last_activity_at: Optional[datetime] = None
     order_idx: Optional[int] = None
     created_at: Optional[datetime] = None
@@ -71,6 +72,7 @@ def db_create_task(task: DatabaseTask, current_user: dict | None = Depends(get_c
             "type": task.type,
             "weight": task.weight,
             "branch_name": task.branch_name,
+            "repo_url": task.repo_url,
             "last_activity_at": task.last_activity_at,
             "order_idx": assigned_order_idx,
         }
@@ -89,7 +91,7 @@ def db_create_task(task: DatabaseTask, current_user: dict | None = Depends(get_c
         
         cols_sql = ", ".join(columns)
         vals_sql = ", ".join(placeholders)
-        sql = f"INSERT INTO opentask.tasks ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
+        sql = f"INSERT INTO opentask.tasks ({cols_sql}) VALUES ({vals_sql}) RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;"
 
         cur.execute(sql, params)
         row = cur.fetchone()
@@ -141,7 +143,7 @@ def db_get_tasks():
     cur = None
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at FROM opentask.tasks;")
+        cur.execute("SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at FROM opentask.tasks;")
         rows = cur.fetchall()
         return rows
     finally:
@@ -157,7 +159,7 @@ def db_get_task_by_id(task_id: SafeId):
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at FROM opentask.tasks WHERE id = %s LIMIT 1;",
+            "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at FROM opentask.tasks WHERE id = %s LIMIT 1;",
             (task_id,),
         )
         row = cur.fetchone()
@@ -182,6 +184,7 @@ class TaskUpdate(BaseModel):
     type: Optional[str] = None
     weight: Optional[int] = None
     branch_name: Optional[str] = None
+    repo_url: Optional[str] = None
     last_activity_at: Optional[datetime] = None
     order_idx: Optional[int] = None
 
@@ -209,7 +212,7 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
         params = list(update_data.values())
         params.append(task_id)
         
-        sql = f"UPDATE opentask.tasks SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, last_activity_at, order_idx, created_at, updated_at;"
+        sql = f"UPDATE opentask.tasks SET {set_clause}, updated_at = NOW() WHERE id = %s RETURNING id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, title, description, type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;"
         
         cur.execute(sql, params)
         row = cur.fetchone()

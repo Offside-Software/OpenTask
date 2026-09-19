@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
-import { Clock, GitPullRequest, MoreHorizontal, Check } from 'lucide-react';
+import { Clock, GitPullRequest, MoreHorizontal, Check, GitBranch } from 'lucide-react';
 import type { TaskType } from '../../models';
 import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
 import { TrashButton } from '../../design-system/TrashButton';
@@ -17,6 +17,7 @@ interface KanbanCardProps {
   warnStagnant?: boolean;
   isSuggested?: boolean;
   pr?: boolean;
+  repoUrl?: string;
   isCompleted?: boolean;
   onToggleComplete?: (completed: boolean) => void;
   onContextMenu?: (e: React.MouseEvent) => void;
@@ -46,6 +47,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   warnStagnant,
   isSuggested,
   pr,
+  repoUrl,
   isCompleted = false,
   onToggleComplete,
   onContextMenu,
@@ -198,6 +200,13 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {pr && (
         <div className="mt-1 text-black font-mono text-[10px] font-black flex items-center gap-1.5 bg-[#FFE600] border border-black px-2 py-0.5 shadow-[1.5px_1.5px_0px_0px_#000000]">
           <GitPullRequest size={11} strokeWidth={3} /> PR LINKED
+        </div>
+      )}
+
+      {repoUrl && (
+        <div className="mt-1 text-neutral-300 font-mono text-[10px] font-bold flex items-center gap-1.5 bg-[#0B0E14] border border-neutral-700 px-2 py-0.5 truncate" title={repoUrl}>
+          <GitBranch size={10} strokeWidth={2.5} className="text-[#FFE600] shrink-0" />
+          <span className="truncate">{repoUrl.replace('https://github.com/', '')}</span>
         </div>
       )}
 

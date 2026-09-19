@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
-import { Settings, Users, Plus, Search, Save, X, AlertTriangle } from 'lucide-react';
+import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
 import { userService } from '../../services/userService';
@@ -8,6 +8,7 @@ import { searchGithubUsers } from '../../services/githubServices';
 import { useToast } from '../../design-system/Toast';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { LoadingScreen } from '../ui/LoadingScreen';
+import { RepositoryPickerModal } from '../modals/RepositoryPickerModal';
 import { useNavigate } from 'react-router-dom';
 import { getCached, setCached } from '../../utils/cache';
 import type { Project, ProjectMember } from '../../models';
@@ -33,6 +34,11 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
 
+    // Repository State
+    const [isRepoPicker, setIsRepoPicker] = useState(false);
+    const [repoUrls, setRepoUrls] = useState<string[]>([]);
+
+
     // Add Member State
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<{ id?: number | string; gh_username: string; display_name?: string }[]>([]);
@@ -50,6 +56,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             setProject(p);
             setName(p.name || '');
             setDescription(p.description || '');
+            setRepoUrls(p.gh_repo_url || []);
             setMembers(m);
         } catch (e) {
             console.error(e);
@@ -111,6 +118,32 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             showToast('Failed to delete project', 'error');
         }
     };
+
+    const handleReposUpdated = async (newUrls: string[]) => {
+        setRepoUrls(newUrls);
+        if (!project) return;
+        try {
+            const updated = await projectService.updateProject(projectId, {
+                ...project,
+                name,
+                description,
+                gh_repo_url: newUrls,
+            });
+            setProject(updated);
+            onProjectUpdated?.(updated);
+            showToast('Repository connections updated', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to save repository changes', 'error');
+        }
+    };
+
+    const handleRemoveRepo = async (url: string) => {
+        const newUrls = repoUrls.filter(u => u !== url);
+        await handleReposUpdated(newUrls);
+    };
+
+
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
@@ -234,15 +267,66 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
 
                     <button
                         onClick={handleUpdateProject}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                     >
                         <Save size={14} strokeWidth={2.5} /> Save Changes
                     </button>
                 </div>
             </SurfaceCard>
 
+            {/* Connected Repositories */}
+            <SurfaceCard title="Connected Repositories" subtitle={`${repoUrls.length} repo${repoUrls.length !== 1 ? 's' : ''} linked`} icon={GitBranch} rightElement={null}>
+                <div className="space-y-4">
+                    {repoUrls.length === 0 ? (
+                        <div className="py-6 text-center border-2 border-dashed border-neutral-700 rounded-none">
+                            <Github size={24} className="text-neutral-600 mx-auto mb-2" />
+                            <p className="text-neutral-500 font-mono text-[11px] uppercase">// NO REPOSITORIES CONNECTED</p>
+                            <p className="text-neutral-600 font-mono text-[10px] mt-1">Connect repos to enable AI code review</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {repoUrls.map((url) => {
+                                const repoName = url.replace('https://github.com/', '');
+                                const [orgName, repoShortName] = repoName.split('/');
+                                return (
+                                    <div key={url} className="flex items-center justify-between p-3 bg-[#121417] border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="p-1.5 bg-[#FFE600] border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000]">
+                                                <Github size={12} strokeWidth={2.5} className="text-black" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="text-[13px] font-bold text-white font-mono uppercase truncate">{repoShortName || repoName}</div>
+                                                <div className="text-[12px] text-white font-mono">{orgName}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-[#FFE600] transition-colors">
+                                                <ExternalLink size={13} strokeWidth={2} />
+                                            </a>
+                                            <button
+                                                onClick={() => handleRemoveRepo(url)}
+                                                className="text-neutral-500 hover:text-[#EF4444] transition-colors cursor-pointer"
+                                            >
+                                                <Trash2 size={13} strokeWidth={2} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    <button
+                        onClick={() => setIsRepoPicker(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                    >
+                        <Github size={13} strokeWidth={2.5} /> Connect Repository
+                    </button>
+                </div>
+            </SurfaceCard>
+
             {/* Member Management */}
             <SurfaceCard title="Project Members" subtitle={`${members.length} members in project`} icon={Users} rightElement={null}>
+
                 <div className="space-y-6">
                     {/* Existing Members Search Filter */}
                     <div>
@@ -397,6 +481,16 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                     </button>
                 </div>
             </div>
+
+            {/* Repository Picker Modal */}
+            {isRepoPicker && (
+                <RepositoryPickerModal
+                    projectId={projectId}
+                    currentRepoUrls={repoUrls}
+                    onClose={() => setIsRepoPicker(false)}
+                    onReposUpdated={handleReposUpdated}
+                />
+            )}
 
             {/* Delete Project Confirmation Modal */}
             {isDeleteModalOpen && (

@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus } from 'lucide-react';
-import type { Task, Bucket, ProjectMember } from '../../models';
+import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import type { Task, Bucket, ProjectMember, PrReview } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
 import { useToast } from '../../design-system/Toast';
 import { Badge } from '../../design-system/Badge';
+import { prReviewService } from '../../services/prReviewService';
 
 interface TaskDetailModalProps {
     task: Task;
     buckets: Bucket[];
     members: ProjectMember[];
+    projectRepoUrls?: string[];
     onClose: () => void;
     onUpdate: (taskId: string | number, data: Partial<Task>) => Promise<void>;
 }
@@ -17,10 +19,14 @@ interface TaskDetailModalProps {
 const TASK_WEIGHTS = [1, 2, 3, 5, 8]; // Fibonacci sequence for story points
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
-    task, buckets, members, onClose, onUpdate
+    task, buckets, members, projectRepoUrls = [], onClose, onUpdate
 }) => {
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description || '');
+    const [repoUrl, setRepoUrl] = useState(task.repo_url || '');
+    const [reviews, setReviews] = useState<PrReview[]>([]);
+    const [loadingReviews, setLoadingReviews] = useState(false);
+    const [expandedReviewId, setExpandedReviewId] = useState<string | number | null>(null);
     const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
         const parsed = parseTaskTypes(task.type);
         return parsed.length > 0 ? parsed : ['CODE'];
@@ -96,8 +102,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         setBucketId(task.bucket_id ? String(task.bucket_id) : undefined);
         setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
         setBranchName(task.branch_name || '');
+        setRepoUrl(task.repo_url || '');
         setAvailableTypes(getAllTaskTypes([task.type]));
     }, [task]);
+
+    useEffect(() => {
+        if (task.id) {
+            setLoadingReviews(true);
+            prReviewService.getTaskReviews(task.id)
+                .then(data => setReviews(data || []))
+                .catch(err => console.error("Failed to load task PR reviews", err))
+                .finally(() => setLoadingReviews(false));
+        }
+    }, [task.id]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -113,6 +130,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             bucket_id: bucketId || undefined,
             lead_assignee_id: leadAssigneeId || undefined,
             branch_name: branchName.trim() || undefined,
+            repo_url: repoUrl.trim() || undefined,
         };
         try {
             await onUpdate(task.id, updatePayload);
@@ -136,7 +154,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none" onClick={onClose}>
-            <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-2xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-5xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
                 <div className="flex items-start flex-col gap-3 p-6 border-b-2 border-black bg-[#181B20]">
@@ -217,6 +235,26 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 <h3>// DEVELOPMENT PIPELINE</h3>
                             </div>
                             <div className="bg-[#0B0E14] border-2 border-black rounded-none p-4 space-y-3 shadow-[2px_2px_0px_0px_#000000]">
+                                {/* Target Repository */}
+                                <div>
+                                    <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                        <GitBranch size={11} /> TARGET REPOSITORY
+                                    </label>
+                                    <select
+                                        value={repoUrl}
+                                        onChange={(e) => setRepoUrl(e.target.value)}
+                                        className="w-full bg-[#121417] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white focus:outline-none focus:border-[#FFE600] transition-all"
+                                    >
+                                        <option value="">[UNASSIGNED - GENERAL TASK]</option>
+                                        {projectRepoUrls && projectRepoUrls.map(url => {
+                                            const repoName = url.replace('https://github.com/', '');
+                                            return (
+                                                <option key={url} value={url}>{repoName}</option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+
                                 <div>
                                     <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">BRANCH NAME</label>
                                     <input
@@ -230,6 +268,92 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                     <div className="text-[11px] font-mono">
                                         <span className="text-neutral-400 uppercase">PULL REQUEST: </span>
                                         <a href={task.prUrl} target="_blank" rel="noopener noreferrer" className="text-[#FFE600] hover:underline font-bold">{task.prUrl}</a>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Gemini AI PR Reviews & Verdicts */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2 text-white font-black text-[12px] uppercase">
+                                    <ShieldCheck size={14} className="text-[#00FF66]" />
+                                    <h3>// GEMINI AI CODE REVIEWS</h3>
+                                </div>
+                                {reviews.length > 0 && (
+                                    <span className="font-mono text-[10px] text-neutral-400 uppercase">
+                                        {reviews.length} REVIEW{reviews.length !== 1 ? 'S' : ''}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="bg-[#0B0E14] border-2 border-black rounded-none p-4 space-y-3 shadow-[2px_2px_0px_0px_#000000]">
+                                {loadingReviews ? (
+                                    <div className="flex items-center gap-2 text-neutral-500 font-mono text-[11px] uppercase py-3 justify-center">
+                                        <Loader2 size={13} className="animate-spin text-[#FFE600]" />
+                                        <span>RETRIEVING AI VERDICTS...</span>
+                                    </div>
+                                ) : reviews.length === 0 ? (
+                                    <div className="text-center py-3 text-neutral-500 font-mono text-[11px] uppercase">
+                                        // NO AI CODE REVIEWS YET. REVIEWS TRIGGER WHEN PRS ARE OPENED.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {reviews.map((rev) => {
+                                            const isPass = rev.verdict === 'PASS';
+                                            const isExpanded = expandedReviewId === rev.id;
+                                            return (
+                                                <div
+                                                    key={String(rev.id)}
+                                                    className="border-2 border-black p-3 bg-[#121417] transition-all shadow-[2px_2px_0px_0px_#000000]"
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className={`px-2 py-0.5 text-[10px] font-mono font-black border border-black uppercase shadow-[1px_1px_0px_0px_#000000] ${
+                                                                isPass ? 'bg-[#00FF66] text-black' : 'bg-[#EF4444] text-white'
+                                                            }`}>
+                                                                {isPass ? '✓ PASS' : '✕ FAIL'}
+                                                            </span>
+                                                            <span className="text-[12px] font-bold font-mono text-white truncate">
+                                                                PR #{rev.pr_number}{rev.pr_title ? `: ${rev.pr_title}` : ''}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            {rev.completeness_score !== undefined && rev.completeness_score > 0 && (
+                                                                <span className="text-[10px] font-mono font-bold text-[#FFE600] px-1.5 py-0.5 bg-black border border-neutral-700">
+                                                                    {rev.completeness_score}% SPEC
+                                                                </span>
+                                                            )}
+                                                            {rev.pr_url && (
+                                                                <a
+                                                                    href={rev.pr_url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="p-1 hover:text-[#FFE600] text-neutral-400 transition-colors"
+                                                                    title="View Pull Request"
+                                                                >
+                                                                    <ExternalLink size={12} />
+                                                                </a>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setExpandedReviewId(isExpanded ? null : rev.id)}
+                                                                className="p-1 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                                                            >
+                                                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Expanded Feedback */}
+                                                    {isExpanded && rev.feedback && (
+                                                        <div className="mt-3 pt-3 border-t border-neutral-800 text-[11px] font-mono text-neutral-300 whitespace-pre-wrap leading-relaxed bg-[#0B0E14] p-3 border border-neutral-800">
+                                                            {rev.feedback}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

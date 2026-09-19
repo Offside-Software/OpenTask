@@ -8,6 +8,7 @@ export default defineConfig({
   // Load .env files from the repo root instead of the frontend/ folder
   envDir: "../",
   server: {
+    host: true,
     port: 5173,
     strictPort: true,
     allowedHosts: ["monasterial-luella-rigid.ngrok-free.dev"],
