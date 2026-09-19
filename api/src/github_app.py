@@ -18,7 +18,7 @@ def get_github_client(installation_id: int | None = None) -> Github:
         raise ValueError("No installation_id provided and GITHUB_APP_INSTALLATION_ID is not set.")
     
     gi = get_github_integration()
-    installation = gi.get_installation(iid)
+    installation = gi.get_app_installation(iid)
     return installation.get_github_for_installation()
 
 

@@ -137,14 +137,95 @@ def auth_login(request: Request):
     return response
 
 @router.get("/callback")
-async def auth_callback(request: Request, code: str, state: str):
+async def auth_callback(
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    installation_id: int | None = None,
+    setup_action: str | None = None,
+):
     """
-    Handle the GitHub OAuth callback.
-    Validates the state token, exchanges the code for an access token,
-    and returns basic user information.
+    Handle the GitHub OAuth callback and GitHub App installation callback.
+    - If it's an App installation (setup_action == 'install' or installation_id present):
+      Gracefully redirects back to OpenTask workspaces.
+    - If it's user OAuth login (code and state present):
+      Validates state, exchanges code for access token, and sets auth cookie.
     """
+    is_install_flow = setup_action == "install" or installation_id is not None
+    frontend_url = _get_frontend_url(request)
+
+    # 1. Handle GitHub App Installation callback (state is not provided by GitHub for installations)
+    if is_install_flow and not state:
+        access_token = None
+        if code:
+            try:
+                client_id = settings.gh_app_client_id
+                client_secret = settings.gh_app_client_secret
+                redirect_uri = _get_redirect_uri(request)
+                async with httpx.AsyncClient() as http:
+                    token_resp = await http.post(
+                        "https://github.com/login/oauth/access_token",
+                        json={
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "code": code,
+                            "redirect_uri": redirect_uri,
+                        },
+                        headers={"Accept": "application/json"},
+                        timeout=10,
+                    )
+                if token_resp.status_code == 200:
+                    token_data = token_resp.json()
+                    access_token = token_data.get("access_token")
+            except Exception as e:
+                print(f"[AUTH WARNING] Failed to exchange code during installation: {e}")
+
+        if access_token:
+            async with httpx.AsyncClient() as http:
+                user_resp = await http.get(
+                    "https://api.github.com/user",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Accept": "application/vnd.github+json",
+                    },
+                    timeout=10,
+                )
+            user = user_resp.json() if user_resp.status_code == 200 else {}
+            if user:
+                try:
+                    await run_in_threadpool(
+                        get_or_create_user,
+                        int(user.get("id", 0) or 0),
+                        user.get("email"),
+                        user.get("login"),
+                        user.get("name"),
+                        None,
+                        access_token
+                    )
+                except Exception as err:
+                    print(f"[AUTH WARNING] Failed to persist user during install callback: {err}")
+
+        target_url = f"{frontend_url.rstrip('/')}/workspaces"
+        response = RedirectResponse(url=target_url, status_code=302)
+        if access_token:
+            is_https = "https" in frontend_url
+            response.set_cookie(
+                key=AUTH_COOKIE,
+                value=access_token,
+                httponly=True,
+                secure=is_https,
+                samesite="lax",
+                path="/",
+                max_age=28800,
+            )
+        return response
+
+    # 2. Standard OAuth Login Flow
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
     cookie_state = request.cookies.get("oauth_state")
-    if (state not in _pending_oauth_states) and (cookie_state != state):
+    if (not state) or ((state not in _pending_oauth_states) and (cookie_state != state)):
         raise HTTPException(status_code=400, detail="Invalid or expired state parameter")
     _pending_oauth_states.discard(state)
 
@@ -205,7 +286,6 @@ async def auth_callback(request: Request, code: str, state: str):
         except Exception as err:
             print(f"[AUTH WARNING] Failed to persist user in database during callback: {err}")
 
-    frontend_url = _get_frontend_url(request)
     response = RedirectResponse(url=frontend_url or "/", status_code=302)
     is_https = "https" in frontend_url or "https" in redirect_uri
     response.set_cookie(

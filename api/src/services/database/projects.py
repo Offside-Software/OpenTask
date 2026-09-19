@@ -240,7 +240,7 @@ def db_get_project_board_data(project_id: SafeId):
 
         cur.execute(
             "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, "
-            "suggested_assignee_id, title, description, type, weight, branch_name, "
+            "suggested_assignee_id, title, description, type, weight, branch_name, repo_url, "
             "last_activity_at, order_idx, created_at, updated_at "
             "FROM opentask.tasks WHERE project_id = %s "
             "ORDER BY order_idx ASC;",

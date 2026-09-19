@@ -543,6 +543,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                             assignee={assigneeName}
                             assigneeAvatar={assigneeAvatar}
                             pr={!!task.prUrl}
+                            repoUrl={task.repo_url}
                             description={task.description}
                             warnStagnant={task.warnStagnant}
                             isSuggested={task.isSuggested}
@@ -734,6 +735,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
           task={selectedTaskForEdit}
           buckets={buckets}
           members={members}
+          projectRepoUrls={project?.gh_repo_url || []}
           onClose={() => setSelectedTaskForEdit(null)}
           onUpdate={handleUpdateTask}
         />

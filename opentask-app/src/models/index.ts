@@ -10,7 +10,7 @@ export type BucketState =
 
 export type DefaultTaskType = "CODE" | "REQUIREMENT" | "DESIGN" | "OTHER" | "NON-CODE";
 export type TaskType = DefaultTaskType | string;
-export type AlertType = "STAGNATION" | "REALLOCATION" | "DRAFT_APPROVAL" | "TASK_ASSIGNED" | "SYSTEM_TEST" | (string & {});
+export type AlertType = "STAGNATION" | "REALLOCATION" | "DRAFT_APPROVAL" | "TASK_ASSIGNED" | "SYSTEM_TEST" | "PR_REVIEWED" | "FORGOTTEN_TASK" | (string & {});
 
 export interface Bucket {
   id?: number | string;
@@ -162,6 +162,7 @@ export interface Task {
   warnStagnant?: boolean;
   isSuggested?: boolean;
   prUrl?: string;
+  repo_url?: string;
 }
 
 export interface TaskAssignee {
@@ -197,4 +198,38 @@ export interface ExtractedTaskPayload {
   type?: string;
   weight?: number;
   assignee_id: number;
+}
+
+export interface GithubInstallation {
+  installation_id: number;
+  account_login: string;
+  account_type: 'Organization' | 'User';
+  account_avatar_url?: string;
+  app_install_url?: string;
+}
+
+export interface GithubInstallationRepo {
+  full_name: string;
+  html_url: string;
+  private: boolean;
+  description?: string;
+  installation_id?: number;
+  account_login?: string;
+  account_type?: string;
+  is_connected?: boolean;
+}
+
+export interface PrReview {
+  id: string | number;
+  project_id: string | number;
+  task_id?: string | number;
+  repo_full_name: string;
+  pr_number: number;
+  pr_title?: string;
+  pr_url?: string;
+  verdict: 'PASS' | 'FAIL';
+  feedback?: string;
+  matched_task_title?: string;
+  completeness_score?: number;
+  reviewed_at?: string;
 }
