@@ -1,7 +1,8 @@
+import re
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
-from fastapi import HTTPException, BackgroundTasks, Depends
+from fastapi import HTTPException, BackgroundTasks, Depends, Query
 import psycopg2
 import psycopg2.extras
 
@@ -628,4 +629,59 @@ def db_get_bucket_tasks(
         if cur is not None:
             cur.close()
         _put_conn(conn)
+
+
+@db_router.get("/projects/{project_id}/tasks/search")
+def db_search_project_tasks(
+    project_id: SafeId,
+    q: str = Query(..., min_length=1),
+    limit: int = 25
+):
+    """
+    Search tasks across an entire project by title, description, task ID, branch_name, or type.
+    """
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        search_term = f"%{q.strip()}%"
+        # Check if query is or contains a numeric ID
+        digit_part = re.sub(r"[^\d]", "", q.strip())
+        id_clause = "OR t.id = %s" if digit_part else ""
+        params = [int(project_id), search_term, search_term, search_term, search_term]
+        if digit_part:
+            params.append(int(digit_part))
+        params.append(limit)
+
+        sql = f"""
+            SELECT t.id, t.project_id, t.bucket_id, t.title, t.description, t.type, t.weight,
+                   t.branch_name, t.repo_url, t.last_activity_at, t.order_idx, t.created_at,
+                   b.name AS bucket_name, b.state AS bucket_state,
+                   u.display_name AS assignee_name, u.gh_username AS assignee_gh_username
+            FROM opentask.tasks t
+            LEFT JOIN opentask.buckets b ON t.bucket_id = b.id
+            LEFT JOIN opentask.users u ON t.lead_assignee_id = u.id
+            WHERE t.project_id = %s
+              AND (
+                  t.title ILIKE %s
+                  OR t.description ILIKE %s
+                  OR t.type ILIKE %s
+                  OR t.branch_name ILIKE %s
+                  {id_clause}
+              )
+            ORDER BY t.last_activity_at DESC
+            LIMIT %s;
+        """
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        for r in rows:
+            r["id"] = str(r["id"])
+            r["project_id"] = str(r["project_id"])
+            r["bucket_id"] = str(r["bucket_id"]) if r["bucket_id"] else None
+        return {"tasks": rows, "count": len(rows), "query": q}
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+
 

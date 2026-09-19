@@ -68,7 +68,7 @@ export const useBoard = (projectId: string | number) => {
    * Optimistically update full tasks array (used for drag and drop)
    */
   const setTasksOptimistically = useCallback(
-    (newTasks: Task[]) => {
+    (newTasks: Task[] | ((prev: Task[]) => Task[])) => {
       setTasks(newTasks);
     },
     [],

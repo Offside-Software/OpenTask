@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useBoard } from '../controllers/useBoard';
 import { useTasks } from '../controllers/useTasks';
 import { useMeetings } from '../controllers/useMeetings';
@@ -6,7 +6,7 @@ import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
 import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
-import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw, Sparkles, Search, X } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
 import { MeetingAccordion } from '../components/dashboard/MeetingAccordion';
@@ -216,6 +216,108 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         });
     }
   }, [taskIdParam, tasks, boardLoading, projectId]);
+
+  // Task Search State & Real-time Matching
+  const [taskSearchQuery, setTaskSearchQuery] = useState('');
+  const [isSearchingBackend, setIsSearchingBackend] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const matchingTasks = useMemo(() => {
+    const q = taskSearchQuery.trim().toLowerCase();
+    if (!q) return tasks;
+
+    const rawDigits = q.replace(/^#/, '');
+
+    return tasks.filter(t => {
+      // 1. Match task ID (Snowflake ID substring)
+      if (rawDigits && String(t.id).includes(rawDigits)) {
+        return true;
+      }
+      // 2. Match title
+      if (t.title && t.title.toLowerCase().includes(q)) {
+        return true;
+      }
+      // 3. Match description
+      if (t.description && t.description.toLowerCase().includes(q)) {
+        return true;
+      }
+      // 4. Match type
+      if (t.type && t.type.toLowerCase().includes(q)) {
+        return true;
+      }
+      // 5. Match branch
+      if (t.branch_name && t.branch_name.toLowerCase().includes(q)) {
+        return true;
+      }
+      // 6. Match assignee name or GitHub username
+      const assignedMember = members.find(m => String(m.user_id) === String(t.lead_assignee_id));
+      if (assignedMember) {
+        if (assignedMember.gh_username && assignedMember.gh_username.toLowerCase().includes(q)) return true;
+        if (assignedMember.display_name && assignedMember.display_name.toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }, [tasks, taskSearchQuery, members]);
+
+  // Debounced backend backlog search for tasks not yet in local DOM
+  useEffect(() => {
+    const q = taskSearchQuery.trim();
+    if (q.length < 2) return;
+
+    const timer = setTimeout(() => {
+      setIsSearchingBackend(true);
+      taskService.searchTasks(projectId, q)
+        .then(res => {
+          if (res?.tasks?.length) {
+            setTasksOptimistically((prev: Task[]) => {
+              const existingIds = new Set(prev.map((t: Task) => String(t.id)));
+              const newOnes = res.tasks.filter((t: Task) => !existingIds.has(String(t.id)));
+              if (newOnes.length > 0) {
+                return [...prev, ...newOnes];
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(err => console.warn("Backend task search error:", err))
+        .finally(() => setIsSearchingBackend(false));
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [taskSearchQuery, projectId, setTasksOptimistically]);
+
+  // Keyboard shortcut: Press '/' to focus task search, 'Escape' to clear
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '/' && activeTab === 'Tasks') {
+        const activeTag = document.activeElement?.tagName.toLowerCase();
+        if (activeTag !== 'input' && activeTag !== 'textarea') {
+          e.preventDefault();
+          searchInputRef.current?.focus();
+        }
+      } else if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        setTaskSearchQuery('');
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (matchingTasks.length === 1) {
+        handleOpenTask(matchingTasks[0]);
+      } else if (taskSearchQuery.trim()) {
+        const q = taskSearchQuery.trim().replace(/^#/, '');
+        const exactMatch = matchingTasks.find(t => String(t.id) === q || String(t.id).endsWith(q));
+        if (exactMatch) {
+          handleOpenTask(exactMatch);
+        }
+      }
+    }
+  };
+
 
   const handleCreateTask = async (data: { project_id: number | string; title: string; type: TaskType; weight: number; bucket_id?: number | string }) => {
     setIsCreatingTask(true);
@@ -559,12 +661,63 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
               </div>
             </div>
 
+            {/* Task Search Bar */}
+            <div className="mb-4 flex items-center justify-between gap-3 flex-wrap bg-[#141619] p-3 border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
+              <div className="relative flex-1 min-w-[260px] max-w-xl">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-500">
+                  <Search size={14} />
+                </div>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={taskSearchQuery}
+                  onChange={(e) => setTaskSearchQuery(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="SEARCH TASKS (TITLE, #ID, TAG, ASSIGNEE)... [/]"
+                  className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-8 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                />
+                {taskSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setTaskSearchQuery('')}
+                    className="absolute inset-y-0 right-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
+                    title="Clear Search (Esc)"
+                  >
+                    <X size={14} strokeWidth={2.5} />
+                  </button>
+                )}
+              </div>
+
+              {taskSearchQuery.trim() && (
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 bg-[#1E2227] text-neutral-300 border border-neutral-700 font-mono text-[11px] font-bold uppercase tracking-wider">
+                    <span className="text-[#FFE600] font-black mr-1">{matchingTasks.length}</span>
+                    OF {tasks.length} MATCHING
+                  </span>
+                  {isSearchingBackend && (
+                    <span className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-400">
+                      <Loader2 size={12} className="animate-spin text-[#FFE600]" />
+                      SEARCHING BACKLOG...
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setTaskSearchQuery('')}
+                    className="px-2 py-1 bg-[#1E2227] hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-700 font-mono text-[10px] uppercase font-bold cursor-pointer"
+                  >
+                    RESET
+                  </button>
+                </div>
+              )}
+            </div>
+
             {tasksLoading || bucketsLoading ? (
               <div className="flex-1 flex items-center justify-center text-slate-500 text-[14px]">Loading board state...</div>
             ) : (
               <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4 flex-1 no-scrollbar items-start">
                 {buckets.map(bucket => {
-                  const colTasks = tasks.filter(t => String(t.bucket_id) === String(bucket.id));
+                  const displayTasks = taskSearchQuery.trim() ? matchingTasks : tasks;
+                  const colTasks = displayTasks.filter(t => String(t.bucket_id) === String(bucket.id));
                   return (
                     <KanbanColumn
                       key={bucket.id}

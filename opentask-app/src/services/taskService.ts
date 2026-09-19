@@ -86,4 +86,15 @@ export const taskService = {
       `/projects/${projectId}/buckets/${bucketId}/tasks?limit=${limit}&offset=${offset}`
     );
   },
+
+  searchTasks: async (
+    projectId: number | string,
+    query: string,
+    limit: number = 25
+  ): Promise<{ tasks: Task[]; count: number; query: string }> => {
+    return await apiFetch(
+      `/projects/${projectId}/tasks/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    );
+  },
 };
+

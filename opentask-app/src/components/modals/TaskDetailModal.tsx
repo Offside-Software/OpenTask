@@ -6,6 +6,7 @@ import { CloseButton } from '../../design-system/CloseButton';
 import { useToast } from '../../design-system/Toast';
 import { Badge } from '../../design-system/Badge';
 import { prReviewService } from '../../services/prReviewService';
+import { ConfirmModal } from './ConfirmModal';
 
 interface TaskDetailModalProps {
     task: Task;
@@ -145,6 +146,37 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         }
     };
 
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+    const isDirty = Boolean(
+        title !== task.title ||
+        description !== (task.description || '') ||
+        repoUrl !== (task.repo_url || '') ||
+        branchName !== (task.branch_name || '') ||
+        weight !== task.weight ||
+        bucketId !== (task.bucket_id ? String(task.bucket_id) : undefined) ||
+        leadAssigneeId !== (task.lead_assignee_id ? String(task.lead_assignee_id) : undefined) ||
+        JSON.stringify([...selectedTypes].sort()) !== JSON.stringify([...parseTaskTypes(task.type)].sort())
+    );
+
+    useEffect(() => {
+        if (!isDirty) return;
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
+
+    const handleAttemptClose = () => {
+        if (isDirty) {
+            setShowDiscardConfirm(true);
+        } else {
+            onClose();
+        }
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim() || !task.id) return;
@@ -182,7 +214,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none">
             <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-5xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
@@ -197,7 +229,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             placeholder="TASK TITLE"
                             className={`bg-transparent ${isCompleted ? 'text-neutral-400 line-through' : 'text-white'} font-mono font-black uppercase text-lg w-full focus:outline-none focus:border-b-2 focus:border-[#FFE600] rounded-none px-2 py-1 -ml-2 transition-all`}
                         />
-                        <CloseButton onClick={onClose} size='md'/>
+                        {isDirty && (
+                            <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#FFE600] text-black border border-black font-mono text-[10px] font-black uppercase tracking-wider shrink-0 shadow-[1px_1px_0px_0px_#000000]">
+                                <span className="w-1.5 h-1.5 bg-black rounded-full animate-ping"></span>
+                                UNSAVED
+                            </span>
+                        )}
+                        <CloseButton onClick={handleAttemptClose} size='md'/>
                     </div>
                     <div className="flex items-center justify-between w-full flex-wrap gap-2">
                         <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-400 uppercase">
@@ -581,7 +619,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <div className="p-4 border-t-2 border-black flex justify-end gap-3 bg-[#0E1012] rounded-none">
                     <button 
                         type="button" 
-                        onClick={onClose} 
+                        onClick={handleAttemptClose} 
                         className="px-5 py-2.5 rounded-none border-2 border-black bg-[#1E2227] text-neutral-300 font-mono text-[12px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         Cancel
@@ -597,6 +635,22 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
 
             </div>
+
+            {/* Confirm Discard Modal */}
+            {showDiscardConfirm && (
+                <ConfirmModal
+                    title="DISCARD UNSAVED CHANGES?"
+                    message="You have unsaved changes on this task. Are you sure you want to close and lose your edits?"
+                    confirmLabel="DISCARD & CLOSE"
+                    cancelLabel="KEEP EDITING"
+                    variant="warning"
+                    onConfirm={() => {
+                        setShowDiscardConfirm(false);
+                        onClose();
+                    }}
+                    onCancel={() => setShowDiscardConfirm(false)}
+                />
+            )}
         </div>
     );
 };

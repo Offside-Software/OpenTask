@@ -174,3 +174,8 @@ CREATE INDEX IF NOT EXISTS idx_pr_reviews_task ON opentask.pr_reviews(task_id);
 -- Migration: Add repo_url to tasks table
 ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS repo_url TEXT;
 CREATE INDEX IF NOT EXISTS idx_tasks_repo_url ON opentask.tasks(repo_url);
+
+-- Migration: Add api_key to projects table for AI Agent access
+ALTER TABLE opentask.projects ADD COLUMN IF NOT EXISTS api_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_api_key ON opentask.projects(api_key) WHERE api_key IS NOT NULL;
+

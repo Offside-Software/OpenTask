@@ -56,4 +56,21 @@ export const projectService = {
       method: "DELETE",
     });
   },
+
+  getProjectApiKey: async (projectId: number | string): Promise<{ project_id: string; api_key: string | null }> => {
+    return await apiFetch<{ project_id: string; api_key: string | null }>(`/projects/${projectId}/api-key`);
+  },
+
+  generateProjectApiKey: async (projectId: number | string): Promise<{ project_id: string; api_key: string; generated: boolean }> => {
+    return await apiFetch<{ project_id: string; api_key: string; generated: boolean }>(`/projects/${projectId}/api-key`, {
+      method: "POST",
+    });
+  },
+
+  revokeProjectApiKey: async (projectId: number | string): Promise<{ project_id: string; status: string }> => {
+    return await apiFetch<{ project_id: string; status: string }>(`/projects/${projectId}/api-key`, {
+      method: "DELETE",
+    });
+  },
 };
+

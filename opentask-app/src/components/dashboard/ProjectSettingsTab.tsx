@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
-import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink } from 'lucide-react';
+import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
 import { userService } from '../../services/userService';
@@ -30,6 +30,13 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const { showToast } = useToast();
 
+    // AI Agent Access API Key State
+    const [apiKey, setApiKey] = useState<string | null>(null);
+    const [apiKeyLoading, setApiKeyLoading] = useState(false);
+    const [showApiKey, setShowApiKey] = useState(false);
+    const [copiedKey, setCopiedKey] = useState(false);
+    const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
+
     // Project Edit State
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -49,19 +56,64 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     const loadData = async () => {
         setLoading(true);
         try {
-            const [p, m] = await Promise.all([
+            const [p, m, keyData] = await Promise.all([
                 projectService.getProjectById(projectId),
                 projectMemberService.getMembers(projectId),
+                projectService.getProjectApiKey(projectId).catch(() => ({ api_key: null })),
             ]);
             setProject(p);
             setName(p.name || '');
             setDescription(p.description || '');
             setRepoUrls(p.gh_repo_url || []);
             setMembers(m);
+            setApiKey(keyData?.api_key || null);
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGenerateApiKey = async () => {
+        setApiKeyLoading(true);
+        try {
+            const res = await projectService.generateProjectApiKey(projectId);
+            setApiKey(res.api_key);
+            setShowApiKey(true);
+            showToast("Project API key generated successfully", "success");
+        } catch (e) {
+            console.error(e);
+            showToast("Failed to generate project API key", "error");
+        } finally {
+            setApiKeyLoading(false);
+        }
+    };
+
+    const handleRevokeApiKey = async () => {
+        setIsRevokeModalOpen(false);
+        setApiKeyLoading(true);
+        try {
+            await projectService.revokeProjectApiKey(projectId);
+            setApiKey(null);
+            setShowApiKey(false);
+            showToast("Project API key revoked", "info");
+        } catch (e) {
+            console.error(e);
+            showToast("Failed to revoke API key", "error");
+        } finally {
+            setApiKeyLoading(false);
+        }
+    };
+
+    const handleCopyApiKey = async () => {
+        if (!apiKey) return;
+        try {
+            await navigator.clipboard.writeText(apiKey);
+            setCopiedKey(true);
+            showToast("API key copied to clipboard", "success");
+            setTimeout(() => setCopiedKey(false), 2000);
+        } catch {
+            showToast("Failed to copy API key", "error");
         }
     };
 
@@ -324,6 +376,121 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                 </div>
             </SurfaceCard>
 
+            {/* AI Native Agent Access Card */}
+            <SurfaceCard 
+                title="AI Agent Access" 
+                subtitle="PROGRAMMATIC API FOR CODE AGENTS (CURSOR, ANTIGRAVITY, CLAUDE, AIDER)" 
+                icon={Bot} 
+                rightElement={
+                    apiKey && (
+                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#00FF66] text-black border-2 border-black font-mono text-[10px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000]">
+                            <span className="w-2 h-2 bg-black rounded-full animate-pulse"></span>
+                            ACTIVE
+                        </span>
+                    )
+                }
+            >
+                <div className="space-y-5">
+                    <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
+                        Authorize external AI coding agents to interact directly with this project. Agents can look up tasks using copied IDs, mark tasks complete, move tasks between pipeline stages, and fetch project status summaries.
+                    </p>
+
+                    {apiKey ? (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5 font-mono">
+                                    // PROJECT API KEY (SECRET)
+                                </label>
+                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                    <div className="relative flex-1 min-w-[280px]">
+                                        <input
+                                            type={showApiKey ? "text" : "password"}
+                                            readOnly
+                                            value={apiKey}
+                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-[#FFE600] tracking-wider focus:outline-none shadow-[2px_2px_0px_0px_#000000] select-all"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowApiKey(!showApiKey)}
+                                        className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        title={showApiKey ? "Hide Key" : "Reveal Key"}
+                                    >
+                                        {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        <span>{showApiKey ? "HIDE" : "REVEAL"}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyApiKey}
+                                        className="px-4 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        {copiedKey ? <Check size={14} strokeWidth={3} /> : <Copy size={14} />}
+                                        <span>{copiedKey ? "COPIED!" : "COPY KEY"}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 pt-1 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateApiKey}
+                                    disabled={apiKeyLoading}
+                                    className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    <Key size={13} />
+                                    <span>{apiKeyLoading ? "REGENERATING..." : "REGENERATE KEY"}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsRevokeModalOpen(true)}
+                                    disabled={apiKeyLoading}
+                                    className="px-4 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    <Trash2 size={13} />
+                                    <span>REVOKE KEY</span>
+                                </button>
+                            </div>
+
+                            {/* Agent Integration Quick Reference */}
+                            <div className="p-4 bg-[#0B0E14] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] font-mono text-[11px] space-y-2.5">
+                                <div className="flex items-center gap-2 text-white font-bold uppercase tracking-wider pb-2 border-b border-neutral-800">
+                                    <Terminal size={14} className="text-[#FFE600]" />
+                                    <span>// AGENT INTEGRATION GUIDE</span>
+                                </div>
+                                <p className="text-neutral-400">
+                                    Include the header <code className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700">X-Project-Key: {apiKey.slice(0, 12)}...</code> on requests:
+                                </p>
+                                <div className="space-y-1.5 text-neutral-300">
+                                    <div><span className="text-[#00FF66] font-bold">GET</span> <code className="text-white">/api/agent/tasks/[Title](#ID)</code> <span className="text-neutral-500">// Fetch task by pasted markdown link or ID</span></div>
+                                    <div><span className="text-[#FFE600] font-bold">POST</span> <code className="text-white">/api/agent/tasks/[Title](#ID)/complete</code> <span className="text-neutral-500">// Automatically move task to COMPLETED</span></div>
+                                    <div><span className="text-[#00FF66] font-bold">GET</span> <code className="text-white">/api/agent/summary</code> <span className="text-neutral-500">// Fetch live project markdown & metrics</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="p-5 bg-[#121417] border-2 border-dashed border-neutral-700 rounded-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div>
+                                <div className="text-white font-bold text-[13px] uppercase font-mono tracking-wider">
+                                    No API Key Generated
+                                </div>
+                                <div className="text-neutral-400 font-mono text-[11px] mt-1">
+                                    Create a secure token to enable IDE AI assistants and background agents to manage project tasks.
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleGenerateApiKey}
+                                disabled={apiKeyLoading}
+                                className="px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                            >
+                                <Key size={14} />
+                                <span>{apiKeyLoading ? "GENERATING..." : "GENERATE API KEY"}</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </SurfaceCard>
+
             {/* Member Management */}
             <SurfaceCard title="Project Members" subtitle={`${members.length} members in project`} icon={Users} rightElement={null}>
 
@@ -489,6 +656,19 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                     currentRepoUrls={repoUrls}
                     onClose={() => setIsRepoPicker(false)}
                     onReposUpdated={handleReposUpdated}
+                />
+            )}
+
+            {/* Revoke API Key Confirmation Modal */}
+            {isRevokeModalOpen && (
+                <ConfirmModal
+                    title="REVOKE PROJECT API KEY?"
+                    message="Are you sure you want to revoke this API key? External code agents or scripts using this key will immediately lose access to this project."
+                    confirmLabel="YES, REVOKE KEY"
+                    cancelLabel="CANCEL"
+                    variant="danger"
+                    onConfirm={handleRevokeApiKey}
+                    onCancel={() => setIsRevokeModalOpen(false)}
                 />
             )}
 

@@ -410,4 +410,81 @@ def db_get_project_dashboard_data(project_id: int):
         _put_conn(conn)
 
 
+@db_router.get("/projects/{project_id}/api-key")
+def db_get_project_api_key(project_id: int):
+    """Retrieve the API key for AI agent access."""
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id, api_key FROM opentask.projects WHERE id = %s;", (project_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Project not found")
+        return {"project_id": str(row["id"]), "api_key": row["api_key"]}
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+
+
+@db_router.post("/projects/{project_id}/api-key")
+def db_generate_project_api_key(project_id: int):
+    """Generate or regenerate an API key for AI agent access."""
+    import secrets
+    new_key = f"ot_live_{secrets.token_hex(20)}"
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "UPDATE opentask.projects SET api_key = %s, updated_at = NOW() WHERE id = %s RETURNING id, api_key;",
+            (new_key, project_id)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Project not found")
+        conn.commit()
+        return {"project_id": str(row["id"]), "api_key": row["api_key"], "generated": True}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+
+
+@db_router.delete("/projects/{project_id}/api-key")
+def db_revoke_project_api_key(project_id: int):
+    """Revoke the API key for a project."""
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "UPDATE opentask.projects SET api_key = NULL, updated_at = NOW() WHERE id = %s RETURNING id;",
+            (project_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Project not found")
+        conn.commit()
+        return {"project_id": str(row["id"]), "status": "revoked"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+
+
+
 
