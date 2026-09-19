@@ -69,4 +69,21 @@ export const taskService = {
       `/tasks/${id}/redirect`
     );
   },
+
+  getBucketTasks: async (
+    projectId: number | string,
+    bucketId: number | string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<{
+    tasks: Task[];
+    total: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  }> => {
+    return await apiFetch(
+      `/projects/${projectId}/buckets/${bucketId}/tasks?limit=${limit}&offset=${offset}`
+    );
+  },
 };

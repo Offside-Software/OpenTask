@@ -30,6 +30,7 @@ export interface Bucket {
   description?: string;
   state: BucketState;
   is_system_locked?: boolean;
+  task_count?: number;
   order_idx: number;
   created_at?: string;
   updated_at?: string;

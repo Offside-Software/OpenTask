@@ -580,3 +580,52 @@ def db_get_task_redirect(task_id: SafeId):
             cur.close()
         _put_conn(conn)
 
+
+@db_router.get("/projects/{project_id}/buckets/{bucket_id}/tasks")
+def db_get_bucket_tasks(
+    project_id: SafeId,
+    bucket_id: SafeId,
+    limit: int = 20,
+    offset: int = 0
+):
+    """
+    Paginated task query for a single bucket.
+    Enables loading more tasks on-demand when a bucket has more than initial limit.
+    """
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """
+            SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id,
+                   suggested_assignee_id, title, description, type, weight, branch_name, repo_url,
+                   last_activity_at, order_idx, created_at, updated_at
+            FROM opentask.tasks
+            WHERE project_id = %s AND bucket_id = %s
+            ORDER BY order_idx ASC
+            LIMIT %s OFFSET %s;
+            """,
+            (int(project_id), int(bucket_id), limit, offset)
+        )
+        tasks = cur.fetchall()
+
+        cur.execute(
+            "SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = %s AND bucket_id = %s;",
+            (int(project_id), int(bucket_id))
+        )
+        count_row = cur.fetchone()
+        total = count_row["count"] if count_row else 0
+
+        return {
+            "tasks": tasks,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + len(tasks)) < total
+        }
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+

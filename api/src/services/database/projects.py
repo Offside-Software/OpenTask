@@ -224,7 +224,7 @@ def db_delete_project(project_id: int):
 # Returns all fields the UI needs including description and branch_name.
 # ---------------------------------------------------------------------------
 @db_router.get("/projects/{project_id}/board", response_model=BoardResponse)
-def db_get_project_board_data(project_id: SafeId):
+def db_get_project_board_data(project_id: SafeId, limit_per_bucket: Optional[int] = 20):
     conn = _get_conn()
     cur = None
     try:
@@ -238,14 +238,41 @@ def db_get_project_board_data(project_id: SafeId):
         )
         buckets = cur.fetchall()
 
+        # Compute total tasks count per bucket
         cur.execute(
-            "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, "
-            "suggested_assignee_id, title, description, type, weight, branch_name, repo_url, "
-            "last_activity_at, order_idx, created_at, updated_at "
-            "FROM opentask.tasks WHERE project_id = %s "
-            "ORDER BY order_idx ASC;",
+            "SELECT bucket_id, COUNT(*) as count FROM opentask.tasks WHERE project_id = %s GROUP BY bucket_id;",
             (project_id,)
         )
+        count_map = {str(r["bucket_id"]): r["count"] for r in cur.fetchall()}
+        for b in buckets:
+            b["task_count"] = count_map.get(str(b["id"]), 0)
+
+        # Query tasks (capped per bucket if limit_per_bucket specified)
+        if limit_per_bucket:
+            cur.execute(
+                """
+                SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id,
+                       suggested_assignee_id, title, description, type, weight, branch_name, repo_url,
+                       last_activity_at, order_idx, created_at, updated_at
+                FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY bucket_id ORDER BY order_idx ASC) as rn
+                    FROM opentask.tasks
+                    WHERE project_id = %s
+                ) sub
+                WHERE rn <= %s
+                ORDER BY order_idx ASC;
+                """,
+                (project_id, limit_per_bucket)
+            )
+        else:
+            cur.execute(
+                "SELECT id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, "
+                "suggested_assignee_id, title, description, type, weight, branch_name, repo_url, "
+                "last_activity_at, order_idx, created_at, updated_at "
+                "FROM opentask.tasks WHERE project_id = %s "
+                "ORDER BY order_idx ASC;",
+                (project_id,)
+            )
         tasks = cur.fetchall()
 
         return {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Plus, Settings2 } from 'lucide-react';
+import { CheckCircle2, Plus, Settings2, ChevronDown, Loader2 } from 'lucide-react';
 import { Badge } from '../../design-system/Badge';
 import { TrashButton } from '../../design-system/TrashButton';
 
@@ -10,6 +10,10 @@ interface KanbanColumnProps {
   colorClass: string;
   statusText: string;
   taskCount: number;
+  totalTasks?: number;
+  hasMoreTasks?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: (bucketId: number | string) => void;
   onDropTask: (taskId: number | string, newBucketId: number | string, targetTaskId?: number | string) => void;
   onDragStartColumn?: (e: React.DragEvent<HTMLDivElement>, columnId: number | string) => void;
   onDropColumn?: (e: React.DragEvent<HTMLDivElement>, targetColumnId: number | string) => void;
@@ -26,6 +30,10 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   colorClass,
   statusText,
   taskCount,
+  totalTasks,
+  hasMoreTasks,
+  isLoadingMore,
+  onLoadMore,
   onDropTask,
   onDragStartColumn,
   onDropColumn,
@@ -90,8 +98,13 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             </h3>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="px-1.5 py-0.5 rounded-none bg-black text-[#FFE600] border border-neutral-700 font-mono text-[10px] font-black">
-              {String(taskCount).padStart(2, '0')}
+            <span
+              className="px-1.5 py-0.5 rounded-none bg-black text-[#FFE600] border border-neutral-700 font-mono text-[10px] font-black"
+              title={totalTasks !== undefined && totalTasks > taskCount ? `Loaded ${taskCount} of ${totalTasks} tasks` : `${taskCount} tasks`}
+            >
+              {totalTasks !== undefined && totalTasks > taskCount
+                ? `${taskCount}/${totalTasks}`
+                : String(taskCount).padStart(2, '0')}
             </span>
             {onEditBucket && (
               <button
@@ -136,6 +149,28 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       {/* Task List */}
       <div className="p-3 overflow-y-auto space-y-3 no-scrollbar flex-1 relative min-h-[140px]">
         {children}
+
+        {(hasMoreTasks || (totalTasks !== undefined && taskCount < totalTasks)) && (
+          <button
+            onClick={() => onLoadMore && onLoadMore(id)}
+            disabled={isLoadingMore}
+            className="w-full py-2.5 flex items-center justify-center gap-1.5 bg-[#141619] hover:bg-[#FFE600] text-[#FFE600] hover:text-black border-2 border-black rounded-none transition-all duration-75 font-mono text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
+            title="Load more tasks for this column"
+          >
+            {isLoadingMore ? (
+              <>
+                <Loader2 size={13} className="animate-spin text-current" />
+                <span>LOADING TASKS...</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown size={14} strokeWidth={3} />
+                <span>LOAD MORE {totalTasks !== undefined && totalTasks > taskCount ? `(${totalTasks - taskCount} MORE)` : '(+20)'}</span>
+              </>
+            )}
+          </button>
+        )}
+
         <button
           onClick={() => onAddTask && onAddTask(id)}
           className="w-full py-2.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-black border-2 border-dashed border-neutral-700 hover:border-black hover:bg-[#FFE600] rounded-none transition-all duration-75 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
