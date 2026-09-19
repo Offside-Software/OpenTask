@@ -181,10 +181,11 @@ def notify_task_assigned(
     project_id: int | str,
     project_name: Optional[str] = None,
     task_id: Optional[int | str] = None,
+    assigned_by_name: Optional[str] = None,
 ):
     """
     Trigger both a persistent DB Alert in opentask.alerts AND a Web Push notification
-    when a task is assigned to a user.
+    when a task is assigned to a user, displaying who assigned the user.
     """
     conn = _get_conn()
     cur = None
@@ -198,8 +199,9 @@ def notify_task_assigned(
                 resolved_project_name = p_row.get("name")
 
         proj_text = f" in {resolved_project_name}" if resolved_project_name else ""
+        by_text = f" by {assigned_by_name}" if assigned_by_name else ""
         alert_title = f"Task Assigned: {task_title}"
-        alert_body = f'You were assigned to "{task_title}"{proj_text}.'
+        alert_body = f'You were assigned to "{task_title}"{by_text}{proj_text}.'
 
         alert_id = _generator.generate()
         cur.execute(
@@ -235,21 +237,250 @@ def notify_task_assigned(
             cur.close()
         _put_conn(conn)
 
-    # Dispatch Web Push
+    # Dispatch Web Push with direct task link
     proj_text = f" in {resolved_project_name}" if resolved_project_name else ""
+    by_text = f" by {assigned_by_name}" if assigned_by_name else ""
     title = "🔔 Task Assigned"
-    body = f'You were assigned to "{task_title}"{proj_text}.'
-    url = f"/projects/{project_id}"
+    body = f'You were assigned to "{task_title}"{by_text}{proj_text}.'
+    url = f"/projects/{project_id}?taskId={task_id}" if task_id else f"/projects/{project_id}"
     try:
         send_push_notification(
             user_id=assignee_id,
             title=title,
             body=body,
             url=url,
-            tag=f"task-assigned-{project_id}",
+            tag=f"task-assigned-{task_id or project_id}",
         )
     except Exception as e:
         logger.warning(f"[NOTIFICATIONS] Failed to trigger task assigned push: {e}")
+
+
+def notify_task_unassigned(
+    task_title: str,
+    unassigned_user_id: int | str,
+    project_id: int | str,
+    project_name: Optional[str] = None,
+    task_id: Optional[int | str] = None,
+    unassigned_by_name: Optional[str] = None,
+):
+    """
+    Trigger both a persistent DB Alert AND a Web Push notification
+    when a user is unassigned from a task, displaying who unassigned them.
+    """
+    conn = _get_conn()
+    cur = None
+    resolved_project_name = project_name
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if not resolved_project_name:
+            cur.execute("SELECT name FROM opentask.projects WHERE id = %s LIMIT 1;", (int(project_id),))
+            p_row = cur.fetchone()
+            if p_row:
+                resolved_project_name = p_row.get("name")
+
+        proj_text = f" in {resolved_project_name}" if resolved_project_name else ""
+        by_text = f" by {unassigned_by_name}" if unassigned_by_name else ""
+        alert_title = f"Task Unassigned: {task_title}"
+        alert_body = f'You were unassigned from "{task_title}"{by_text}{proj_text}.'
+
+        alert_id = _generator.generate()
+        cur.execute(
+            """
+            INSERT INTO opentask.alerts (
+                id, user_id, context_id, project_id, title, description,
+                type, severity, suggested_actions, is_resolved, created_at, updated_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, FALSE, NOW(), NOW()
+            );
+            """,
+            (
+                alert_id,
+                int(unassigned_user_id),
+                int(task_id) if task_id else int(project_id),
+                int(project_id),
+                alert_title,
+                alert_body,
+                "TASK_UNASSIGNED",
+                "info",
+                ["View Task", "Go to Project"],
+            ),
+        )
+        conn.commit()
+        logger.info(f"[NOTIFICATIONS] Persistent unassigned alert {alert_id} created for user {unassigned_user_id}.")
+    except Exception as db_err:
+        if conn:
+            conn.rollback()
+        logger.warning(f"[NOTIFICATIONS] Failed to record task unassigned alert in DB: {db_err}")
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+
+    # Dispatch Web Push with direct task link
+    proj_text = f" in {resolved_project_name}" if resolved_project_name else ""
+    by_text = f" by {unassigned_by_name}" if unassigned_by_name else ""
+    title = "ℹ️ Task Unassigned"
+    body = f'You were unassigned from "{task_title}"{by_text}{proj_text}.'
+    url = f"/projects/{project_id}?taskId={task_id}" if task_id else f"/projects/{project_id}"
+    try:
+        send_push_notification(
+            user_id=unassigned_user_id,
+            title=title,
+            body=body,
+            url=url,
+            tag=f"task-unassigned-{task_id or project_id}",
+        )
+    except Exception as e:
+        logger.warning(f"[NOTIFICATIONS] Failed to trigger task unassigned push: {e}")
+
+
+def notify_task_completed(
+    task_title: str,
+    project_id: int | str,
+    actor_name: Optional[str] = None,
+    task_id: Optional[int | str] = None,
+    assignee_id: Optional[int | str] = None,
+    extra_user_ids: Optional[List[int | str]] = None,
+):
+    """
+    Trigger alert and push notification when a task is marked as COMPLETED.
+    """
+    target_users = set()
+    if assignee_id:
+        target_users.add(int(assignee_id))
+    if extra_user_ids:
+        for u in extra_user_ids:
+            if u:
+                target_users.add(int(u))
+
+    title = "✅ Task Completed"
+    by_text = f" by {actor_name}" if actor_name else ""
+    body = f'"{task_title}" has been marked as COMPLETED{by_text}.'
+    url = f"/projects/{project_id}?taskId={task_id}" if task_id else f"/projects/{project_id}"
+
+    for uid in target_users:
+        conn = _get_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            alert_id = _generator.generate()
+            cur.execute(
+                """
+                INSERT INTO opentask.alerts (
+                    id, user_id, context_id, project_id, title, description,
+                    type, severity, suggested_actions, is_resolved, created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, FALSE, NOW(), NOW()
+                );
+                """,
+                (
+                    alert_id,
+                    uid,
+                    int(task_id) if task_id else int(project_id),
+                    int(project_id),
+                    f"Task Completed: {task_title}",
+                    body,
+                    "TASK_COMPLETED",
+                    "info",
+                    ["View Task", "Go to Project"],
+                )
+            )
+            conn.commit()
+        except Exception as err:
+            if conn:
+                conn.rollback()
+            logger.warning(f"[NOTIFICATIONS] Failed to save task completed alert: {err}")
+        finally:
+            if cur:
+                cur.close()
+            _put_conn(conn)
+
+        try:
+            send_push_notification(
+                user_id=uid,
+                title=title,
+                body=body,
+                url=url,
+                tag=f"task-completed-{task_id or project_id}",
+            )
+        except Exception as e:
+            logger.warning(f"[NOTIFICATIONS] Failed to send task completed push: {e}")
+
+
+def notify_task_reopened(
+    task_title: str,
+    project_id: int | str,
+    actor_name: Optional[str] = None,
+    task_id: Optional[int | str] = None,
+    assignee_id: Optional[int | str] = None,
+    extra_user_ids: Optional[List[int | str]] = None,
+):
+    """
+    Trigger alert and push notification when a task's completed status is reverted.
+    """
+    target_users = set()
+    if assignee_id:
+        target_users.add(int(assignee_id))
+    if extra_user_ids:
+        for u in extra_user_ids:
+            if u:
+                target_users.add(int(u))
+
+    title = "🔄 Task Reopened"
+    by_text = f" by {actor_name}" if actor_name else ""
+    body = f'"{task_title}" completed status was reverted{by_text}.'
+    url = f"/projects/{project_id}?taskId={task_id}" if task_id else f"/projects/{project_id}"
+
+    for uid in target_users:
+        conn = _get_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            alert_id = _generator.generate()
+            cur.execute(
+                """
+                INSERT INTO opentask.alerts (
+                    id, user_id, context_id, project_id, title, description,
+                    type, severity, suggested_actions, is_resolved, created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, FALSE, NOW(), NOW()
+                );
+                """,
+                (
+                    alert_id,
+                    uid,
+                    int(task_id) if task_id else int(project_id),
+                    int(project_id),
+                    f"Task Reopened: {task_title}",
+                    body,
+                    "TASK_REOPENED",
+                    "info",
+                    ["View Task", "Go to Project"],
+                )
+            )
+            conn.commit()
+        except Exception as err:
+            if conn:
+                conn.rollback()
+            logger.warning(f"[NOTIFICATIONS] Failed to save task reopened alert: {err}")
+        finally:
+            if cur:
+                cur.close()
+            _put_conn(conn)
+
+        try:
+            send_push_notification(
+                user_id=uid,
+                title=title,
+                body=body,
+                url=url,
+                tag=f"task-reopened-{task_id or project_id}",
+            )
+        except Exception as e:
+            logger.warning(f"[NOTIFICATIONS] Failed to send task reopened push: {e}")
 
 
 def notify_pr_reviewed(
@@ -260,10 +491,11 @@ def notify_pr_reviewed(
     pr_number: int,
     project_id: Optional[int | str] = None,
     extra_user_ids: Optional[List[int | str]] = None,
+    task_id: Optional[int | str] = None,
 ):
     """
     Trigger a Web Push notification when an AI PR review verdict is ready.
-    The notification click redirects the user to the PR on GitHub.
+    The notification click redirects the user to the task or PR on GitHub.
     Sends to assignee and any extra_user_ids (e.g. PR author, PMs).
     """
     verdict_icon = "✅" if verdict == "PASS" else "❌"
@@ -271,6 +503,7 @@ def notify_pr_reviewed(
 
     title = f"{verdict_icon} PR Review: {verdict_label}"
     body = f'AI review for "{task_title}" — PR #{pr_number} {verdict_label}. Tap to view.'
+    direct_url = f"/projects/{project_id}?taskId={task_id}" if (project_id and task_id) else pr_url
 
     all_users = set()
     if assignee_id:
@@ -295,13 +528,13 @@ def notify_pr_reviewed(
                 (
                     alert_id,
                     uid,
-                    int(project_id) if project_id else uid,
+                    int(task_id) if task_id else (int(project_id) if project_id else uid),
                     int(project_id) if project_id else None,
                     title,
                     body,
                     "PR_REVIEWED",
                     "info" if verdict == "PASS" else "warning",
-                    ["View PR on GitHub", "Go to Task"],
+                    ["View Task", "View PR on GitHub"],
                 )
             )
             conn.commit()
@@ -320,7 +553,7 @@ def notify_pr_reviewed(
                 user_id=uid,
                 title=title,
                 body=body,
-                url=pr_url,
+                url=direct_url,
                 tag=f"pr-review-{pr_number}",
             )
         except Exception as e:

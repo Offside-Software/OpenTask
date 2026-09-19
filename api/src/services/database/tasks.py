@@ -119,7 +119,8 @@ def db_create_task(task: DatabaseTask, current_user: dict | None = Depends(get_c
                     task_title=task.title,
                     assignee_id=task.lead_assignee_id,
                     project_id=task.project_id,
-                    task_id=row["id"]
+                    task_id=row["id"],
+                    assigned_by_name=user_name,
                 )
             except Exception as notify_err:
                 print(f"[WARN] Failed to trigger assignee push: {notify_err}")
@@ -228,8 +229,74 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
         old_bucket_id = old_task.get("bucket_id")
         title = row.get("title") or old_task.get("title")
 
-        if new_bucket_id is not None and str(new_bucket_id) != str(old_bucket_id):
-            # Check bucket state
+        # 1. Check Assignee Change (Type-safe comparison)
+        old_lead_raw = old_task.get("lead_assignee_id")
+        old_lead_str = str(old_lead_raw) if old_lead_raw is not None else None
+
+        has_lead_in_update = "lead_assignee_id" in update_data
+        new_lead_raw = update_data.get("lead_assignee_id") if has_lead_in_update else None
+        new_lead_str = str(new_lead_raw) if new_lead_raw is not None else None
+
+        assignee_changed = has_lead_in_update and (new_lead_str != old_lead_str)
+
+        if assignee_changed:
+            if new_lead_str is not None:
+                record_project_event(
+                    project_id=row["project_id"],
+                    user_name=user_name,
+                    action="assigned",
+                    target=title,
+                    event_type="TASK_ASSIGNED",
+                    entity_type="TASK",
+                    entity_id=task_id,
+                    metadata={"title": title, "lead_assignee_id": str(new_lead_str), "assigned_by": user_name},
+                    user_id=user_id,
+                    conn=conn,
+                )
+                try:
+                    from services.notifications import notify_task_assigned
+                    notify_task_assigned(
+                        task_title=title,
+                        assignee_id=new_lead_str,
+                        project_id=row["project_id"],
+                        task_id=task_id,
+                        assigned_by_name=user_name,
+                    )
+                except Exception as notify_err:
+                    print(f"[WARN] Failed to trigger assignee push: {notify_err}")
+            elif old_lead_str is not None:
+                # Assignee was unassigned / cleared
+                record_project_event(
+                    project_id=row["project_id"],
+                    user_name=user_name,
+                    action="unassigned",
+                    target=title,
+                    event_type="TASK_UNASSIGNED",
+                    entity_type="TASK",
+                    entity_id=task_id,
+                    metadata={"title": title, "unassigned_user_id": str(old_lead_str), "unassigned_by": user_name},
+                    user_id=user_id,
+                    conn=conn,
+                )
+                try:
+                    from services.notifications import notify_task_unassigned
+                    notify_task_unassigned(
+                        task_title=title,
+                        unassigned_user_id=old_lead_str,
+                        project_id=row["project_id"],
+                        task_id=task_id,
+                        unassigned_by_name=user_name,
+                    )
+                except Exception as notify_err:
+                    print(f"[WARN] Failed to trigger unassign push: {notify_err}")
+
+        # 2. Check Bucket Change (Completion or Reopen/Moved)
+        bucket_changed = new_bucket_id is not None and str(new_bucket_id) != str(old_bucket_id)
+        if bucket_changed:
+            cur.execute("SELECT state FROM opentask.buckets WHERE id = %s LIMIT 1;", (old_bucket_id,))
+            old_b_row = cur.fetchone()
+            old_b_state = old_b_row["state"] if old_b_row else "UNKNOWN"
+
             cur.execute("SELECT name, state FROM opentask.buckets WHERE id = %s LIMIT 1;", (new_bucket_id,))
             b_row = cur.fetchone()
             b_name = b_row["name"] if b_row else f"Bucket #{new_bucket_id}"
@@ -248,6 +315,18 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
                     user_id=user_id,
                     conn=conn,
                 )
+                if old_b_state != "COMPLETED":
+                    try:
+                        from services.notifications import notify_task_completed
+                        notify_task_completed(
+                            task_title=title,
+                            project_id=row["project_id"],
+                            actor_name=user_name,
+                            task_id=task_id,
+                            assignee_id=row.get("lead_assignee_id"),
+                        )
+                    except Exception as notify_err:
+                        print(f"[WARN] Failed to trigger task completed push: {notify_err}")
             else:
                 record_project_event(
                     project_id=row["project_id"],
@@ -261,37 +340,26 @@ def db_update_task(task_id: SafeId, task_data: TaskUpdate, background_tasks: Bac
                     user_id=user_id,
                     conn=conn,
                 )
+                if old_b_state == "COMPLETED":
+                    try:
+                        from services.notifications import notify_task_reopened
+                        notify_task_reopened(
+                            task_title=title,
+                            project_id=row["project_id"],
+                            actor_name=user_name,
+                            task_id=task_id,
+                            assignee_id=row.get("lead_assignee_id"),
+                        )
+                    except Exception as notify_err:
+                        print(f"[WARN] Failed to trigger task reopened push: {notify_err}")
 
             # Only sync to GitHub if moving to an active ONGOING branch and it is a CODE task
             if b_state == "ONGOING" and row.get("type") == "CODE":
                 from services.github_sync import sync_task_to_github_branch
                 background_tasks.add_task(sync_task_to_github_branch, task_id, new_bucket_id)
 
-        elif "lead_assignee_id" in update_data and update_data["lead_assignee_id"] != old_task.get("lead_assignee_id"):
-            record_project_event(
-                project_id=row["project_id"],
-                user_name=user_name,
-                action="assigned",
-                target=title,
-                event_type="TASK_ASSIGNED",
-                entity_type="TASK",
-                entity_id=task_id,
-                metadata={"title": title, "lead_assignee_id": str(update_data["lead_assignee_id"])},
-                user_id=user_id,
-                conn=conn,
-            )
-            if update_data["lead_assignee_id"]:
-                try:
-                    from services.notifications import notify_task_assigned
-                    notify_task_assigned(
-                        task_title=title,
-                        assignee_id=update_data["lead_assignee_id"],
-                        project_id=row["project_id"],
-                        task_id=task_id
-                    )
-                except Exception as notify_err:
-                    print(f"[WARN] Failed to trigger assignee push: {notify_err}")
-        elif "title" in update_data or "description" in update_data:
+        # 3. Check General Task Updates (description, title, weight) - Activity Event Only, NO push notification!
+        if not assignee_changed and not bucket_changed and ("title" in update_data or "description" in update_data):
             record_project_event(
                 project_id=row["project_id"],
                 user_name=user_name,
@@ -479,3 +547,36 @@ def db_reorder_tasks(
         if cur is not None:
             cur.close()
         _put_conn(conn)
+
+
+@db_router.get("/tasks/{task_id}/redirect")
+def db_get_task_redirect(task_id: SafeId):
+    """
+    Lookup task by ID and return redirection metadata (project_id, task_id, direct url)
+    to enable opening the task from any context (notifications, emails, AI reviews).
+    """
+    conn = _get_conn()
+    cur = None
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT id, project_id, title FROM opentask.tasks WHERE id = %s LIMIT 1;",
+            (int(task_id),)
+        )
+        task_row = cur.fetchone()
+        if not task_row:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        project_id = str(task_row["project_id"])
+        tid = str(task_row["id"])
+        return {
+            "task_id": tid,
+            "project_id": project_id,
+            "title": task_row.get("title", ""),
+            "url": f"/projects/{project_id}?taskId={tid}",
+        }
+    finally:
+        if cur is not None:
+            cur.close()
+        _put_conn(conn)
+

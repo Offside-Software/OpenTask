@@ -42,7 +42,11 @@ export const NotificationsPage: React.FC = () => {
 
   const handleNavigateToProject = (alert: Alert) => {
     if (alert.project_id) {
-      navigate(`/projects/${alert.project_id}`);
+      if (alert.context_id) {
+        navigate(`/projects/${alert.project_id}?taskId=${alert.context_id}`);
+      } else {
+        navigate(`/projects/${alert.project_id}`);
+      }
     }
     setSelectedAlert(null);
   };
@@ -56,7 +60,9 @@ export const NotificationsPage: React.FC = () => {
 
   const getAlertIcon = (type?: string) => {
     if (type === 'DRAFT_APPROVAL') return <Sparkles size={22} />;
-    if (type === 'TASK_ASSIGNED') return <CheckCircle2 size={22} />;
+    if (type === 'TASK_ASSIGNED' || type === 'TASK_COMPLETED') return <CheckCircle2 size={22} />;
+    if (type === 'TASK_UNASSIGNED' || type === 'TASK_REOPENED') return <AlertTriangle size={22} />;
+    if (type === 'PR_REVIEWED') return <Sparkles size={22} />;
     if (type === 'SYSTEM_TEST') return <Bell size={22} />;
     return <AlertTriangle size={22} />;
   };
@@ -66,9 +72,17 @@ export const NotificationsPage: React.FC = () => {
       bg: 'bg-[#FFE600]', border: 'border-black', text: 'text-black',
       headerBg: 'bg-[#FFE600]/15'
     };
-    if (type === 'TASK_ASSIGNED') return {
+    if (type === 'TASK_ASSIGNED' || type === 'TASK_COMPLETED') return {
       bg: 'bg-[#22C55E]', border: 'border-black', text: 'text-black',
       headerBg: 'bg-[#22C55E]/15'
+    };
+    if (type === 'TASK_UNASSIGNED' || type === 'TASK_REOPENED') return {
+      bg: 'bg-[#F97316]', border: 'border-black', text: 'text-black',
+      headerBg: 'bg-[#F97316]/15'
+    };
+    if (type === 'PR_REVIEWED') return {
+      bg: 'bg-[#8B5CF6]', border: 'border-black', text: 'text-white',
+      headerBg: 'bg-[#8B5CF6]/15'
     };
     if (type === 'SYSTEM_TEST') return {
       bg: 'bg-[#FFE600]', border: 'border-black', text: 'text-black',
@@ -209,7 +223,7 @@ export const NotificationsPage: React.FC = () => {
                       variant={
                         alert.type === 'DRAFT_APPROVAL'
                           ? 'primary'
-                          : alert.type === 'TASK_ASSIGNED'
+                          : (alert.type === 'TASK_ASSIGNED' || alert.type === 'TASK_COMPLETED')
                             ? 'success'
                             : alert.severity === 'critical'
                               ? 'critical'
@@ -232,7 +246,7 @@ export const NotificationsPage: React.FC = () => {
                   <h3 className="text-white font-mono font-black text-[15px] uppercase tracking-wide truncate group-hover:text-[#FFE600] transition-colors">{alert.title}</h3>
                   <p className="text-neutral-400 font-mono text-[12px] mt-0.5 line-clamp-1">{alert.description}</p>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
+                <div className="flex gap-2 flex-shrink-0 items-center">
                   {!alert.is_resolved && (
                     <button
                       onClick={e => { e.stopPropagation(); resolveAlert(alert.id!); }}
@@ -241,13 +255,26 @@ export const NotificationsPage: React.FC = () => {
                       Dismiss
                     </button>
                   )}
+                  {alert.context_id && alert.project_id && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!alert.is_resolved) resolveAlert(alert.id!);
+                        navigate(`/projects/${alert.project_id}?taskId=${alert.context_id}`);
+                      }}
+                      className="px-3 py-1.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] transition-all flex items-center gap-1 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                      title="Directly open task on project board"
+                    >
+                      <span>TASK</span> <ExternalLink size={11} strokeWidth={2.5} />
+                    </button>
+                  )}
                   <button
                     onClick={e => {
                       e.stopPropagation();
                       if (!alert.is_resolved) resolveAlert(alert.id!);
                       setSelectedAlert(alert);
                     }}
-                    className="px-3 py-1.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] transition-all flex items-center gap-1.5 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    className="px-3 py-1.5 rounded-none border-2 border-black bg-[#141619] hover:bg-white text-neutral-300 hover:text-black font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] transition-all flex items-center gap-1.5 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                   >
                     View <ArrowRight size={12} strokeWidth={3} />
                   </button>
@@ -279,7 +306,7 @@ export const NotificationsPage: React.FC = () => {
                       variant={
                         isDraftApproval
                           ? 'primary'
-                          : selectedAlert.type === 'TASK_ASSIGNED'
+                          : (selectedAlert.type === 'TASK_ASSIGNED' || selectedAlert.type === 'TASK_COMPLETED')
                             ? 'success'
                             : selectedAlert.severity === 'critical'
                               ? 'critical'
@@ -348,7 +375,9 @@ export const NotificationsPage: React.FC = () => {
                       onClick={() => handleNavigateToProject(selectedAlert)}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
-                      {isDraftApproval ? (
+                      {selectedAlert.context_id ? (
+                        <><ExternalLink size={14} strokeWidth={2.5} /> Open Task</>
+                      ) : isDraftApproval ? (
                         <><Sparkles size={14} strokeWidth={2.5} /> Review Meeting Tasks</>
                       ) : (
                         <><ExternalLink size={14} strokeWidth={2.5} /> View Project</>

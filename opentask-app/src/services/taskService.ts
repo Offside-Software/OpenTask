@@ -57,4 +57,16 @@ export const taskService = {
   getBuckets: async (projectId: number | string): Promise<Bucket[]> => {
     return await apiFetch<Bucket[]>(`/projects/${projectId}/buckets`);
   },
+
+  getTaskById: async (id: number | string): Promise<Task> => {
+    return await apiFetch<Task>(`/tasks/${id}`);
+  },
+
+  getTaskRedirect: async (
+    id: number | string
+  ): Promise<{ task_id: string; project_id: string; title: string; url: string }> => {
+    return await apiFetch<{ task_id: string; project_id: string; title: string; url: string }>(
+      `/tasks/${id}/redirect`
+    );
+  },
 };
