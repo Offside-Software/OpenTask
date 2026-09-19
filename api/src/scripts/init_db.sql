@@ -179,3 +179,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_repo_url ON opentask.tasks(repo_url);
 ALTER TABLE opentask.projects ADD COLUMN IF NOT EXISTS api_key TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_api_key ON opentask.projects(api_key) WHERE api_key IS NOT NULL;
 
+-- Migration: Add custom_ai_api_key to projects and users tables for Bring-Your-Own-Token AI
+ALTER TABLE opentask.projects ADD COLUMN IF NOT EXISTS custom_ai_api_key TEXT;
+ALTER TABLE opentask.users ADD COLUMN IF NOT EXISTS custom_ai_api_key TEXT;
+
+

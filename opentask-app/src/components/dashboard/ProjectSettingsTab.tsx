@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
-import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal } from 'lucide-react';
+import { Badge } from '../../design-system/Badge';
+import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal, Sparkles, CheckCircle2 } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
 import { userService } from '../../services/userService';
 import { searchGithubUsers } from '../../services/githubServices';
+import { aiKeyService, type ProjectAiKeyResponse } from '../../services/aiKeyService';
 import { useToast } from '../../design-system/Toast';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { LoadingScreen } from '../ui/LoadingScreen';
@@ -37,6 +39,15 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     const [copiedKey, setCopiedKey] = useState(false);
     const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
 
+    // Custom Integrated AI (Gemini Key) State
+    const [customAiKeyInfo, setCustomAiKeyInfo] = useState<ProjectAiKeyResponse | null>(null);
+    const [customAiInput, setCustomAiInput] = useState('');
+    const [showCustomAiKey, setShowCustomAiKey] = useState(false);
+    const [aiKeyTesting, setAiKeyTesting] = useState(false);
+    const [aiKeySaving, setAiKeySaving] = useState(false);
+    const [aiKeyTestResult, setAiKeyTestResult] = useState<{ valid: boolean; model?: string; error?: string | null } | null>(null);
+    const [isRemoveProjectAiKeyModalOpen, setIsRemoveProjectAiKeyModalOpen] = useState(false);
+
     // Project Edit State
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -56,10 +67,11 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     const loadData = async () => {
         setLoading(true);
         try {
-            const [p, m, keyData] = await Promise.all([
+            const [p, m, keyData, customKeyData] = await Promise.all([
                 projectService.getProjectById(projectId),
                 projectMemberService.getMembers(projectId),
                 projectService.getProjectApiKey(projectId).catch(() => ({ api_key: null })),
+                aiKeyService.getProjectAiKey(projectId).catch(() => null),
             ]);
             setProject(p);
             setName(p.name || '');
@@ -67,10 +79,70 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             setRepoUrls(p.gh_repo_url || []);
             setMembers(m);
             setApiKey(keyData?.api_key || null);
+            setCustomAiKeyInfo(customKeyData);
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTestCustomAiKey = async () => {
+        const keyToTest = customAiInput.trim();
+        if (!keyToTest) {
+            showToast("Please enter an API key to test", "warning");
+            return;
+        }
+        setAiKeyTesting(true);
+        setAiKeyTestResult(null);
+        try {
+            const res = await aiKeyService.testApiKey(keyToTest);
+            setAiKeyTestResult(res);
+            if (res.valid) {
+                showToast(`API Key verified successfully! Model: ${res.model}`, "success");
+            } else {
+                showToast(res.error || "API Key verification failed", "error");
+            }
+        } catch (e: any) {
+            const errMsg = e.message || "Failed to test API key";
+            setAiKeyTestResult({ valid: false, error: errMsg });
+            showToast(errMsg, "error");
+        } finally {
+            setAiKeyTesting(false);
+        }
+    };
+
+    const handleSaveCustomAiKey = async () => {
+        const keyToSave = customAiInput.trim();
+        if (!keyToSave) {
+            showToast("Please enter an API key to save", "warning");
+            return;
+        }
+        setAiKeySaving(true);
+        try {
+            const res = await aiKeyService.saveProjectAiKey(projectId, keyToSave, true);
+            setCustomAiKeyInfo(res);
+            setCustomAiInput('');
+            setAiKeyTestResult(null);
+            setShowCustomAiKey(false);
+            showToast("Project Custom AI key saved and verified successfully!", "success");
+        } catch (e: any) {
+            showToast(e.message || "Failed to save API key", "error");
+        } finally {
+            setAiKeySaving(false);
+        }
+    };
+
+    const handleRemoveCustomAiKey = async () => {
+        setIsRemoveProjectAiKeyModalOpen(false);
+        try {
+            await aiKeyService.deleteProjectAiKey(projectId);
+            setCustomAiKeyInfo({ project_id: String(projectId), has_custom_key: false, masked_key: null });
+            setCustomAiInput('');
+            setAiKeyTestResult(null);
+            showToast("Custom AI key removed. Reverted to system default key.", "info");
+        } catch (e: any) {
+            showToast(e.message || "Failed to remove custom AI key", "error");
         }
     };
 
@@ -376,6 +448,136 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                 </div>
             </SurfaceCard>
 
+            {/* Custom Integrated AI (BYOT Gemini Key) */}
+            <SurfaceCard
+                title="Custom Integrated AI"
+                subtitle="BRING YOUR OWN GEMINI KEY FOR PR REVIEWS, MEETINGS & TASK EVALUATIONS"
+                icon={Sparkles}
+                rightElement={
+                    customAiKeyInfo?.has_custom_key ? (
+                        <Badge variant="success">
+                            <CheckCircle2 size={11} className="mr-1 inline" /> CUSTOM TOKEN ACTIVE
+                        </Badge>
+                    ) : (
+                        <Badge variant="default">
+                            SYSTEM DEFAULT KEY
+                        </Badge>
+                    )
+                }
+            >
+                <div className="space-y-5">
+                    <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
+                        Configure a custom Google Gemini API key for this project. When active, all internal AI operations (automated PR code reviews, meeting analysis, task estimation) will utilize your token and quotas instead of the shared system token.
+                    </p>
+
+                    {customAiKeyInfo?.has_custom_key && (
+                        <div className="p-3.5 bg-[#121417] border-2 border-black rounded-none flex items-center justify-between gap-3 shadow-[2px_2px_0px_0px_#000000]">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="p-1.5 bg-[#00FF66] text-black border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000]">
+                                    <CheckCircle2 size={14} strokeWidth={2.5} />
+                                </div>
+                                <div className="min-w-0 font-mono">
+                                    <div className="text-[10px] font-black uppercase text-neutral-400">// ACTIVE PROJECT KEY</div>
+                                    <div className="text-[13px] font-bold text-white tracking-widest truncate">{customAiKeyInfo.masked_key}</div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
+                                className="px-3 py-1.5 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                            >
+                                <Trash2 size={12} />
+                                <span>REMOVE</span>
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="space-y-3">
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-[11px] font-bold uppercase text-neutral-400 font-mono">
+                                    // {customAiKeyInfo?.has_custom_key ? "REPLACE GEMINI API KEY" : "ENTER GOOGLE GEMINI API KEY"}
+                                </label>
+                                <a
+                                    href="https://aistudio.google.com/app/apikey"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#FFE600] hover:underline"
+                                >
+                                    <span>GET FREE KEY (AI STUDIO)</span>
+                                    <ExternalLink size={11} />
+                                </a>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                <div className="relative flex-1 min-w-[280px]">
+                                    <input
+                                        type={showCustomAiKey ? "text" : "password"}
+                                        value={customAiInput}
+                                        onChange={(e) => {
+                                            setCustomAiInput(e.target.value);
+                                            setAiKeyTestResult(null);
+                                        }}
+                                        placeholder={customAiKeyInfo?.has_custom_key ? "Enter new API key (AIzaSy...)" : "AIzaSy..."}
+                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-white tracking-wider focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCustomAiKey(!showCustomAiKey)}
+                                    className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                    title={showCustomAiKey ? "Hide Key" : "Reveal Key"}
+                                >
+                                    {showCustomAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    <span>{showCustomAiKey ? "HIDE" : "REVEAL"}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleTestCustomAiKey}
+                                    disabled={aiKeyTesting || !customAiInput.trim()}
+                                    className="px-4 py-2.5 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                >
+                                    <Bot size={14} />
+                                    <span>{aiKeyTesting ? "TESTING..." : "TEST KEY"}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveCustomAiKey}
+                                    disabled={aiKeySaving || !customAiInput.trim()}
+                                    className="px-4 py-2.5 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                >
+                                    <Save size={14} strokeWidth={2.5} />
+                                    <span>{aiKeySaving ? "SAVING..." : "SAVE KEY"}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Test Feedback banner */}
+                        {aiKeyTestResult && (
+                            <div
+                                className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${
+                                    aiKeyTestResult.valid
+                                        ? "bg-[#00FF66] text-black font-bold"
+                                        : "bg-[#FF3333] text-white font-bold"
+                                }`}
+                            >
+                                {aiKeyTestResult.valid ? (
+                                    <>
+                                        <CheckCircle2 size={15} strokeWidth={2.5} />
+                                        <span>KEY VALID & READY! PING VERIFIED WITH MODEL: {aiKeyTestResult.model?.toUpperCase()}</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <AlertTriangle size={15} strokeWidth={2.5} />
+                                        <span>VALIDATION ERROR: {aiKeyTestResult.error || "INVALID KEY"}</span>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </SurfaceCard>
+
             {/* AI Native Agent Access Card */}
             <SurfaceCard 
                 title="AI Agent Access" 
@@ -656,6 +858,19 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                     currentRepoUrls={repoUrls}
                     onClose={() => setIsRepoPicker(false)}
                     onReposUpdated={handleReposUpdated}
+                />
+            )}
+
+            {/* Remove Custom AI Key Confirmation Modal */}
+            {isRemoveProjectAiKeyModalOpen && (
+                <ConfirmModal
+                    title="REMOVE PROJECT AI KEY?"
+                    message="Are you sure you want to remove this custom Gemini API key? The project will revert to using the user or system default AI key for code reviews and meeting summaries."
+                    confirmLabel="YES, REMOVE KEY"
+                    cancelLabel="CANCEL"
+                    variant="danger"
+                    onConfirm={handleRemoveCustomAiKey}
+                    onCancel={() => setIsRemoveProjectAiKeyModalOpen(false)}
                 />
             )}
 

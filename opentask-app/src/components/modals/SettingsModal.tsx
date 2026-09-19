@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Send, ExternalLink, Shield, Bell, User, Sun, Moon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Send, ExternalLink, Shield, Bell, User, Sun, Moon, Sparkles, Eye, EyeOff, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { updateTelegramChatId } from '../../auth/api';
 import { useTheme } from '../../context/themeContext';
 import { CloseButton } from '../../design-system/CloseButton';
+import { aiKeyService, type UserAiKeyResponse } from '../../services/aiKeyService';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -17,7 +18,70 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+    // Personal AI Key State
+    const [userAiKeyInfo, setUserAiKeyInfo] = useState<UserAiKeyResponse | null>(null);
+    const [userAiKeyInput, setUserAiKeyInput] = useState('');
+    const [showUserAiKey, setShowUserAiKey] = useState(false);
+    const [isTestingUserKey, setIsTestingUserKey] = useState(false);
+    const [isSavingUserKey, setIsSavingUserKey] = useState(false);
+    const [userKeyTestResult, setUserKeyTestResult] = useState<{ valid: boolean; model?: string; error?: string | null } | null>(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            aiKeyService.getUserAiKey()
+                .then(res => setUserAiKeyInfo(res))
+                .catch(() => setUserAiKeyInfo(null));
+        }
+    }, [isOpen]);
+
     if (!isOpen) return null;
+
+    const handleTestUserAiKey = async () => {
+        const key = userAiKeyInput.trim();
+        if (!key) return;
+        setIsTestingUserKey(true);
+        setUserKeyTestResult(null);
+        try {
+            const res = await aiKeyService.testApiKey(key);
+            setUserKeyTestResult(res);
+        } catch (e: any) {
+            setUserKeyTestResult({ valid: false, error: e.message || 'Key test failed' });
+        } finally {
+            setIsTestingUserKey(false);
+        }
+    };
+
+    const handleSaveUserAiKey = async () => {
+        const key = userAiKeyInput.trim();
+        if (!key) return;
+        setIsSavingUserKey(true);
+        try {
+            const res = await aiKeyService.saveUserAiKey(key, true);
+            setUserAiKeyInfo(res);
+            setUserAiKeyInput('');
+            setUserKeyTestResult(null);
+            setShowUserAiKey(false);
+            setMessage({ type: 'success', text: 'Personal AI key verified and saved!' });
+            setTimeout(() => setMessage(null), 3000);
+        } catch (e: any) {
+            setMessage({ type: 'error', text: e.message || 'Failed to save personal AI key.' });
+        } finally {
+            setIsSavingUserKey(false);
+        }
+    };
+
+    const handleRemoveUserAiKey = async () => {
+        try {
+            await aiKeyService.deleteUserAiKey();
+            setUserAiKeyInfo({ user_id: '', has_custom_key: false, masked_key: null });
+            setUserAiKeyInput('');
+            setUserKeyTestResult(null);
+            setMessage({ type: 'success', text: 'Personal AI key removed. Reverted to system key.' });
+            setTimeout(() => setMessage(null), 3000);
+        } catch (e: any) {
+            setMessage({ type: 'error', text: e.message || 'Failed to remove AI key.' });
+        }
+    };
 
     const handleSave = async () => {
         if (!user?.db_user?.id) return;
@@ -38,7 +102,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 select-none animate-in fade-in duration-100" onClick={onClose}>
             <div
-                className="bg-[#121417] border-3 border-black rounded-none w-full max-w-md shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono"
+                className="bg-[#121417] border-3 border-black rounded-none w-full max-w-lg shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
@@ -56,7 +120,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
 
                 {/* Body */}
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
                     {/* User Info Section */}
                     <section>
                         <h4 className="text-white text-[13px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -152,6 +216,128 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                 </div>
                                 <ExternalLink size={14} className="text-neutral-400 group-hover:text-black transition-colors" />
                             </a>
+                        </div>
+                    </section>
+
+                    {/* Personal AI Key Section */}
+                    <section>
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-white text-[13px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <Sparkles size={12} />
+                                <span className="text-[#FFE600] mr-1.5">//</span>PERSONAL INTEGRATED AI KEY
+                            </h4>
+                            {userAiKeyInfo?.has_custom_key ? (
+                                <span className="px-2 py-0.5 bg-[#00FF66] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000]">
+                                    ACTIVE
+                                </span>
+                            ) : (
+                                <span className="px-2 py-0.5 bg-[#1E2227] text-neutral-400 border border-neutral-700 font-mono text-[9px] font-black uppercase">
+                                    SYSTEM KEY
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            <p className="text-neutral-400 text-[11px] leading-relaxed">
+                                Provide your Google Gemini API key to use your personal quotas and token limits across all projects you interact with when no project key is configured.
+                            </p>
+
+                            <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-neutral-500">// GOOGLE AI STUDIO</span>
+                                <a
+                                    href="https://aistudio.google.com/app/apikey"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[#FFE600] hover:underline font-bold"
+                                >
+                                    <span>GET FREE KEY</span>
+                                    <ExternalLink size={11} />
+                                </a>
+                            </div>
+
+                            {userAiKeyInfo?.has_custom_key && (
+                                <div className="p-3 bg-[#0B0E14] border-2 border-black rounded-none flex items-center justify-between gap-3 shadow-[2px_2px_0px_0px_#000000]">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="p-1 bg-[#00FF66] text-black border border-black shrink-0">
+                                            <CheckCircle2 size={12} strokeWidth={2.5} />
+                                        </div>
+                                        <div className="min-w-0 font-mono">
+                                            <div className="text-[9px] font-bold text-neutral-400 uppercase">// CURRENT KEY</div>
+                                            <div className="text-[12px] font-bold text-white tracking-wider truncate">{userAiKeyInfo.masked_key}</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleRemoveUserAiKey}
+                                        className="px-2.5 py-1 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border border-black font-mono text-[10px] font-black uppercase transition-all shrink-0 cursor-pointer"
+                                    >
+                                        REMOVE
+                                    </button>
+                                </div>
+                            )}
+
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <input
+                                            type={showUserAiKey ? "text" : "password"}
+                                            value={userAiKeyInput}
+                                            onChange={(e) => {
+                                                setUserAiKeyInput(e.target.value);
+                                                setUserKeyTestResult(null);
+                                            }}
+                                            placeholder={userAiKeyInfo?.has_custom_key ? "REPLACE KEY (AIzaSy...)" : "ENTER KEY (AIzaSy...)"}
+                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none py-2 px-3 text-white text-[12px] font-mono focus:outline-none focus:border-[#FFE600] transition-all placeholder:text-neutral-600 shadow-[2px_2px_0px_0px_#000000]"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowUserAiKey(!showUserAiKey)}
+                                        className="p-2 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                        title={showUserAiKey ? "Hide Key" : "Reveal Key"}
+                                    >
+                                        {showUserAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleTestUserAiKey}
+                                        disabled={isTestingUserKey || !userAiKeyInput.trim()}
+                                        className="px-3 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0"
+                                    >
+                                        {isTestingUserKey ? "TESTING..." : "TEST"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveUserAiKey}
+                                        disabled={isSavingUserKey || !userAiKeyInput.trim()}
+                                        className="px-3.5 py-2 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0"
+                                    >
+                                        {isSavingUserKey ? "SAVING..." : "SAVE"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {userKeyTestResult && (
+                                <div
+                                    className={`p-2.5 border-2 border-black rounded-none font-mono text-[10px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${
+                                        userKeyTestResult.valid
+                                            ? "bg-[#00FF66] text-black font-bold"
+                                            : "bg-[#FF3333] text-white font-bold"
+                                    }`}
+                                >
+                                    {userKeyTestResult.valid ? (
+                                        <>
+                                            <CheckCircle2 size={13} strokeWidth={2.5} />
+                                            <span>KEY VALID! VERIFIED WITH {userKeyTestResult.model?.toUpperCase()}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <AlertTriangle size={13} strokeWidth={2.5} />
+                                            <span>ERROR: {userKeyTestResult.error || "INVALID KEY"}</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </section>
 

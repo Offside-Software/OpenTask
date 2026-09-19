@@ -10,6 +10,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from config import settings
+from services.ai_client import resolve_gemini_client
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -83,10 +84,6 @@ async def process_task_aware_pr_evaluation(
     posts GitHub comment, and sends push notifications to related users.
     """
     logger.info(f"🚀 Starting task-aware evaluation for PR #{pr_number} on {repo_full_name}")
-
-    if not ai_client:
-        logger.error("❌ Aborting: Gemini Client not initialized.")
-        return
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as http_client:
@@ -421,36 +418,44 @@ CRITICAL REVIEW RULES:
             f"Evaluate the Pull Request."
         )
 
+        client_to_use, source = resolve_gemini_client(project_id=project_id)
+        if not client_to_use:
+            logger.warning("⚠️ No Gemini API key available (neither project custom key nor server default key).")
+            result_dict["feedback"] = "AI evaluation skipped: No Gemini API Key configured for this project or server. Please add your Gemini API Key in Project Settings."
+        else:
+            logger.info(f"Using Gemini client resolved from '{source}' for project #{project_id}")
+
         models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-lite-latest"]
         ai_success = False
 
-        for model_name in models_to_try:
-            for attempt in range(2):
-                try:
-                    logger.info(f"Invoking Gemini model '{model_name}' (attempt {attempt + 1})...")
-                    ai_response = await asyncio.wait_for(
-                        ai_client.aio.models.generate_content(
-                            model=model_name,
-                            contents=user_prompt,
-                            config=types.GenerateContentConfig(
-                                system_instruction=system_instruction,
-                                response_mime_type="application/json",
-                                response_schema=TaskAwarePREvaluation,
-                                temperature=0.1
-                            )
-                        ),
-                        timeout=45.0
-                    )
-                    parsed = json.loads(ai_response.text)
-                    result_dict.update(parsed)
-                    ai_success = True
-                    logger.info(f"✅ AI evaluation complete using {model_name}. Matched: {result_dict.get('matched_task_title')}, Verdict: {result_dict.get('verdict')}")
+        if client_to_use:
+            for model_name in models_to_try:
+                for attempt in range(2):
+                    try:
+                        logger.info(f"Invoking Gemini model '{model_name}' (attempt {attempt + 1})...")
+                        ai_response = await asyncio.wait_for(
+                            client_to_use.aio.models.generate_content(
+                                model=model_name,
+                                contents=user_prompt,
+                                config=types.GenerateContentConfig(
+                                    system_instruction=system_instruction,
+                                    response_mime_type="application/json",
+                                    response_schema=TaskAwarePREvaluation,
+                                    temperature=0.1
+                                )
+                            ),
+                            timeout=45.0
+                        )
+                        parsed = json.loads(ai_response.text)
+                        result_dict.update(parsed)
+                        ai_success = True
+                        logger.info(f"✅ AI evaluation complete using {model_name}. Matched: {result_dict.get('matched_task_title')}, Verdict: {result_dict.get('verdict')}")
+                        break
+                    except Exception as e:
+                        logger.warning(f"⚠️ Gemini call on {model_name} attempt {attempt + 1} failed: {e}")
+                        await asyncio.sleep(1.5)
+                if ai_success:
                     break
-                except Exception as e:
-                    logger.warning(f"⚠️ Gemini call on {model_name} attempt {attempt + 1} failed: {e}")
-                    await asyncio.sleep(1.5)
-            if ai_success:
-                break
 
         # Fallback heuristic if all AI calls failed
         if not ai_success and project_tasks:

@@ -2,7 +2,7 @@ import sys
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-from routers import auth, github, meetings, tasks, telegram, notifications, agent_api
+from routers import auth, github, meetings, tasks, telegram, notifications, agent_api, ai_keys
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -95,6 +95,7 @@ app.include_router(tasks.router)
 app.include_router(telegram.router)
 app.include_router(notifications.router)
 app.include_router(agent_api.router)
+app.include_router(ai_keys.router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True, log_level="debug")

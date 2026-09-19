@@ -16,6 +16,7 @@ from config import settings
 from routers.auth import get_current_user
 from services.database.database import _get_conn, _put_conn
 from services.database.id_generator import _generator
+from services.ai_client import resolve_gemini_client
 
 from services.database.alerts import DatabaseAlert, db_create_alert
 
@@ -264,13 +265,19 @@ async def analyze_meeting_endpoint(
         raise HTTPException(status_code=400, detail="project_id form field is required.")
 
     try:
+        user_id = current_user.get("id") if current_user else None
+        gemini_client, source = resolve_gemini_client(project_id=project_id, user_id=user_id)
+        if not gemini_client:
+            print("Gemini analysis failed: No API key available.")
+            return _fallback_analysis_payload("no-api-key-configured")
+
         input_bytes = await file.read()
         mime_type = file.content_type
 
         try:
             # For audio/video, it's safer to use the File API if file is large, 
             # but for now let's at least switch to async call
-            response = await client.aio.models.generate_content(
+            response = await gemini_client.aio.models.generate_content(
                 model=MODEL_ID,
                 contents=[
                     GEMINI_SYSTEM_PROMPT,
