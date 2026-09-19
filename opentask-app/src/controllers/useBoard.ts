@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Bucket, Task } from "../models";
 import { apiFetch } from "../services/apiClient";
+import { taskService } from "../services/taskService";
 import { useToast } from "../design-system/Toast";
 import { removeCached } from "../utils/cache";
 
@@ -166,10 +167,51 @@ export const useBoard = (projectId: string | number) => {
     setTasks((prev) => prev.filter((t) => String(t.id) !== String(taskId)));
   }, []);
 
+  const [loadingBuckets, setLoadingBuckets] = useState<Record<string, boolean>>({});
+
+  /**
+   * Fetch next batch of 20 tasks for a specific bucket on demand
+   */
+  const loadMoreBucketTasks = useCallback(
+    async (bucketId: number | string) => {
+      const bIdStr = String(bucketId);
+      if (loadingBuckets[bIdStr]) return;
+
+      setLoadingBuckets((prev) => ({ ...prev, [bIdStr]: true }));
+      try {
+        const currentBucketTasks = tasks.filter((t) => String(t.bucket_id) === bIdStr);
+        const offset = currentBucketTasks.length;
+        const res = await taskService.getBucketTasks(projectId, bucketId, 20, offset);
+
+        if (res.tasks && res.tasks.length > 0) {
+          setTasks((prev) => {
+            const existingIds = new Set(prev.map((t) => t.id));
+            const newTasks = res.tasks.filter((t) => !existingIds.has(t.id));
+            return [...prev, ...newTasks];
+          });
+        }
+
+        if (res.total !== undefined) {
+          setBuckets((prev) =>
+            prev.map((b) => (String(b.id) === bIdStr ? { ...b, task_count: res.total } : b))
+          );
+        }
+      } catch (err) {
+        console.error(`Failed to load more tasks for bucket ${bucketId}:`, err);
+        showToast("Failed to load more tasks", "error");
+      } finally {
+        setLoadingBuckets((prev) => ({ ...prev, [bIdStr]: false }));
+      }
+    },
+    [projectId, tasks, loadingBuckets, showToast]
+  );
+
   return {
     buckets,
     tasks,
     loading,
+    loadingBuckets,
+    loadMoreBucketTasks,
     error,
     refreshBoard: fetchBoard,
     moveTaskLocally,

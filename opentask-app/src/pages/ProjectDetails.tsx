@@ -124,6 +124,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     buckets,
     tasks,
     loading: boardLoading,
+    loadingBuckets,
+    loadMoreBucketTasks,
     refreshBoard,
     setTasksOptimistically,
     setBucketsOptimistically,
@@ -572,6 +574,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                       colorClass={STATUS_COLORS[bucket.state] || 'bg-slate-500'}
                       statusText="ACTIVE"
                       taskCount={colTasks.length}
+                      totalTasks={bucket.task_count}
+                      isLoadingMore={!!loadingBuckets[String(bucket.id)]}
+                      onLoadMore={loadMoreBucketTasks}
                       onDropTask={handleDropTask}
                       onDragStartColumn={handleDragStartColumn}
                       onDropColumn={handleDropColumn}
