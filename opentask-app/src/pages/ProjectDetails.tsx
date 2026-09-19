@@ -6,7 +6,7 @@ import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
 import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
-import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
 import { MeetingAccordion } from '../components/dashboard/MeetingAccordion';
@@ -26,6 +26,7 @@ import { useAuth } from '../auth/useAuth';
 import { useCurrentUserRole } from '../controllers/useCurrentUserRole';
 import { useProjectMembers } from '../controllers/useProjectMembers';
 import { projectService } from '../services/projectService';
+import { prReviewService } from '../services/prReviewService';
 import { useNavigate } from 'react-router-dom';
 import { NotFoundPage } from './NotFound';
 
@@ -85,6 +86,26 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       showToast('Failed to refresh tasks', 'error');
     } finally {
       setIsRefreshingTasks(false);
+    }
+  };
+
+  const [isSyncingPrs, setIsSyncingPrs] = useState(false);
+
+  const handleSyncAndReviewPrs = async () => {
+    setIsSyncingPrs(true);
+    try {
+      const res = await prReviewService.syncProjectPrs(projectId);
+      if (res.reviews_triggered > 0) {
+        showToast(`AI Code Review triggered for ${res.reviews_triggered} PR(s)!`, 'success');
+      } else {
+        showToast('Scanned repos: no unreviewed PRs found', 'info');
+      }
+      await refreshBoard(false);
+    } catch (err: any) {
+      console.error('Failed to sync PRs:', err);
+      showToast(err?.message || 'Failed to sync PRs', 'error');
+    } finally {
+      setIsSyncingPrs(false);
     }
   };
 
@@ -469,15 +490,26 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                   6-STAGE STACK ARCHITECTURE • DRAFT → COMPLETED
                 </p>
               </div>
-              <button
-                onClick={handleRefreshTasksOnly}
-                disabled={isRefreshingTasks}
-                className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
-                title="Refresh tasks without reloading the web page"
-              >
-                <RefreshCw size={13} strokeWidth={2.5} className={isRefreshingTasks ? 'animate-spin text-black' : 'text-[#FFE600]'} />
-                <span>{isRefreshingTasks ? 'SYNCING...' : 'REFRESH TASKS'}</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleSyncAndReviewPrs}
+                  disabled={isSyncingPrs}
+                  className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+                  title="Scan connected repositories and immediately run Gemini AI Code Review on open PRs"
+                >
+                  <Sparkles size={13} strokeWidth={2.5} className={isSyncingPrs ? 'animate-spin text-black' : 'text-[#FFE600]'} />
+                  <span>{isSyncingPrs ? 'REVIEWING PRS...' : 'SYNC & REVIEW PRS'}</span>
+                </button>
+                <button
+                  onClick={handleRefreshTasksOnly}
+                  disabled={isRefreshingTasks}
+                  className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+                  title="Refresh tasks without reloading the web page"
+                >
+                  <RefreshCw size={13} strokeWidth={2.5} className={isRefreshingTasks ? 'animate-spin text-black' : 'text-[#FFE600]'} />
+                  <span>{isRefreshingTasks ? 'SYNCING...' : 'REFRESH TASKS'}</span>
+                </button>
+              </div>
             </div>
 
             {tasksLoading || bucketsLoading ? (

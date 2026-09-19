@@ -72,7 +72,7 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
     return (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 select-none" onClick={onClose}>
             <div
-                className="bg-[#121417] border-2 border-black rounded-none w-full max-w-lg shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[85vh]"
+                className="bg-[#121417] border-2 border-black rounded-none w-full max-w-3xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[85vh]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
@@ -85,7 +85,7 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
                             <h2 className="text-white font-mono font-black text-[14px] uppercase tracking-wider">
                                 // CONNECT REPOSITORIES
                             </h2>
-                            <p className="text-neutral-500 font-mono text-[10px] uppercase mt-0.5">
+                            <p className="text-neutral-500 font-mono text-[11px] uppercase mt-0.5">
                                 Search or enter GitHub repo URLs
                             </p>
                         </div>
@@ -96,7 +96,7 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
                                 href={installUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2.5 py-1 bg-black text-[#FFE600] border border-neutral-700 hover:border-[#FFE600] font-mono text-[10px] font-black uppercase tracking-wider transition-all shadow-[1.5px_1.5px_0px_0px_#000000]"
+                                className="flex items-center gap-1 px-2.5 py-1 bg-black text-[#FFE600] border border-neutral-700 hover:border-[#FFE600] font-mono text-[11px] font-black uppercase tracking-wider transition-all shadow-[1.5px_1.5px_0px_0px_#000000]"
                                 title="Install GitHub App on your account or organization"
                             >
                                 <Plus size={11} strokeWidth={3} /> Install on GitHub
@@ -151,7 +151,7 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
                                                 <Github size={12} strokeWidth={2} className={isSelected ? 'text-black' : 'text-neutral-400'} />
                                                 <span className="text-[12px] font-bold uppercase truncate">{r.full_name}</span>
                                                 {r.private && (
-                                                    <span className={`text-[9px] px-1 border font-bold uppercase ${isSelected ? 'border-black text-black' : 'border-neutral-600 text-neutral-500'}`}>
+                                                    <span className={`text-[11px] px-1 border font-bold uppercase ${isSelected ? 'border-black text-black' : 'border-neutral-600 text-neutral-500'}`}>
                                                         PRIVATE
                                                     </span>
                                                 )}
@@ -217,6 +217,21 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
                             </div>
                         </div>
                     )}
+                    {/* Local Webhook Forwarding Note */}
+                    <div className="p-3 bg-[#0B0E14] border-2 border-neutral-800 rounded-none font-mono text-[11px] text-neutral-400 space-y-1">
+                        <div className="flex items-center gap-1.5 text-[#FFE600] font-black uppercase">
+                            <span>⚡ Real-Time Webhook Setup (Localhost):</span>
+                        </div>
+                        <p>
+                            To receive GitHub&apos;s real-time events on localhost, forward webhooks via Smee or ngrok:
+                        </p>
+                        <div className="bg-black p-4 border border-neutral-800 text-neutral-300 font-mono text-[11px] select-all">
+                            npx smee -u &lt;your-smee-channel-url&gt; -t http://localhost:8000/github/webhook
+                        </div>
+                        <p className="text-neutral-500">
+                            Or click <strong className="text-neutral-300">[SYNC &amp; REVIEW PRS]</strong> on the Kanban board to immediately review PRs anytime!
+                        </p>
+                    </div>
                 </div>
 
                 {/* Footer */}

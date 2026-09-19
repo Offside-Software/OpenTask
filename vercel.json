@@ -2,9 +2,18 @@
   "version": 2,
   "buildCommand": "cd opentask-app && bun install && bun run build",
   "outputDirectory": "opentask-app/dist",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/github/(.*)",
       "destination": "/api/index.py"
     },
     {

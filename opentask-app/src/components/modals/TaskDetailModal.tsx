@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
 import type { Task, Bucket, ProjectMember, PrReview } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
@@ -115,6 +115,35 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 .finally(() => setLoadingReviews(false));
         }
     }, [task.id]);
+
+    const [triggeringReview, setTriggeringReview] = useState(false);
+    const [triggerError, setTriggerError] = useState<string | null>(null);
+
+    const handleTriggerReview = async () => {
+        const pId = task.project_id;
+        if (!pId || !task.id) return;
+        setTriggeringReview(true);
+        setTriggerError(null);
+        try {
+            const review = await prReviewService.triggerReview(pId, {
+                task_id: task.id,
+                repo_full_name: repoUrl ? repoUrl.replace('https://github.com/', '') : undefined,
+            });
+            showToast(`AI Code Review Completed: ${review.verdict}!`, review.verdict === 'PASS' ? 'success' : 'error');
+            const updated = await prReviewService.getTaskReviews(task.id);
+            setReviews(updated || []);
+            if (review.id) {
+                setExpandedReviewId(review.id);
+            }
+        } catch (err: any) {
+            console.error("Failed to trigger review", err);
+            const msg = err?.message || "Failed to trigger review. Ensure repo has open PR or branch matches.";
+            setTriggerError(msg);
+            showToast("Failed to run AI Code Review", "error");
+        } finally {
+            setTriggeringReview(false);
+        }
+    };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -275,17 +304,44 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                         {/* Gemini AI PR Reviews & Verdicts */}
                         <div>
-                            <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                                 <div className="flex items-center gap-2 text-white font-black text-[12px] uppercase">
                                     <ShieldCheck size={14} className="text-[#00FF66]" />
-                                    <h3>// GEMINI AI CODE REVIEWS</h3>
+                                    <h3>// AI CODE REVIEWS</h3>
                                 </div>
-                                {reviews.length > 0 && (
-                                    <span className="font-mono text-[10px] text-neutral-400 uppercase">
-                                        {reviews.length} REVIEW{reviews.length !== 1 ? 'S' : ''}
-                                    </span>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {reviews.length > 0 && (
+                                        <span className="font-mono text-[10px] text-neutral-400 uppercase">
+                                            {reviews.length} REVIEW{reviews.length !== 1 ? 'S' : ''}
+                                        </span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleTriggerReview}
+                                        disabled={triggeringReview}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black font-mono uppercase bg-[#FFE600] text-black border-2 border-black hover:bg-yellow-300 disabled:opacity-50 transition-all shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+                                        title="Immediately spawn Gemini Code Review for this task"
+                                    >
+                                        {triggeringReview ? (
+                                            <>
+                                                <Loader2 size={11} className="animate-spin" />
+                                                <span>EVALUATING...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles size={11} />
+                                                <span>RUN AI REVIEW</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
+
+                            {triggerError && (
+                                <div className="mb-2 p-2 bg-red-950/40 border-2 border-red-700 text-red-300 font-mono text-[11px]">
+                                    ⚠ {triggerError}
+                                </div>
+                            )}
 
                             <div className="bg-[#0B0E14] border-2 border-black rounded-none p-4 space-y-3 shadow-[2px_2px_0px_0px_#000000]">
                                 {loadingReviews ? (
@@ -294,8 +350,31 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                         <span>RETRIEVING AI VERDICTS...</span>
                                     </div>
                                 ) : reviews.length === 0 ? (
-                                    <div className="text-center py-3 text-neutral-500 font-mono text-[11px] uppercase">
-                                        // NO AI CODE REVIEWS YET. REVIEWS TRIGGER WHEN PRS ARE OPENED.
+                                    <div className="text-center py-4 space-y-2">
+                                        <div className="text-neutral-500 font-mono text-[11px] uppercase">
+                                            // NO AI CODE REVIEWS YET.
+                                        </div>
+                                        <p className="text-[11px] font-mono text-neutral-400 max-w-sm mx-auto">
+                                            Open a Pull Request on GitHub, or trigger immediate AI evaluation using the button below.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleTriggerReview}
+                                            disabled={triggeringReview}
+                                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black font-mono uppercase bg-[#FFE600] text-black border-2 border-black hover:bg-yellow-300 disabled:opacity-50 transition-all shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+                                        >
+                                            {triggeringReview ? (
+                                                <>
+                                                    <Loader2 size={12} className="animate-spin" />
+                                                    <span>RUNNING REVIEW...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles size={12} />
+                                                    <span>RUN AI CODE REVIEW NOW</span>
+                                                </>
+                                            )}
+                                        </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2.5">
