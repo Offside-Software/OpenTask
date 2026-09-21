@@ -24,6 +24,35 @@ export const taskService = {
     id: number | string,
     data: Partial<Task>,
   ): Promise<Task> => {
+    // Only send valid task schema fields and clean up empty strings
+    const payload: Record<string, unknown> = {};
+    
+    const allowedKeys: (keyof Task)[] = [
+      "title",
+      "description",
+      "bucket_id",
+      "project_id",
+      "lead_assignee_id",
+      "suggested_assignee_id",
+      "type",
+      "weight",
+      "branch_name",
+      "repo_url",
+      "order_idx",
+    ];
+
+
+    for (const key of allowedKeys) {
+      if (key in data) {
+        // Conver empty string IDs (e.g unassigned assignee) to null
+        let val = data[key];
+        if ((key === "lead_assignee_id" || key === "suggested_assignee_id" || key === "bucket_id") && val === "") {
+          val = null as any;
+        }
+        payload[key] = val;
+      }
+    }
+
     return await apiFetch<Task>(`/tasks/${id}`, {
       method: "PUT",
       body: JSONBig.stringify(data),

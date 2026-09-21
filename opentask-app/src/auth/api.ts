@@ -27,7 +27,8 @@ export interface GitHubUser {
 export async function fetchCurrentUser(): Promise<GitHubUser | null> {
     const resp = await fetch(resolveApiUrl('/api/auth/me'), { credentials: 'include' })
     if (resp.status === 401) return null
-    if (!resp.ok) throw new Error(`Unexpected response from /auth/me: ${resp.status}`)
+    if (!resp.ok) 
+        throw new Error(`Unexpected response from /auth/me: ${resp.status}`)
 
     try {
         const payload = await resp.json()

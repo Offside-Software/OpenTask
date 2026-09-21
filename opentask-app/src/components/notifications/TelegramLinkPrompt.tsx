@@ -65,7 +65,7 @@ export const TelegramLinkPrompt: React.FC<TelegramLinkPromptProps> = ({ onOpenSe
                                 LINK NOW <ArrowRight size={14} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
                             </button>
                             <a
-                                href="https://t.me/equilibra_notif_bot"
+                                href="https://t.me/OffsideOpenTaskBot"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-2.5 rounded-none bg-[#1E2227] border-2 border-black text-neutral-300 hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer"

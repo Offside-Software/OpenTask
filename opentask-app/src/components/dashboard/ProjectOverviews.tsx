@@ -214,10 +214,36 @@ export const ProjectOverviewPM: React.FC<ProjectOverviewProps> = ({ projectId })
                   <div key={m.id!}>
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-white font-mono text-[12px] font-bold uppercase tracking-wider">{m.label}</span>
-                      <Badge variant={m.status as "success" | "warning" | "critical" | "primary" | "default" | "outline"} className="!text-[8px] uppercase">{m.status}</Badge>
+                      <Badge
+                        variant={m.status as "success" | "warning" | "critical" | "primary" | "default" | "outline"}
+                        className="!text-[8px] uppercase">{m.status}
+                      </Badge>
                     </div>
                     <div className="flex items-end gap-2 mb-2">
-                      <span className="text-[32px] text-white font-mono font-black leading-none">{m.value.replace(/[^0-9]/g, '')}<span className="text-[14px] text-neutral-500 font-mono font-bold ml-1">{m.value.replace(/[0-9]/g, '')}</span></span>
+                      {m.value.includes('/') ? (
+                        // Handle ratio format like "28/34"
+                        (() => {
+                            const [completed, total] = m.value.split('/');
+                            return (
+                            <span className="text-[32px] text-white font-mono font-black leading-none">
+                              {completed}
+                              <span className="text-[14px] text-neutral-500 font-mono font-bold ml-1">
+                                {total}
+                              </span>
+                            </span>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-[32px] text-white font-mono font-black leading-none">
+                          {m.value.replace(/[^0-9]/g, '')}
+                          <span className="text-[14px] text-neutral-500 font-mono font-bold ml-1">
+                            {m.value.replace(/[0-9]/g, '')}
+                          </span>
+                        </span>
+                      )}
+
+                      
+
                     </div>
                     <ProgressBar value={m.progress} colorClass={m.status === 'critical' ? 'bg-[#EF4444]' : m.status === 'warning' ? 'bg-[#FFE600]' : 'bg-[#22C55E]'} label="" />
                     <p className="text-neutral-400 font-mono text-[10px] mt-1 font-bold uppercase">// {m.target_label}</p>
@@ -344,7 +370,7 @@ export const ProjectOverviewDev: React.FC<ProjectOverviewDevProps> = ({
   onUpdateTask
 }) => {
   const { user } = useAuth();
-  const { activity: activities } = useDashboard(projectId);
+  const { activities } = useDashboard(projectId);
   const { stats } = useUserProjectStats(projectId);
 
   const myUserId = user?.db_user?.id;

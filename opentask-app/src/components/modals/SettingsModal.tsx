@@ -200,7 +200,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             </div>
 
                             <a
-                                href="https://t.me/equilibra_notif_bot"
+                                href="https://t.me/OffsideOpenTaskBot"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center justify-between p-4 bg-[#141619] border-2 border-black rounded-none group hover:bg-[#FFE600] transition-all cursor-pointer shadow-[3px_3px_0px_0px_#000000]"
@@ -211,7 +211,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                     </div>
                                     <div>
                                         <span className="text-white group-hover:text-black text-[12px] font-black uppercase block">OPEN TELEGRAM BOT</span>
-                                        <span className="text-neutral-400 group-hover:text-black text-[10px]">@equilibra_notif_bot</span>
+                                        <span className="text-neutral-400 group-hover:text-black text-[10px]">@OffsideOpenTaskBot</span>
                                     </div>
                                 </div>
                                 <ExternalLink size={14} className="text-neutral-400 group-hover:text-black transition-colors" />

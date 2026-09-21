@@ -270,7 +270,7 @@ async def on_pr_comment_created(payload: dict, event: str, pool=None):
 
     # Check for on-demand review trigger command in comment: /review, !review, @opentask review
     cmd = comment_body.strip().lower()
-    if any(trigger in cmd for trigger in ("/review", "!review", "@opentask review", "@openequilibra review")):
+    if any(trigger in cmd for trigger in ("/review", "!review", "@opentask review")):
         logger.info(f"⚡ [WEBHOOK] Comment command '{comment_body.strip()[:30]}' detected on PR #{pr_number}. Triggering on-demand AI review...")
         from services.pr_evaluator import process_task_aware_pr_evaluation
         if installation_id and repo_full_name and pr_number:

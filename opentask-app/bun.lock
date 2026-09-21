@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "equilibra",
+      "name": "opentask",
       "dependencies": {
         "json-bigint": "^1.0.0",
         "lucide-react": "^0.575.0",
