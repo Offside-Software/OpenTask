@@ -8,7 +8,7 @@ use serde::Deserialize;
 use serde_json::json;
 use sqlx::Row;
 
-use crate::error::AppError;
+use crate::{error::AppError, models::task::TaskUpdatePayload};
 use crate::models::safe_id::SafeId;
 use crate::models::task::{BatchReviewPayload, DatabaseTask, TaskReorderPayload};
 use crate::routes::auth::AppState;
@@ -199,7 +199,7 @@ pub async fn get_task(
 pub async fn update_task(
     State(state): State<AppState>,
     Path(task_id): Path<SafeId>,
-    Json(payload): Json<DatabaseTask>,
+    Json(payload): Json<TaskUpdatePayload>,
 ) -> Result<Json<DatabaseTask>, AppError> {
     let row = sqlx::query_as::<_, DatabaseTask>(
         r#"

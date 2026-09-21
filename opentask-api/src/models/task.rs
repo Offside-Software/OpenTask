@@ -25,6 +25,21 @@ pub struct DatabaseTask {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct TaskUpdatePayload {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub task_type: Option<String>,
+    pub weight: Option<i32>,
+    pub bucket_id: Option<SafeId>,
+    pub lead_assignee_id: Option<SafeId>,
+    pub suggested_assignee_id: Option<SafeId>,
+    pub branch_name: Option<String>,
+    pub repo_url: Option<String>,
+    pub order_idx: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct TaskReviewItem {
     pub title: String,
     pub description: Option<String>,
