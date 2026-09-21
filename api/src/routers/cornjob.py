@@ -78,7 +78,7 @@ def run_stagnation_radar():
         project_id = task["project_id"]
         assignee_id = task.get("lead_assignee_id")
         
-        print(f"⚠️ Stagnation detected on Task ID {task_id}")
+        print(f"Stagnation detected on Task ID {task_id}")
 
         # 3. NUDGE THE DEVELOPER (via Telegram)
         if assignee_id and settings.telegram_bot_token:
@@ -86,7 +86,7 @@ def run_stagnation_radar():
             if user_res.data and user_res.data[0].get("telegram_chat_id"):
                 chat_id = user_res.data[0]["telegram_chat_id"]
                 pesan = (
-                    f"🔔 *STAGNATION RADAR ALERT*\n\n"
+                    f"*STAGNATION RADAR ALERT*\n\n"
                     f"Task: *{task.get('title')}*\n"
                     f"No activity detected in the last 48 hours.\n\n"
                     f"Please update the GitHub branch or the task will be proposed for reallocation."

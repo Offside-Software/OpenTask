@@ -15,6 +15,7 @@ export function resolveApiUrl(endpoint: string): string {
   if (cleanEndpoint.startsWith("/api/")) {
     return cleanEndpoint;
   }
+
   return `/api${cleanEndpoint}`;
 }
 

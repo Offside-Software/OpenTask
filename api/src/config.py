@@ -11,8 +11,6 @@ _API_DIR = Path(__file__).parent.parent
 
 # Discover any existing env file
 _env_candidates = [
-    _API_DIR / ".env",
-    _API_DIR / ".env.local",
     _REPO_ROOT / ".env",
     _REPO_ROOT / ".env.local",
 ]
