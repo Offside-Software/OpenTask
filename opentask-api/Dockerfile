@@ -1,6 +1,6 @@
 # Multi-stage Docker build for OpenTask Rust Tokio API
 # Stage 1: Build binary
-FROM rust:1.98.1-bookworm AS builder
+FROM rust:bookworm AS builder
 
 WORKDIR /usr/src/opentask-api
 
