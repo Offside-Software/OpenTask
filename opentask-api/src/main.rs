@@ -19,10 +19,7 @@ use crate::routes::auth::AppState;
 async fn main() -> anyhow::Result<()> {
     // 1. Initialize logging
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "opentask_api=debug,tower_http=info".into()),
-        )
+        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "opentask_api=debug,tower_http=info".into()))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
@@ -67,13 +64,20 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(tower_http::cors::AllowMethods::mirror_request())
         .allow_headers(tower_http::cors::AllowHeaders::mirror_request());
 
-    // 6. Build Axum Router
+    // 6. Build Axum Router with HTTP Request/Response Logging
     let app_state = AppState {
         pool: pool.clone(),
         config: config.clone(),
     };
 
+    let trace_layer = tower_http::trace::TraceLayer::new_for_http()
+        .make_span_with(tower_http::trace::DefaultMakeSpan::new().level(tracing::Level::INFO))
+        .on_request(tower_http::trace::DefaultOnRequest::new().level(tracing::Level::INFO))
+        .on_response(tower_http::trace::DefaultOnResponse::new().level(tracing::Level::INFO))
+        .on_failure(tower_http::trace::DefaultOnFailure::new().level(tracing::Level::ERROR));
+
     let app = routes::build_router(app_state)
+        .layer(trace_layer)
         .layer(cors)
         .layer(Extension(pool));
 

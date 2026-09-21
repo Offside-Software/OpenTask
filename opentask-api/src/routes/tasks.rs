@@ -1,8 +1,8 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -54,10 +54,12 @@ pub async fn create_task(
 
     // If bucket_id is None, default to DRAFT bucket
     if target_bucket_id.is_none() {
-        let draft_row = sqlx::query("SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;")
-            .bind(project_id.0)
-            .fetch_optional(&state.pool)
-            .await?;
+        let draft_row = sqlx::query(
+            "SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;",
+        )
+        .bind(project_id.0)
+        .fetch_optional(&state.pool)
+        .await?;
 
         target_bucket_id = draft_row.and_then(|r| r.try_get::<i64, _>("id").ok());
     }
@@ -65,10 +67,12 @@ pub async fn create_task(
     let b_id = target_bucket_id
         .ok_or_else(|| AppError::BadRequest("No valid bucket found for task".to_string()))?;
 
-    let max_idx_row = sqlx::query("SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.tasks WHERE bucket_id = $1;")
-        .bind(b_id)
-        .fetch_one(&state.pool)
-        .await?;
+    let max_idx_row = sqlx::query(
+        "SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.tasks WHERE bucket_id = $1;",
+    )
+    .bind(b_id)
+    .fetch_one(&state.pool)
+    .await?;
     let max_idx: i32 = max_idx_row.try_get("max_idx").unwrap_or(-1);
 
     let order_idx = payload.order_idx.unwrap_or(max_idx + 1);
@@ -118,6 +122,28 @@ pub async fn create_task(
         })),
     )
     .await;
+
+    if let Some(assignee) = row.lead_assignee_id.as_ref() {
+        let pool = state.pool.clone();
+        let config = state.config.clone();
+        let task_title = row.title.clone();
+        let pid = project_id.0;
+        let tid = task_id;
+        let aid = assignee.0;
+        tokio::spawn(async move {
+            crate::services::notifications::notify_task_assigned(
+                &pool,
+                &config,
+                &task_title,
+                aid,
+                pid,
+                None,
+                Some(tid),
+                None,
+            )
+            .await;
+        });
+    }
 
     Ok(Json(row))
 }
@@ -212,8 +238,16 @@ pub async fn update_task(
     .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
 
     if let Some(pid) = row.project_id {
-        let action = if payload.bucket_id.is_some() { "moved" } else { "updated" };
-        let event_type = if payload.bucket_id.is_some() { "TASK_MOVED" } else { "TASK_UPDATED" };
+        let action = if payload.bucket_id.is_some() {
+            "moved"
+        } else {
+            "updated"
+        };
+        let event_type = if payload.bucket_id.is_some() {
+            "TASK_MOVED"
+        } else {
+            "TASK_UPDATED"
+        };
         let _ = crate::routes::activities::record_project_event(
             &state.pool,
             pid.0,
@@ -227,6 +261,62 @@ pub async fn update_task(
             None,
         )
         .await;
+    }
+
+    // Trigger notification if assignee was updated
+    if let Some(assignee) = payload.lead_assignee_id {
+        let pool = state.pool.clone();
+        let config = state.config.clone();
+        let task_title = row.title.clone();
+        let pid = row.project_id.map(|p| p.0).unwrap_or(0);
+        let tid = task_id.0;
+        let aid = assignee.0;
+        tokio::spawn(async move {
+            crate::services::notifications::notify_task_assigned(
+                &pool,
+                &config,
+                &task_title,
+                aid,
+                pid,
+                None,
+                Some(tid),
+                None,
+            )
+            .await;
+        });
+    }
+
+    // Trigger notification if task moved to a completed bucket
+    if let Some(b_id) = payload.bucket_id {
+        let pool = state.pool.clone();
+        let config = state.config.clone();
+        let task_title = row.title.clone();
+        let pid = row.project_id.map(|p| p.0).unwrap_or(0);
+        let tid = task_id.0;
+        let aid = row.lead_assignee_id.as_ref().map(|l| l.0);
+        tokio::spawn(async move {
+            if let Ok(Some(b_row)) = sqlx::query("SELECT title FROM opentask.buckets WHERE id = $1 LIMIT 1;")
+                .bind(b_id.0)
+                .fetch_optional(&pool)
+                .await
+            {
+                let b_name: String = b_row.try_get("title").unwrap_or_default();
+                let lower = b_name.to_lowercase();
+                if lower.contains("done") || lower.contains("complete") || lower.contains("finish") {
+                    crate::services::notifications::notify_task_completed(
+                        &pool,
+                        &config,
+                        &task_title,
+                        pid,
+                        None,
+                        Some(tid),
+                        aid,
+                        None,
+                    )
+                    .await;
+                }
+            }
+        });
     }
 
     Ok(Json(row))
@@ -251,7 +341,10 @@ pub async fn delete_task(
     }
 
     if let Some(t) = task_info {
-        if let (Ok(pid), Ok(title)) = (t.try_get::<i64, _>("project_id"), t.try_get::<String, _>("title")) {
+        if let (Ok(pid), Ok(title)) = (
+            t.try_get::<i64, _>("project_id"),
+            t.try_get::<String, _>("title"),
+        ) {
             let _ = crate::routes::activities::record_project_event(
                 &state.pool,
                 pid,
@@ -275,11 +368,12 @@ pub async fn redirect_task(
     State(state): State<AppState>,
     Path(task_id): Path<SafeId>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let row = sqlx::query("SELECT project_id, bucket_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
-        .bind(task_id.0)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
+    let row =
+        sqlx::query("SELECT project_id, bucket_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
+            .bind(task_id.0)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
 
     let pid: Option<i64> = row.try_get("project_id").ok();
     let bid: Option<i64> = row.try_get("bucket_id").ok();
@@ -319,24 +413,54 @@ pub async fn search_tasks(
 
 pub async fn reorder_tasks(
     State(state): State<AppState>,
-    Path((_project_id, target_bucket_id)): Path<(SafeId, SafeId)>,
+    Path((project_id, target_bucket_id)): Path<(SafeId, SafeId)>,
     Json(payload): Json<TaskReorderPayload>,
-) -> Result<StatusCode, AppError> {
-    let mut tx = state.pool.begin().await?;
+) -> Result<Json<serde_json::Value>, AppError> {
+    let items: Vec<(SafeId, i32, i64)> = match payload {
+        TaskReorderPayload::List(ids) => ids
+            .into_iter()
+            .enumerate()
+            .map(|(idx, id)| (id, idx as i32, target_bucket_id.0))
+            .collect(),
+        TaskReorderPayload::Object { tasks } => tasks
+            .into_iter()
+            .map(|item| {
+                let b_id = item.bucket_id.map(|b| b.0).unwrap_or(target_bucket_id.0);
+                (item.id, item.order_idx, b_id)
+            })
+            .collect(),
+    };
 
-    for item in payload.tasks {
-        let b_id = item.bucket_id.map(|b| b.0).unwrap_or(target_bucket_id.0);
-        sqlx::query("UPDATE opentask.tasks SET order_idx = $1, bucket_id = $2, updated_at = NOW() WHERE id = $3;")
-            .bind(item.order_idx)
-            .bind(b_id)
-            .bind(item.id.0)
-            .execute(&mut *tx)
-            .await?;
+    let mut tx = state.pool.begin().await?;
+    let mut ordered_ids = Vec::with_capacity(items.len());
+
+    for (t_id, order_idx, b_id) in &items {
+        ordered_ids.push(t_id.to_string());
+        sqlx::query(
+            "UPDATE opentask.tasks SET order_idx = $1, bucket_id = $2, updated_at = NOW() WHERE id = $3 AND project_id = $4;"
+        )
+        .bind(order_idx)
+        .bind(b_id)
+        .bind(t_id.0)
+        .bind(project_id.0)
+        .execute(&mut *tx)
+        .await?;
     }
 
     tx.commit().await?;
 
-    Ok(StatusCode::OK)
+    tracing::info!(
+        "Reordered {} tasks for project {} into bucket {}",
+        items.len(),
+        project_id,
+        target_bucket_id
+    );
+
+    Ok(Json(json!({
+        "status": "success",
+        "order": ordered_ids,
+        "bucket_id": target_bucket_id
+    })))
 }
 
 pub async fn batch_review_tasks(
@@ -346,25 +470,35 @@ pub async fn batch_review_tasks(
     let mut tx = state.pool.begin().await?;
 
     // 1. Lock the alert row FOR UPDATE to guard against double-processing
-    let alert_row = sqlx::query("SELECT is_resolved FROM opentask.alerts WHERE id = $1 FOR UPDATE;")
-        .bind(payload.alert_id.0)
-        .fetch_optional(&mut *tx)
-        .await?;
+    let alert_row =
+        sqlx::query("SELECT is_resolved FROM opentask.alerts WHERE id = $1 FOR UPDATE;")
+            .bind(payload.alert_id.0)
+            .fetch_optional(&mut *tx)
+            .await?;
 
     let is_resolved = match alert_row {
         Some(a) => a.try_get::<bool, _>("is_resolved").unwrap_or(false),
-        None => return Err(AppError::NotFound(format!("Alert {} not found", payload.alert_id))),
+        None => {
+            return Err(AppError::NotFound(format!(
+                "Alert {} not found",
+                payload.alert_id
+            )));
+        }
     };
 
     if is_resolved {
-        return Err(AppError::Conflict("Alert has already been resolved".to_string()));
+        return Err(AppError::Conflict(
+            "Alert has already been resolved".to_string(),
+        ));
     }
 
     // 2. Resolve default DRAFT bucket
-    let bucket_row = sqlx::query("SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;")
-        .bind(payload.project_id.0)
-        .fetch_optional(&mut *tx)
-        .await?;
+    let bucket_row = sqlx::query(
+        "SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;",
+    )
+    .bind(payload.project_id.0)
+    .fetch_optional(&mut *tx)
+    .await?;
 
     let bucket_id: i64 = bucket_row
         .and_then(|r| r.try_get::<i64, _>("id").ok())

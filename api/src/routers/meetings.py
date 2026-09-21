@@ -369,7 +369,7 @@ async def invite_meeting_bot(
     
     payload = {
         "meeting_url": meeting_url,
-        "bot_name": "Equilibra AI Bot",
+        "bot_name": "OpenTask AI Bot",
         "metadata": {
             "user_uuid": user_uuid,
             "project_id": project_id

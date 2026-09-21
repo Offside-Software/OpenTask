@@ -1,8 +1,8 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -11,7 +11,9 @@ use sqlx::Row;
 use crate::error::AppError;
 use crate::extractors::auth::OptionalCurrentUser;
 use crate::models::bucket::DatabaseBucket;
-use crate::models::project::{BoardResponse, DatabaseProject, ProjectApiKeyResponse, ProjectMember};
+use crate::models::project::{
+    BoardResponse, DatabaseProject, ProjectApiKeyResponse, ProjectMember,
+};
 use crate::models::safe_id::SafeId;
 use crate::models::task::DatabaseTask;
 use crate::routes::auth::AppState;
@@ -41,10 +43,15 @@ pub fn router() -> Router<AppState> {
             get(get_project).put(update_project).delete(delete_project),
         )
         .route("/projects/{project_id}/board", get(get_project_board))
-        .route("/projects/{project_id}/dashboard", get(get_project_dashboard))
+        .route(
+            "/projects/{project_id}/dashboard",
+            get(get_project_dashboard),
+        )
         .route(
             "/projects/{project_id}/api-key",
-            get(get_project_api_key).post(create_project_api_key).delete(delete_project_api_key),
+            get(get_project_api_key)
+                .post(create_project_api_key)
+                .delete(delete_project_api_key),
         )
         .route(
             "/projects/{project_id}/members",
@@ -222,7 +229,9 @@ pub async fn delete_project(
         .await?;
 
     if res.rows_affected() == 0 {
-        return Err(AppError::NotFound(format!("Project {project_id} not found")));
+        return Err(AppError::NotFound(format!(
+            "Project {project_id} not found"
+        )));
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -294,10 +303,11 @@ pub async fn get_project_dashboard(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let total_tasks_row = sqlx::query("SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = $1;")
-        .bind(project_id.0)
-        .fetch_one(&state.pool)
-        .await?;
+    let total_tasks_row =
+        sqlx::query("SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = $1;")
+            .bind(project_id.0)
+            .fetch_one(&state.pool)
+            .await?;
     let total_tasks: i64 = total_tasks_row.try_get("count").unwrap_or(0);
 
     let completed_tasks_row = sqlx::query(
@@ -306,17 +316,18 @@ pub async fn get_project_dashboard(
         FROM opentask.tasks t
         JOIN opentask.buckets b ON t.bucket_id = b.id
         WHERE t.project_id = $1 AND b.state = 'COMPLETED';
-        "#
+        "#,
     )
     .bind(project_id.0)
     .fetch_one(&state.pool)
     .await?;
     let completed_tasks: i64 = completed_tasks_row.try_get("count").unwrap_or(0);
 
-    let members_count_row = sqlx::query("SELECT COUNT(*) as count FROM opentask.project_member WHERE project_id = $1;")
-        .bind(project_id.0)
-        .fetch_one(&state.pool)
-        .await?;
+    let members_count_row =
+        sqlx::query("SELECT COUNT(*) as count FROM opentask.project_member WHERE project_id = $1;")
+            .bind(project_id.0)
+            .fetch_one(&state.pool)
+            .await?;
     let members_count: i64 = members_count_row.try_get("count").unwrap_or(0);
 
     Ok(Json(json!({
@@ -351,7 +362,11 @@ pub async fn create_project_api_key(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<ProjectApiKeyResponse>, AppError> {
-    let generated = format!("opk_{:x}{:x}", rand::random::<u128>(), rand::random::<u128>());
+    let generated = format!(
+        "opk_{:x}{:x}",
+        rand::random::<u128>(),
+        rand::random::<u128>()
+    );
 
     sqlx::query("UPDATE opentask.projects SET api_key = $1, updated_at = NOW() WHERE id = $2;")
         .bind(&generated)
@@ -418,7 +433,11 @@ pub async fn add_project_member(
 
     let uid = match resolved_user_id {
         Some(id) => id,
-        None => return Err(AppError::BadRequest("user_id or valid gh_username is required".to_string())),
+        None => {
+            return Err(AppError::BadRequest(
+                "user_id or valid gh_username is required".to_string(),
+            ));
+        }
     };
 
     let row = sqlx::query_as::<_, ProjectMember>(

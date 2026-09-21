@@ -24,4 +24,7 @@ jsonwebtoken = "9"
 regex = "1.10"
 rand = "0.10.3"
 async-trait = "0.1.92"
+web-push-native = "0.5.0"
+base64ct = { version = "1.8", features = ["alloc"] }
+
 

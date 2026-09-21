@@ -19,10 +19,13 @@ pub struct DatabaseBucket {
 #[derive(Debug, Clone, Deserialize)]
 pub struct BucketReorderItem {
     pub id: SafeId,
+    #[serde(default)]
     pub order_idx: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct BucketReorderPayload {
-    pub buckets: Vec<BucketReorderItem>,
+#[serde(untagged)]
+pub enum BucketReorderPayload {
+    Object { buckets: Vec<BucketReorderItem> },
+    List(Vec<SafeId>),
 }

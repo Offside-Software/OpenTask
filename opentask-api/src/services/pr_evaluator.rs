@@ -170,6 +170,32 @@ pub async fn evaluate_pull_request(
         .send()
         .await;
 
-    tracing::info!("PR review completed and posted for {repo_full_name}#{pr_number}");
+    // 10. Dispatch Web Push notification and persistent in-app alert
+    let mut assignee_id = None;
+    if let Some(tid) = matched_id {
+        if let Ok(Some(t_row)) = sqlx::query("SELECT lead_assignee_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
+            .bind(tid)
+            .fetch_optional(pool)
+            .await
+        {
+            assignee_id = t_row.try_get::<Option<i64>, _>("lead_assignee_id").ok().flatten();
+        }
+    }
+
+    crate::services::notifications::notify_pr_reviewed(
+        pool,
+        config,
+        &pr_title,
+        assignee_id,
+        &verdict,
+        &pr_html_url,
+        pr_number as u64,
+        project_id,
+        None,
+        matched_id,
+    )
+    .await;
+
+    tracing::info!("PR review completed and notifications dispatched for {}#{}", repo_full_name, pr_number);
     Ok(())
 }

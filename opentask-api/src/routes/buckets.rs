@@ -170,20 +170,44 @@ pub async fn delete_bucket(
 
 pub async fn reorder_buckets(
     State(state): State<AppState>,
-    Path(_project_id): Path<SafeId>,
+    Path(project_id): Path<SafeId>,
     Json(payload): Json<BucketReorderPayload>,
-) -> Result<StatusCode, AppError> {
-    let mut tx = state.pool.begin().await?;
+) -> Result<Json<serde_json::Value>, AppError> {
+    let items: Vec<(SafeId, i32)> = match payload {
+        BucketReorderPayload::List(ids) => ids
+            .into_iter()
+            .enumerate()
+            .map(|(idx, id)| (id, idx as i32))
+            .collect(),
+        BucketReorderPayload::Object { buckets } => buckets
+            .into_iter()
+            .map(|item| (item.id, item.order_idx))
+            .collect(),
+    };
 
-    for item in payload.buckets {
-        sqlx::query("UPDATE opentask.buckets SET order_idx = $1, updated_at = NOW() WHERE id = $2;")
-            .bind(item.order_idx)
-            .bind(item.id.0)
+    let mut tx = state.pool.begin().await?;
+    let mut ordered_ids = Vec::with_capacity(items.len());
+
+    for (b_id, order_idx) in &items {
+        ordered_ids.push(b_id.to_string());
+        sqlx::query("UPDATE opentask.buckets SET order_idx = $1, updated_at = NOW() WHERE id = $2 AND project_id = $3;")
+            .bind(order_idx)
+            .bind(b_id.0)
+            .bind(project_id.0)
             .execute(&mut *tx)
             .await?;
     }
 
     tx.commit().await?;
 
-    Ok(StatusCode::OK)
+    tracing::info!(
+        "Reordered {} buckets for project {}",
+        items.len(),
+        project_id
+    );
+
+    Ok(Json(serde_json::json!({
+        "status": "success",
+        "order": ordered_ids
+    })))
 }

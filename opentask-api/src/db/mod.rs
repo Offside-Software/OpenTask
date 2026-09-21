@@ -66,7 +66,7 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
         r#"
         CREATE TABLE IF NOT EXISTS opentask.push_subscriptions (
             id BIGINT PRIMARY KEY,
-            user_id BIGINT NOT NULL,
+            user_id BIGINT,
             endpoint TEXT NOT NULL UNIQUE,
             p256dh TEXT NOT NULL,
             auth TEXT NOT NULL,
@@ -74,7 +74,26 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW()
         );
+        ALTER TABLE opentask.push_subscriptions ALTER COLUMN user_id DROP NOT NULL;
+        ALTER TABLE opentask.push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_fkey;
         CREATE INDEX IF NOT EXISTS idx_push_subs_user_id ON opentask.push_subscriptions(user_id);
+
+        CREATE TABLE IF NOT EXISTS opentask.alerts (
+            id BIGINT PRIMARY KEY,
+            user_id BIGINT,
+            context_id BIGINT,
+            project_id BIGINT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            type TEXT NOT NULL,
+            severity TEXT NOT NULL DEFAULT 'info',
+            suggested_actions TEXT[] DEFAULT '{}',
+            is_resolved BOOLEAN DEFAULT FALSE,
+            pr_url TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_alerts_user_id ON opentask.alerts(user_id);
         "#,
     )
     .execute(pool)

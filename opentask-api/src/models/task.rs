@@ -44,11 +44,14 @@ pub struct BatchReviewPayload {
 #[derive(Debug, Clone, Deserialize)]
 pub struct TaskReorderItem {
     pub id: SafeId,
+    #[serde(default)]
     pub order_idx: i32,
     pub bucket_id: Option<SafeId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct TaskReorderPayload {
-    pub tasks: Vec<TaskReorderItem>,
+#[serde(untagged)]
+pub enum TaskReorderPayload {
+    Object { tasks: Vec<TaskReorderItem> },
+    List(Vec<SafeId>),
 }

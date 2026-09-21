@@ -150,3 +150,86 @@ fn test_timeline_data_serialization() {
     assert!(json_str.contains(r#""label":"Sep 20""#));
     assert!(json_str.contains(r#""avatar_url":"https://github.com/dev-lead.png?size=64""#));
 }
+
+#[test]
+fn test_reorder_payload_deserialization() {
+    use opentask_api::models::task::TaskReorderPayload;
+    use opentask_api::models::bucket::BucketReorderPayload;
+
+    // 1. Raw array of task ID strings (as sent by frontend JSONBig.stringify(taskIds))
+    let raw_task_ids = r#"["93970560257626112", "93970560257626113"]"#;
+    let parsed_tasks: TaskReorderPayload = serde_json::from_str(raw_task_ids).expect("Failed to deserialize task list");
+    match parsed_tasks {
+        TaskReorderPayload::List(ids) => {
+            assert_eq!(ids.len(), 2);
+            assert_eq!(ids[0].0, 93970560257626112i64);
+            assert_eq!(ids[1].0, 93970560257626113i64);
+        }
+        _ => panic!("Expected TaskReorderPayload::List"),
+    }
+
+    // 2. Object format with tasks array
+    let obj_tasks = r#"{"tasks": [{"id": "93970560257626112", "order_idx": 0}]}"#;
+    let parsed_obj: TaskReorderPayload = serde_json::from_str(obj_tasks).expect("Failed to deserialize task obj");
+    match parsed_obj {
+        TaskReorderPayload::Object { tasks } => {
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].id.0, 93970560257626112i64);
+            assert_eq!(tasks[0].order_idx, 0);
+        }
+        _ => panic!("Expected TaskReorderPayload::Object"),
+    }
+
+    // 3. Raw array of bucket ID strings
+    let raw_bucket_ids = r#"["1001", "1002"]"#;
+    let parsed_buckets: BucketReorderPayload = serde_json::from_str(raw_bucket_ids).expect("Failed to deserialize bucket list");
+    match parsed_buckets {
+        BucketReorderPayload::List(ids) => {
+            assert_eq!(ids.len(), 2);
+            assert_eq!(ids[0].0, 1001);
+            assert_eq!(ids[1].0, 1002);
+        }
+        _ => panic!("Expected BucketReorderPayload::List"),
+    }
+}
+
+#[test]
+fn test_vapid_key_and_message_building() {
+    use base64ct::{Base64UrlUnpadded, Encoding as _};
+    use web_push_native::{
+        jwt_simple::algorithms::ES256KeyPair, p256::PublicKey, Auth, WebPushBuilder,
+    };
+
+    let vapid_private_raw = "u9WEYzZFke7f46Kkv5q98geTM08rAYQP8evwPxBp6G4";
+    let priv_bytes = Base64UrlUnpadded::decode_vec(vapid_private_raw.trim_end_matches('='))
+        .expect("Failed to decode VAPID private key");
+    assert_eq!(priv_bytes.len(), 32);
+
+    let key_pair = ES256KeyPair::from_bytes(&priv_bytes)
+        .expect("Failed to create ES256KeyPair from private bytes");
+
+    let p256dh_raw = "BLn9b-VR0ca83knDNZ32dCHGyjJp-1riX9ZTN40MqV8K_LpQmLqxC_DoHvqvFXO_nGdAB4W9dogZb_sM-uV4JbY";
+    let p256dh_bytes = Base64UrlUnpadded::decode_vec(p256dh_raw.trim_end_matches('='))
+        .expect("Failed to decode p256dh");
+    let pub_key = PublicKey::from_sec1_bytes(&p256dh_bytes)
+        .expect("Failed to parse PublicKey from SEC1");
+
+    let auth_raw = "_ordMnz7uTCmrpBTeUV4Bw";
+    let auth_bytes = Base64UrlUnpadded::decode_vec(auth_raw.trim_end_matches('='))
+        .expect("Failed to decode auth");
+    let mut auth_arr = [0u8; 16];
+    auth_arr.copy_from_slice(&auth_bytes);
+    let auth = Auth::from(auth_arr);
+
+    let endpoint: axum::http::Uri = "https://fcm.googleapis.com/fcm/send/fake-endpoint".parse().unwrap();
+
+    let builder = WebPushBuilder::new(endpoint, pub_key, auth)
+        .with_vapid(&key_pair, "mailto:evangelionxyz10@gmail.com");
+
+    let http_req = builder.build(r#"{"title":"Test","body":"Hello World"}"#)
+        .expect("Failed to build HTTP push request");
+
+    assert_eq!(http_req.method(), axum::http::Method::POST);
+    assert!(http_req.headers().contains_key("authorization"));
+    assert!(http_req.headers().contains_key("content-encoding"));
+}

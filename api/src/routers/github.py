@@ -75,7 +75,7 @@ def list_github_installations():
                 "account_login": inst["account"]["login"],
                 "account_type": inst["account"]["type"],
                 "account_avatar_url": inst["account"]["avatar_url"],
-                "app_install_url": f"https://github.com/apps/{inst.get('app_slug', 'openequilibra')}/installations/new",
+                "app_install_url": f"https://github.com/apps/{inst.get('app_slug', 'opentask')}/installations/new",
             }
             for inst in installations
         ]
