@@ -344,7 +344,7 @@ export const ProjectOverviewDev: React.FC<ProjectOverviewDevProps> = ({
   onUpdateTask
 }) => {
   const { user } = useAuth();
-  const { activity: activities } = useDashboard(projectId);
+  const { activities } = useDashboard(projectId);
   const { stats } = useUserProjectStats(projectId);
 
   const myUserId = user?.db_user?.id;

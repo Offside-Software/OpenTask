@@ -5,10 +5,9 @@ use axum::{
     routing::{get, post},
 };
 use serde::Deserialize;
-use serde_json::json;
 use sqlx::Row;
 
-use crate::error::AppError;
+use crate::{error::AppError, models::{history::DatabaseActivity, project::{ProjectDashboardMetric, ProjectDashboardResponse}}};
 use crate::extractors::auth::OptionalCurrentUser;
 use crate::models::bucket::DatabaseBucket;
 use crate::models::project::{
@@ -302,40 +301,168 @@ pub async fn get_project_board(
 pub async fn get_project_dashboard(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let total_tasks_row =
-        sqlx::query("SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = $1;")
-            .bind(project_id.0)
-            .fetch_one(&state.pool)
-            .await?;
-    let total_tasks: i64 = total_tasks_row.try_get("count").unwrap_or(0);
+) -> Result<Json<ProjectDashboardResponse>, AppError> {
 
-    let completed_tasks_row = sqlx::query(
+    // 1. Fetch project mebers with user info
+    let mut members = sqlx::query_as::<_, ProjectMember>(
         r#"
-        SELECT COUNT(*) as count
-        FROM opentask.tasks t
-        JOIN opentask.buckets b ON t.bucket_id = b.id
-        WHERE t.project_id = $1 AND b.state = 'COMPLETED';
-        "#,
-    )
-    .bind(project_id.0)
-    .fetch_one(&state.pool)
-    .await?;
-    let completed_tasks: i64 = completed_tasks_row.try_get("count").unwrap_or(0);
+            SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load,
+                COALESCE(pm.gh_username, u.gh_username) as gh_username,
+                u.display_name,
+                CASE
+                    WHEN COALESCE(pm.gh_username, u.gh_username) IS NOT NULL
+                    THEN 'https://github.com/' || COALESCE(pm.gh_username, u.gh_username) || '.png?size=64'
+                    ELSE NULL
+                END as avatar_url,
+                0::BIGINT as task_count,
+                0::BIGINT as task_point
+            FROM opentask.project_member pm
+            LEFT JOIN opentask.users u ON pm.user_id = u.id
+            WHERE pm.project_id = $1
+            ORDER BY pm.id ASC;
+            "#
+        )
+        .bind(project_id.0)
+        .fetch_all(&state.pool)
+        .await?;
 
-    let members_count_row =
-        sqlx::query("SELECT COUNT(*) as count FROM opentask.project_member WHERE project_id = $1;")
-            .bind(project_id.0)
-            .fetch_one(&state.pool)
-            .await?;
-    let members_count: i64 = members_count_row.try_get("count").unwrap_or(0);
+    // 2. Fetch tasks to calculate workload per member
+    struct TaskWorkload {
+        lead_assignee_id: Option<SafeId>,
+        weight: i32,
+        bucket_state: Option<String>,
+    }
 
-    Ok(Json(json!({
-        "project_id": project_id,
-        "total_tasks": total_tasks,
-        "completed_tasks": completed_tasks,
-        "active_members": members_count,
-    })))
+    let task_rows = sqlx::query(
+        r#"
+            SELECT t.id, t.lead_assignee_id, COALESCE(t.weight, 3) AS weight, b.state AS bucket_state
+            FROM opentask.tasks t
+            LEFT JOIN opentask.buckets b ON t.bucket_id = b.id
+            WHERE t.project_id = $1
+            "#
+        )
+        .bind(project_id.0)
+        .fetch_all(&state.pool)
+        .await?;
+
+
+    let tasks: Vec<TaskWorkload> = task_rows
+        .into_iter()
+        .map(|r| TaskWorkload {
+            lead_assignee_id: r.try_get::<Option<i64>, _>("lead_assignee_id").ok().flatten().map(SafeId),
+            weight: r.try_get::<i32, _>("weight").unwrap_or(3),
+            bucket_state: r.try_get::<Option<String>, _>("bucket_state").ok().flatten(),
+        })
+        .collect();
+
+    // Active (non-completed) assigned tasks vs all assigned tasks fallback
+    let active_tasks: Vec<&TaskWorkload> = tasks
+        .iter()
+        .filter(|t| t.lead_assignee_id.is_some()  && t.bucket_state.as_deref() != Some("COMPLETED"))
+        .collect();
+
+
+    let candidate_tasks: Vec<&TaskWorkload> = if !active_tasks.is_empty() {
+        active_tasks
+    } else {
+        tasks
+        .iter()
+        .filter(|t| t.lead_assignee_id.is_some())
+        .collect()
+    };
+
+    let total_weight: i64 = candidate_tasks
+        .iter()
+        .map(|t| t.weight as i64)
+        .sum();
+
+    // 3. Compute workload per member and update DB
+    for m in &mut members {
+        let m_tasks: Vec<&&TaskWorkload> = candidate_tasks
+            .iter()
+            .filter(|t| t.lead_assignee_id == Some(m.user_id))
+            .collect();
+
+        let m_weight: i64 = m_tasks.iter().map(|t| t.weight as i64).sum();
+        let m_count = m_tasks.len() as i64;
+
+        let calc_load = if total_weight > 0 {
+            ((m_weight as f64 / total_weight as f64) * 100.0).round() as i32
+        } else {
+            0
+        };
+
+        m.current_load = Some(calc_load);
+        m.task_count = Some(m_count);
+        m.task_points = Some(m_weight);
+
+        if let Some(mid) = m.id {
+            let _ = sqlx::query("UPDATE opentask.project_member SET current_load = $1 WHERE id = $2;")
+                .bind(calc_load)
+                .bind(mid.0)
+                .execute(&state.pool)
+                .await?;
+        }
+    }
+
+    // 4. Fetch recent activities (limit 20)
+    let activities = sqlx::query_as::<_, DatabaseActivity>(
+            r#"
+            SELECT id, project_id, user_name, action, target, created_at
+            FROM opentask.activities
+            WHERE project_id = $1
+            ORDER BY created_at DESC
+            LIMIT 20;
+            "#
+        )
+        .bind(project_id.0)
+        .fetch_all(&state.pool)
+        .await
+        .unwrap_or_default();
+
+    // 5. Calculate metrics (e.g task completion)
+    let counts_row = sqlx::query(
+            r#"
+            SELECT 
+                COUNT(*) FILTER (WHERE b.state = 'COMPLETED') AS completed,
+                COUNT(*) AS total
+            FROM opentask.tasks t
+            JOIN opentask.buckets b ON t.bucket_id = b.id
+            WHERE t.project_id = $1
+            "#
+        )
+        .bind(project_id.0)
+        .fetch_optional(&state.pool)
+        .await?;
+
+
+    let (completed, total): (i64, i64) = counts_row
+        .map(|r| {
+            let comp: i64 = r.try_get("completed").unwrap_or(0);
+            let tot: i64 = r.try_get("total").unwrap_or(0);
+            (comp, tot)
+        })
+        .unwrap_or((0, 0));
+
+    let progress = if total > 0 {
+        ((completed as f64 / total as f64) * 100.0).round() as i32
+    } else {
+        0
+    };
+
+    let metrics = vec![ProjectDashboardMetric {
+        label: "Task Completion".to_string(),
+        value: format!("{completed}/{total}"),
+        progress,
+        status: Some(if progress >= 50 {"ON_TRACK".to_string()} else { "AT_RISK".to_string()} ),
+        target_label: Some("100% by deadline".to_string()),
+    }];
+
+    Ok(Json(ProjectDashboardResponse {
+        members,
+        metrics,
+        activities
+    }))
 }
 
 pub async fn get_project_api_key(

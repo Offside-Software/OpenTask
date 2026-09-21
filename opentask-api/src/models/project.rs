@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use crate::models::bucket::DatabaseBucket;
+use crate::models::history::DatabaseActivity;
 use crate::models::safe_id::SafeId;
 use crate::models::task::DatabaseTask;
 
@@ -36,6 +37,26 @@ pub struct ProjectMember {
     pub display_name: Option<String>,
     #[sqlx(default)]
     pub avatar_url: Option<String>,
+    #[sqlx(default)]
+    pub task_count: Option<i64>,
+    #[sqlx(default)]
+    pub task_points: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDashboardMetric {
+    pub label: String,
+    pub value: String,
+    pub progress: i32,
+    pub status: Option<String>,
+    pub target_label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDashboardResponse {
+    pub members: Vec<ProjectMember>,
+    pub metrics: Vec<ProjectDashboardMetric>,
+    pub activities: Vec<DatabaseActivity>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -6,7 +6,7 @@ import { getCached, setCached } from "../utils/cache";
 interface DashboardData {
   members: ProjectMember[];
   metrics: ProjectMetric[];
-  activity: Activity[];
+  activities: Activity[];
 }
 
 export const useDashboard = (projectId: string | number) => {
@@ -15,7 +15,7 @@ export const useDashboard = (projectId: string | number) => {
 
   const [members, setMembers] = useState<ProjectMember[]>(initialCache?.members ?? []);
   const [metrics, setMetrics] = useState<ProjectMetric[]>(initialCache?.metrics ?? []);
-  const [activity, setActivity] = useState<Activity[]>(initialCache?.activity ?? []);
+  const [activities, setActivities] = useState<Activity[]>(initialCache?.activities ?? []);
   const [loading, setLoading] = useState<boolean>(!initialCache);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +31,7 @@ export const useDashboard = (projectId: string | number) => {
         );
         setMembers(data.members ?? []);
         setMetrics(data.metrics ?? []);
-        setActivity(data.activity ?? []);
+        setActivities(data.activities ?? []);
         setCached(`opentask_dashboard_${projectId}`, data);
         setError(null);
       } catch (err) {
@@ -52,7 +52,7 @@ export const useDashboard = (projectId: string | number) => {
   return {
     members,
     metrics,
-    activity,
+    activities,
     loading,
     error,
     refreshDashboard: fetchDashboard,

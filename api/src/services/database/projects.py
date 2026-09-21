@@ -398,7 +398,7 @@ def db_get_project_dashboard_data(project_id: int):
         return {
             "members": members, # members already handled with floats above, but could map to a PM model if needed
             "metrics": metrics,
-            "activity": activities
+            "activities": activities
         }
     except Exception as e:
         if conn:
