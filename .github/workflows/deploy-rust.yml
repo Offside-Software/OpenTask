@@ -7,7 +7,7 @@ on:
     paths:
       - 'opentask-api/**'
       - '.github/workflows/deploy-rust.yml'
-    workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch: # Allows manual trigger from GitHub UI
 
 env:
   REGISTRY: ghcr.io
@@ -60,9 +60,9 @@ jobs:
 
     steps:
       - name: Deploy on DewaCloud via SSH
-        uses: appleboy/ssh-actionv1.0.3
+        uses: appleboy/ssh-action@v1.0.3
         with: 
-          username: ${{ DEWACLOUD_SSH_USER }}
+          username: ${{ secrets.DEWACLOUD_SSH_USER }}
           key: ${{ secrets.DEWACLOUD_SSH_PRIVATE_KEY }}
           scripts:
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
