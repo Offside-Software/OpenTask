@@ -79,26 +79,25 @@ The frontend will launch at `http://localhost:5173` and automatically proxy API 
 
 ```mermaid
 flowchart LR
-    User([User Browser])
+    User["User Browser"]
     
-    subgraph Vercel ["Vercel (Frontend)"]
-        FE[opentask-app /dist]
-        Rewrite["vercel.json Rewrites\n/api/* & /github/*"]
+    subgraph Vercel ["Vercel - Frontend"]
+        FE["opentask-app /dist"]
+        Rewrite["vercel.json Rewrites: /api/* & /github/*"]
     end
     
-    subgraph DewaCloud ["DewaCloud (Backend VPS)"]
-        Docker["Docker Container: rust-api\n(ghcr.io/offside-software/opentask-rust-api)"]
-        Axum["Axum Tokio Server (:8000)"]
+    subgraph DewaCloud ["DewaCloud - Backend VPS"]
+        Axum["Axum Tokio Server :8000"]
     end
     
     subgraph Supabase ["Database"]
-        PG[(PostgreSQL Database)]
+        PG[("PostgreSQL Database")]
     end
 
-    User -->|Visits App| FE
-    User -->|API Requests via Proxy| Rewrite
-    Rewrite -->|HTTPS Reverse Proxy| Axum
-    User -.->|Direct API (Optional VITE_API_BASE_URL)| Axum
+    User -->|"Visits App"| FE
+    User -->|"API Requests via Proxy"| Rewrite
+    Rewrite -->|"HTTPS Reverse Proxy"| Axum
+    User -.->|"Direct API (via VITE_API_BASE_URL)"| Axum
     Axum --> PG
 ```
 
