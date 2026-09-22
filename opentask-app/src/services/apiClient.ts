@@ -1,22 +1,59 @@
 import JSONBig from "json-bigint";
 
-export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+export function getBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const override = localStorage.getItem("opentask_api_url");
+    if (override && override.trim()) {
+      return override.trim();
+    }
+  }
+  return (
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    ""
+  ).trim();
+}
+
+export const BASE_URL = getBaseUrl();
 
 export function resolveApiUrl(endpoint: string): string {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const baseUrl = getBaseUrl();
 
-  if (BASE_URL) {
-    const cleanBase = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
+  if (baseUrl) {
+    const cleanBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+
+    // Prevent duplicate /api when cleanBase ends with /api and cleanEndpoint also starts with /api/
+    if (cleanBase.endsWith("/api") && cleanEndpoint.startsWith("/api/")) {
+      return `${cleanBase}${cleanEndpoint.slice(4)}`;
+    }
+
     return `${cleanBase}${cleanEndpoint}`;
   }
 
-  // In standard browser environment (both local dev and prod):
-  // Ensure the endpoint starts with /api so Vite proxy (dev) and Vercel (prod) route it to FastAPI:
+  // In standard browser environment (both local dev and prod without explicit base URL):
+  // Ensure the endpoint starts with /api so Vite proxy (dev) and Vercel rewrites (prod) route it to backend:
   if (cleanEndpoint.startsWith("/api/")) {
     return cleanEndpoint;
   }
 
   return `/api${cleanEndpoint}`;
+}
+
+export function getStoredToken(): string | null {
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("token");
+    if (urlToken) {
+      localStorage.setItem("gh_token", urlToken);
+      params.delete("token");
+      const newQuery = params.toString() ? `?${params.toString()}` : "";
+      window.history.replaceState({}, document.title, `${window.location.pathname}${newQuery}`);
+      return urlToken;
+    }
+    return localStorage.getItem("gh_token");
+  }
+  return null;
 }
 
 // Map to cleanly deduplicate concurrent identical GET requests
@@ -39,8 +76,10 @@ export async function apiFetch<T>(
     return pendingGetRequests.get(cacheKey) as Promise<T>;
   }
 
-  const defaultHeaders = {
+  const token = getStoredToken();
+  const defaultHeaders: Record<string, string> = {
     "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   const config = {

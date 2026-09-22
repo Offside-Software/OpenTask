@@ -1,4 +1,4 @@
-import { resolveApiUrl } from "../services/apiClient"
+import { resolveApiUrl, getStoredToken } from "../services/apiClient"
 
 export interface DatabaseUser {
     id: number
@@ -23,9 +23,17 @@ export interface GitHubUser {
     db_user: DatabaseUser
 }
 
+function getAuthHeaders(): Record<string, string> {
+    const token = getStoredToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // Get current user
 export async function fetchCurrentUser(): Promise<GitHubUser | null> {
-    const resp = await fetch(resolveApiUrl('/api/auth/me'), { credentials: 'include' })
+    const resp = await fetch(resolveApiUrl('/api/auth/me'), {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+    })
     if (resp.status === 401) return null
     if (!resp.ok) 
         throw new Error(`Unexpected response from /auth/me: ${resp.status}`)
@@ -39,11 +47,22 @@ export async function fetchCurrentUser(): Promise<GitHubUser | null> {
 }
 
 export async function postLogout(): Promise<void> {
-    await fetch(resolveApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' })
+    if (typeof window !== "undefined") {
+        localStorage.removeItem("gh_token");
+    }
+    await fetch(resolveApiUrl('/api/auth/logout'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: getAuthHeaders(),
+    })
 }
 
 export async function postSyncUser(): Promise<DatabaseUser | null> {
-    const resp = await fetch(resolveApiUrl('/api/auth/sync-user'), { method: 'POST', credentials: 'include' })
+    const resp = await fetch(resolveApiUrl('/api/auth/sync-user'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: getAuthHeaders(),
+    })
     if (resp.status === 401) return null
     if (!resp.ok) throw new Error(`Unexpected response from /auth/sync-user: ${resp.status}`)
 
@@ -58,7 +77,10 @@ export async function postSyncUser(): Promise<DatabaseUser | null> {
 export async function updateTelegramChatId(userId: number, chatId: string): Promise<DatabaseUser> {
     const resp = await fetch(resolveApiUrl(`/api/users/${userId}`), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+        },
         body: JSON.stringify({ telegram_chat_id: chatId }),
         credentials: 'include'
     })

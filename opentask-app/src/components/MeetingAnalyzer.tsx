@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import './MeetingAnalyzer.css';
+import { resolveApiUrl } from '../services/apiClient';
 
 interface Task {
     id: string;
@@ -33,7 +34,7 @@ export const MeetingAnalyzer: React.FC = () => {
     // Get current meeting count for polling reference
     const fetchMeetingCount = async () => {
         try {
-            const response = await fetch('/api/meetings', { credentials: 'include' });
+            const response = await fetch(resolveApiUrl('/meetings'), { credentials: 'include' });
             if (response.ok) {
                 const data = await response.json();
                 return data.length;
@@ -49,7 +50,7 @@ export const MeetingAnalyzer: React.FC = () => {
         let interval: ReturnType<typeof setInterval>;
         if (view === 'processing') {
             interval = setInterval(async () => {
-                const response = await fetch('/api/meetings', { credentials: 'include' });
+                const response = await fetch(resolveApiUrl('/meetings'), { credentials: 'include' });
                 if (response.ok) {
                     const meetings = await response.json();
                     if (meetings.length > lastMeetingCount) {
@@ -100,7 +101,7 @@ export const MeetingAnalyzer: React.FC = () => {
         formData.append('project_id', '0'); // Fallback project_id
 
         try {
-            const response = await fetch('/api/analyze-meeting', {
+            const response = await fetch(resolveApiUrl('/analyze-meeting'), {
                 method: 'POST',
                 body: formData,
                 credentials: 'include'
@@ -143,7 +144,7 @@ export const MeetingAnalyzer: React.FC = () => {
             const count = await fetchMeetingCount();
             setLastMeetingCount(count);
 
-            const response = await fetch(`/api/invite-bot?meeting_url=${encodeURIComponent(meetingUrl)}&project_id=0`, {
+            const response = await fetch(resolveApiUrl(`/invite-bot?meeting_url=${encodeURIComponent(meetingUrl)}&project_id=0`), {
                 method: 'POST',
                 credentials: 'include'
             });
