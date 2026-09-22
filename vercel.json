@@ -5,11 +5,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "env-opentask.user.cloudjkt02.com/api/$1"
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
     },
     {
       "source": "/github/(.*)",
-      "destination": "env-opentask.user.cloudjkt02.com/api/$1"
+      "destination": "https://env-opentask.user.cloudjkt02.com/github/$1"
     },
     {
       "source": "/(.*)",
