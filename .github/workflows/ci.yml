@@ -6,12 +6,12 @@ on:
       - master
     paths:
       - 'opentask-api/**'
-      - '.github/workflows/deploy-rust.yml'
+      - '.github/workflows/ci.yml'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_name }}/opentask-rust-api
+  IMAGE_NAME: offside-software/opentask-rust-api
 
 jobs:
   build-and-push:
@@ -49,12 +49,12 @@ jobs:
           context: ./opentask-api
           file: ./opentask-api/Dockerfile
           push: true
-          tags: ${{ steps.meta.output.tags }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deply-to-dewacloud:
+  deploy-to-dewacloud:
     needs: build-and-push
     runs-on: ubuntu-latest
 
@@ -62,9 +62,10 @@ jobs:
       - name: Deploy on DewaCloud via SSH
         uses: appleboy/ssh-action@v1
         with: 
+          host: ${{ vars.DEWACLOUD_SSH_HOST }}
           username: ${{ vars.DEWACLOUD_SSH_USER }}
           key: ${{ secrets.DEWACLOUD_SSH_PRIVATE_KEY }}
-          scripts:
+          script: |
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ env.IMAGE_NAME }}:latest
             docker stop rust-api || true
