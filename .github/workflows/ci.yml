@@ -60,9 +60,10 @@ jobs:
 
     steps:
       - name: Deploy on DewaCloud via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.0
         with: 
           host: ${{ vars.DEWACLOUD_SSH_HOST }}
+          port: ${{ vars.DEWACLOUD_SSH_PORT }}
           username: ${{ vars.DEWACLOUD_SSH_USER }}
           key: ${{ secrets.DEWACLOUD_SSH_PRIVATE_KEY }}
           script: |
