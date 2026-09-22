@@ -1,5 +1,6 @@
 import './LoginPage.css';
 import logo from '../assets/logo.svg';
+import { resolveApiUrl } from '../services/apiClient';
 
 function GitHubMark() {
   return (
@@ -32,7 +33,14 @@ export function LoginPage() {
           <p>AUTHENTICATE VIA GITHUB OAUTH PROTOCOL</p>
         </div>
 
-        <a href="/api/auth/login" className="login-btn">
+        <a
+          href={resolveApiUrl(
+            `/auth/login?return_to=${encodeURIComponent(
+              typeof window !== 'undefined' ? window.location.origin : ''
+            )}`
+          )}
+          className="login-btn"
+        >
           <GitHubMark />
           CONTINUE WITH GITHUB
         </a>

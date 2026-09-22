@@ -211,18 +211,49 @@ pub async fn get_or_create_user(
     Ok(inserted)
 }
 
-pub async fn auth_login(State(state): State<AppState>, headers: HeaderMap) -> Response {
+#[derive(Debug, Deserialize)]
+pub struct LoginQuery {
+    pub return_to: Option<String>,
+    pub redirect_to: Option<String>,
+}
+
+pub async fn auth_login(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<LoginQuery>,
+) -> Response {
     let client_id = &state.config.gh_app_client_id;
     let redirect_uri = get_redirect_uri(&state.config, &headers);
     let rand_state = format!("{:x}", rand::random::<u128>());
 
+    // Determine target frontend URL: query param > referer > configured frontend_url
+    let return_target = query
+        .return_to
+        .or(query.redirect_to)
+        .or_else(|| {
+            headers
+                .get("referer")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|r| {
+                    if let Ok(url) = reqwest::Url::parse(r) {
+                        Some(url.origin().ascii_serialization())
+                    } else {
+                        None
+                    }
+                })
+        })
+        .unwrap_or_else(|| get_frontend_url(&state.config, &headers));
+
+    let encoded_return = hex::encode(return_target.as_bytes());
+    let oauth_state = format!("{rand_state}.{encoded_return}");
+
     let target = format!(
-        "https://github.com/login/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&state={rand_state}"
+        "https://github.com/login/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&state={oauth_state}"
     );
 
     let is_https = redirect_uri.contains("https");
     let cookie = format!(
-        "oauth_state={rand_state}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax{}",
+        "oauth_state={oauth_state}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax{}",
         if is_https { "; Secure" } else { "" }
     );
 
@@ -236,7 +267,23 @@ pub async fn auth_callback(
     headers: HeaderMap,
     Query(query): Query<CallbackQuery>,
 ) -> Result<Response, AppError> {
-    let frontend_url = get_frontend_url(&state.config, &headers);
+    // Decode frontend return URL from state if provided
+    let frontend_url = query
+        .state
+        .as_deref()
+        .and_then(|s| {
+            if let Some((_, hex_part)) = s.split_once('.') {
+                if let Ok(bytes) = hex::decode(hex_part) {
+                    if let Ok(decoded) = String::from_utf8(bytes) {
+                        if decoded.starts_with("http://") || decoded.starts_with("https://") {
+                            return Some(decoded);
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .unwrap_or_else(|| get_frontend_url(&state.config, &headers));
 
     let code = match query.code {
         Some(c) => c,
@@ -309,7 +356,16 @@ pub async fn auth_callback(
         if is_https { "; Secure" } else { "" }
     );
 
-    let mut response = Redirect::temporary(&frontend_url).into_response();
+    // If redirecting to a different origin (e.g. localhost or external client),
+    // append the access token so the frontend can store it:
+    let redirect_target = if frontend_url.contains("localhost") || frontend_url.contains("127.0.0.1") || !frontend_url.contains("cloudjkt02.com") {
+        let sep = if frontend_url.contains('?') { "&" } else { "?" };
+        format!("{frontend_url}{sep}token={access_token}")
+    } else {
+        frontend_url
+    };
+
+    let mut response = Redirect::temporary(&redirect_target).into_response();
     response.headers_mut().insert(header::SET_COOKIE, cookie.parse().unwrap());
     Ok(response)
 }
@@ -402,7 +458,8 @@ fn get_frontend_url(config: &Config, headers: &HeaderMap) -> String {
         .and_then(|v| v.to_str().ok())
         .unwrap_or(if host.contains("vercel.app") { "https" } else { "http" });
 
-    if !host.is_empty() && !host.contains("localhost") && !host.contains("127.0.0.1") {
+    // Only if host is a known frontend domain (like a Vercel deployment), not the API backend host itself
+    if !host.is_empty() && host.contains("vercel.app") {
         return format!("{proto}://{host}");
     }
 

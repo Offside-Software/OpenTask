@@ -1,6 +1,5 @@
 import type { GithubInstallation, GithubInstallationRepo } from '../models';
-
-const API_BASE = '/api';
+import { resolveApiUrl } from './apiClient';
 
 export interface GithubUserSearchResult {
   login: string;
@@ -18,7 +17,7 @@ export const searchGithubUsers = async (query: string): Promise<GithubUserSearch
   const normalized = query.trim();
   if (normalized.length < 2) return [];
 
-  const resp = await fetch(`${API_BASE}/github/users/search?query=${encodeURIComponent(normalized)}`, {
+  const resp = await fetch(resolveApiUrl(`/github/users/search?query=${encodeURIComponent(normalized)}`), {
     credentials: 'include',
   });
 
@@ -35,7 +34,7 @@ export const searchGithubRepositories = async (query: string): Promise<GithubRep
   const normalized = query.trim();
   if (normalized.length < 2) return [];
 
-  const resp = await fetch(`${API_BASE}/github/repos/search?query=${encodeURIComponent(normalized)}`, {
+  const resp = await fetch(resolveApiUrl(`/github/repos/search?query=${encodeURIComponent(normalized)}`), {
     credentials: 'include',
   });
 
@@ -51,7 +50,7 @@ export const searchGithubRepositories = async (query: string): Promise<GithubRep
 export const getGithubInstallations = async (): Promise<{
   installations: GithubInstallation[];
 }> => {
-  const resp = await fetch(`${API_BASE}/github/installations`, {
+  const resp = await fetch(resolveApiUrl('/github/installations'), {
     credentials: 'include',
   });
   if (!resp.ok) throw new Error(`Failed to list GitHub installations: ${resp.status}`);
@@ -61,7 +60,7 @@ export const getGithubInstallations = async (): Promise<{
 export const getInstallationRepos = async (installationId: number): Promise<{
   repos: GithubInstallationRepo[];
 }> => {
-  const resp = await fetch(`${API_BASE}/github/installations/${installationId}/repos`, {
+  const resp = await fetch(resolveApiUrl(`/github/installations/${installationId}/repos`), {
     credentials: 'include',
   });
   if (!resp.ok) throw new Error(`Failed to list repos for installation ${installationId}: ${resp.status}`);
@@ -72,7 +71,7 @@ export const getProjectRepos = async (projectId: string | number): Promise<{
   repos: GithubInstallationRepo[];
   connected_urls: string[];
 }> => {
-  const resp = await fetch(`${API_BASE}/projects/${projectId}/repos`, {
+  const resp = await fetch(resolveApiUrl(`/projects/${projectId}/repos`), {
     credentials: 'include',
   });
   if (!resp.ok) throw new Error(`Failed to get project repos: ${resp.status}`);
@@ -80,7 +79,7 @@ export const getProjectRepos = async (projectId: string | number): Promise<{
 };
 
 export const getGithubAppInstallUrl = async (): Promise<string> => {
-  const resp = await fetch(`${API_BASE}/github/app/install-url`, {
+  const resp = await fetch(resolveApiUrl('/github/app/install-url'), {
     credentials: 'include',
   });
   if (!resp.ok) return 'https://github.com/apps';
@@ -94,7 +93,7 @@ export const linkInstallationToProject = async (
   accountLogin: string,
   accountType: string,
 ): Promise<void> => {
-  const resp = await fetch(`${API_BASE}/projects/${projectId}/installations`, {
+  const resp = await fetch(resolveApiUrl(`/projects/${projectId}/installations`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -111,7 +110,7 @@ export const unlinkInstallationFromProject = async (
   projectId: string | number,
   installationId: number,
 ): Promise<void> => {
-  const resp = await fetch(`${API_BASE}/projects/${projectId}/installations/${installationId}`, {
+  const resp = await fetch(resolveApiUrl(`/projects/${projectId}/installations/${installationId}`), {
     method: 'DELETE',
     credentials: 'include',
   });
