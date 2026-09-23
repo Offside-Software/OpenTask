@@ -201,41 +201,65 @@ pub async fn update_task(
     Path(task_id): Path<SafeId>,
     Json(payload): Json<TaskUpdatePayload>,
 ) -> Result<Json<DatabaseTask>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseTask>(
-        r#"
-        UPDATE opentask.tasks
-        SET title = COALESCE($1, title),
-            description = COALESCE($2, description),
-            type = COALESCE($3, type),
-            weight = COALESCE($4, weight),
-            bucket_id = COALESCE($5, bucket_id),
-            lead_assignee_id = COALESCE($6, lead_assignee_id),
-            suggested_assignee_id = COALESCE($7, suggested_assignee_id),
-            branch_name = COALESCE($8, branch_name),
-            repo_url = COALESCE($9, repo_url),
-            order_idx = COALESCE($10, order_idx),
-            updated_at = NOW(),
-            last_activity_at = NOW()
-        WHERE id = $11
-        RETURNING id, project_id, bucket_id, meeting_id,
-                  parent_task_id, lead_assignee_id, suggested_assignee_id,
-                  title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;
-        "#
-    )
-    .bind(payload.title)
-    .bind(payload.description)
-    .bind(payload.task_type)
-    .bind(payload.weight)
-    .bind(payload.bucket_id.map(|b| b.0))
-    .bind(payload.lead_assignee_id.map(|l| l.0))
-    .bind(payload.suggested_assignee_id.map(|s| s.0))
-    .bind(payload.branch_name)
-    .bind(payload.repo_url)
-    .bind(payload.order_idx)
-    .bind(task_id.0)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
+    let mut builder = sqlx::QueryBuilder::new(
+        "UPDATE opentask.tasks SET updated_at = NOW(), last_activity_at = NOW()",
+    );
+
+    if let Some(ref title) = payload.title {
+        builder.push(", title = ");
+        builder.push_bind(title);
+    }
+    if let Some(ref description) = payload.description {
+        builder.push(", description = ");
+        builder.push_bind(description);
+    }
+    if let Some(ref task_type) = payload.task_type {
+        builder.push(", type = ");
+        builder.push_bind(task_type);
+    }
+    if let Some(weight) = payload.weight {
+        builder.push(", weight = ");
+        builder.push_bind(weight);
+    }
+    if let Some(bucket_id) = payload.bucket_id {
+        builder.push(", bucket_id = ");
+        builder.push_bind(bucket_id.0);
+    }
+    if let Some(ref lead) = payload.lead_assignee_id {
+        builder.push(", lead_assignee_id = ");
+        builder.push_bind(lead.as_ref().map(|l| l.0));
+    }
+    if let Some(ref suggested) = payload.suggested_assignee_id {
+        builder.push(", suggested_assignee_id = ");
+        builder.push_bind(suggested.as_ref().map(|s| s.0));
+    }
+    if let Some(ref branch_name) = payload.branch_name {
+        builder.push(", branch_name = ");
+        builder.push_bind(branch_name);
+    }
+    if let Some(ref repo_url) = payload.repo_url {
+        builder.push(", repo_url = ");
+        builder.push_bind(repo_url);
+    }
+    if let Some(order_idx) = payload.order_idx {
+        builder.push(", order_idx = ");
+        builder.push_bind(order_idx);
+    }
+
+    builder.push(" WHERE id = ");
+    builder.push_bind(task_id.0);
+    builder.push(
+        " RETURNING id, project_id, bucket_id, meeting_id, \
+                   parent_task_id, lead_assignee_id, suggested_assignee_id, \
+                   title, description, type as task_type, weight, branch_name, repo_url, \
+                   last_activity_at, order_idx, created_at, updated_at;",
+    );
+
+    let row = builder
+        .build_query_as::<DatabaseTask>()
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
 
     if let Some(pid) = row.project_id {
         let action = if payload.bucket_id.is_some() {
@@ -263,8 +287,8 @@ pub async fn update_task(
         .await;
     }
 
-    // Trigger notification if assignee was updated
-    if let Some(assignee) = payload.lead_assignee_id {
+    // Trigger notification if assignee was updated to a specific user
+    if let Some(Some(assignee)) = payload.lead_assignee_id {
         let pool = state.pool.clone();
         let config = state.config.clone();
         let task_title = row.title.clone();

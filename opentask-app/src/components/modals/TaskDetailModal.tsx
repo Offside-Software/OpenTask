@@ -189,7 +189,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             type: finalType,
             weight: Number(weight),
             bucket_id: bucketId || undefined,
-            lead_assignee_id: leadAssigneeId || undefined,
+            lead_assignee_id: leadAssigneeId ? leadAssigneeId : null,
             branch_name: branchName.trim() || undefined,
             repo_url: repoUrl.trim() || undefined,
         };

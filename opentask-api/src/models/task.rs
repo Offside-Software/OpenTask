@@ -24,6 +24,31 @@ pub struct DatabaseTask {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+pub fn deserialize_optional_nullable_safe_id<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<SafeId>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper {
+        Val(SafeId),
+        EmptyStr(String),
+        Null,
+    }
+
+    match Option::<Helper>::deserialize(deserializer)? {
+        None | Some(Helper::Null) => Ok(Some(None)),
+        Some(Helper::EmptyStr(s)) if s.trim().is_empty() => Ok(Some(None)),
+        Some(Helper::EmptyStr(s)) => {
+            let id = s.trim().parse::<i64>().map_err(serde::de::Error::custom)?;
+            Ok(Some(Some(SafeId(id))))
+        }
+        Some(Helper::Val(id)) => Ok(Some(Some(id))),
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct TaskUpdatePayload {
     pub title: Option<String>,
@@ -32,8 +57,10 @@ pub struct TaskUpdatePayload {
     pub task_type: Option<String>,
     pub weight: Option<i32>,
     pub bucket_id: Option<SafeId>,
-    pub lead_assignee_id: Option<SafeId>,
-    pub suggested_assignee_id: Option<SafeId>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_safe_id")]
+    pub lead_assignee_id: Option<Option<SafeId>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_safe_id")]
+    pub suggested_assignee_id: Option<Option<SafeId>>,
     pub branch_name: Option<String>,
     pub repo_url: Option<String>,
     pub order_idx: Option<i32>,

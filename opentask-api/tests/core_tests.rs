@@ -233,3 +233,42 @@ fn test_vapid_key_and_message_building() {
     assert!(http_req.headers().contains_key("authorization"));
     assert!(http_req.headers().contains_key("content-encoding"));
 }
+
+#[test]
+fn test_task_update_payload_deserialization() {
+    use opentask_api::models::task::TaskUpdatePayload;
+
+    // 1. Missing lead_assignee_id field -> None (do not update)
+    let json_missing = r#"{"title": "Updated title"}"#;
+    let payload_missing: TaskUpdatePayload = serde_json::from_str(json_missing).unwrap();
+    assert_eq!(payload_missing.lead_assignee_id, None);
+    assert_eq!(payload_missing.suggested_assignee_id, None);
+
+    // 2. Explicit null -> Some(None) (unassign / set to NULL)
+    let json_null = r#"{"lead_assignee_id": null, "suggested_assignee_id": null}"#;
+    let payload_null: TaskUpdatePayload = serde_json::from_str(json_null).unwrap();
+    assert_eq!(payload_null.lead_assignee_id, Some(None));
+    assert_eq!(payload_null.suggested_assignee_id, Some(None));
+
+    // 3. Explicit empty string -> Some(None) (unassign / set to NULL)
+    let json_empty = r#"{"lead_assignee_id": "", "suggested_assignee_id": "   "}"#;
+    let payload_empty: TaskUpdatePayload = serde_json::from_str(json_empty).unwrap();
+    assert_eq!(payload_empty.lead_assignee_id, Some(None));
+    assert_eq!(payload_empty.suggested_assignee_id, Some(None));
+
+    // 4. String ID -> Some(Some(SafeId))
+    let json_str_id = r#"{"lead_assignee_id": "94695191667019776"}"#;
+    let payload_str_id: TaskUpdatePayload = serde_json::from_str(json_str_id).unwrap();
+    assert_eq!(
+        payload_str_id.lead_assignee_id,
+        Some(Some(SafeId(94695191667019776)))
+    );
+
+    // 5. Numeric ID -> Some(Some(SafeId))
+    let json_num_id = r#"{"lead_assignee_id": 94695191667019776}"#;
+    let payload_num_id: TaskUpdatePayload = serde_json::from_str(json_num_id).unwrap();
+    assert_eq!(
+        payload_num_id.lead_assignee_id,
+        Some(Some(SafeId(94695191667019776)))
+    );
+}

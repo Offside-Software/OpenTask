@@ -250,7 +250,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         return true;
       }
       // 6. Match assignee name or GitHub username
-      const assignedMember = members.find(m => String(m.user_id) === String(t.lead_assignee_id));
+      const assignedMember = t.lead_assignee_id ? members.find(m => String(m.user_id) === String(t.lead_assignee_id)) : undefined;
       if (assignedMember) {
         if (assignedMember.gh_username && assignedMember.gh_username.toLowerCase().includes(q)) return true;
         if (assignedMember.display_name && assignedMember.display_name.toLowerCase().includes(q)) return true;
@@ -764,7 +764,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                         }
 
                         const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
-                        const assignedMember = members.find(m => String(m.user_id) === String(task.lead_assignee_id));
+                        const assignedMember = task.lead_assignee_id ? members.find(m => String(m.user_id) === String(task.lead_assignee_id)) : undefined;
                         const assigneeName = assignedMember?.gh_username || assignedMember?.display_name || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
                         const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
 

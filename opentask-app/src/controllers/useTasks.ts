@@ -72,6 +72,13 @@ export const useTasks = (projectId?: string | number) => {
         );
 
         const updated = await taskService.updateTask(id, data);
+        if (updated) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              String(t.id) === String(id) ? { ...t, ...updated } : t,
+            ),
+          );
+        }
         showToast("Task updated", "success");
         return updated;
       } catch (err) {

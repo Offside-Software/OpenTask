@@ -10,7 +10,7 @@ export const taskService = {
 
   getMyTasks: async (userId: number): Promise<Task[]> => {
     const tasks = await apiFetch<Task[]>("/tasks");
-    return tasks.filter((t) => String(t.lead_assignee_id) === String(userId));
+    return tasks.filter((t) => Boolean(t.lead_assignee_id) && String(t.lead_assignee_id) === String(userId));
   },
 
   createTask: async (data: Task): Promise<Task> => {
@@ -24,7 +24,7 @@ export const taskService = {
     id: number | string,
     data: Partial<Task>,
   ): Promise<Task> => {
-    // Only send valid task schema fields and clean up empty strings
+    // Only send valid task schema fields and clean up empty strings / undefined IDs
     const payload: Record<string, unknown> = {};
     
     const allowedKeys: (keyof Task)[] = [
@@ -41,12 +41,14 @@ export const taskService = {
       "order_idx",
     ];
 
-
     for (const key of allowedKeys) {
       if (key in data) {
-        // Conver empty string IDs (e.g unassigned assignee) to null
+        // Convert empty string or undefined IDs (e.g unassigned assignee) to null
         let val = data[key];
-        if ((key === "lead_assignee_id" || key === "suggested_assignee_id" || key === "bucket_id") && val === "") {
+        if (
+          (key === "lead_assignee_id" || key === "suggested_assignee_id" || key === "bucket_id") &&
+          (val === "" || val === undefined)
+        ) {
           val = null as any;
         }
         payload[key] = val;
@@ -55,7 +57,7 @@ export const taskService = {
 
     return await apiFetch<Task>(`/tasks/${id}`, {
       method: "PUT",
-      body: JSONBig.stringify(data),
+      body: JSONBig.stringify(payload),
     });
   },
 
