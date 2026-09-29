@@ -13,6 +13,7 @@ services:
       - redis
 
   rust-api:
+    image: ghcr.io/offside-software/opentask-rust-api:latest
     build:
       context: ./opentask-api
       dockerfile: Dockerfile

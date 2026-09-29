@@ -1,19 +1,44 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "buildCommand": "cd opentask-app && bun install && bun run build",
-  "outputDirectory": "opentask-app/dist",
+  "services": {
+    "web": {
+      "root": "opentask-app",
+      "framework": "vite",
+      "buildCommand": "bun run build",
+      "installCommand": "bun install",
+      "outputDirectory": "dist"
+    },
+    "tokio-api": {
+      "root": ".",
+      "runtime": "container",
+      "entrypoint": "Dockerfile.vercel"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
+      "destination": {
+        "service": "tokio-api"
+      }
     },
     {
       "source": "/github/(.*)",
-      "destination": "https://env-opentask.user.cloudjkt02.com/github/$1"
+      "destination": {
+        "service": "tokio-api"
+      }
+    },
+    {
+      "source": "/health",
+      "destination": {
+        "service": "tokio-api"
+      }
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": {
+        "service": "web"
+      }
     }
   ]
 }

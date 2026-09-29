@@ -358,7 +358,7 @@ pub async fn auth_callback(
 
     // If redirecting to a different origin (e.g. localhost or external client),
     // append the access token so the frontend can store it:
-    let redirect_target = if frontend_url.contains("localhost") || frontend_url.contains("127.0.0.1") || !frontend_url.contains("cloudjkt02.com") {
+    let redirect_target = if frontend_url.contains("localhost") || frontend_url.contains("127.0.0.1") {
         let sep = if frontend_url.contains('?') { "&" } else { "?" };
         format!("{frontend_url}{sep}token={access_token}")
     } else {

@@ -1,0 +1,17 @@
+# ==============================================================================
+# OpenTask Tokio Rust API - Vercel Container Runtime
+# ==============================================================================
+# Consumes the pre-compiled container image built by GitHub Actions and pushed
+# to the GitHub Container Registry (ghcr.io).
+#
+# Note: Vercel standard convention is `Dockerfile.vercel`, also provided.
+# ==============================================================================
+
+FROM ghcr.io/offside-software/opentask-rust-api:latest
+
+# Vercel container functions route incoming HTTP traffic to $PORT (defaults to 80).
+# The Axum server in opentask-api dynamically parses the PORT environment variable.
+ENV PORT=80
+EXPOSE 80
+
+CMD ["/app/opentask-api"]

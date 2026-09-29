@@ -7,6 +7,9 @@ on:
     paths:
       - 'opentask-api/**'
       - '.github/workflows/ci.yml'
+      - 'Dockerfile.vercel'
+      - 'docker.vercel'
+      - 'vercel.json'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 env:
@@ -48,29 +51,40 @@ jobs:
         with:
           context: ./opentask-api
           file: ./opentask-api/Dockerfile
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-to-dewacloud:
+  deploy-to-vercel:
     needs: build-and-push
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy on DewaCloud via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with: 
-          host: ${{ vars.DEWACLOUD_SSH_HOST }}
-          port: ${{ vars.DEWACLOUD_SSH_PORT }}
-          username: ${{ vars.DEWACLOUD_SSH_USER }}
-          key: ${{ secrets.DEWACLOUD_SSH_PRIVATE_KEY }}
-          script: |
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/${{ env.IMAGE_NAME }}:latest
-            docker stop rust-api || true
-            docker rm rust-api || true
-            docker run -d --name rust-api --restart unless-stopped -p 80:8000 --env-file ~/OpenTask/.env \
-              ghcr.io/${{ env.IMAGE_NAME }}:latest
-            docker image prune -af --filter "until=24h"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger Vercel Redeployment via Deploy Hook
+        if: ${{ env.VERCEL_DEPLOY_HOOK != '' }}
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          echo "Triggering Vercel deployment with fresh GHCR image..."
+          curl -sS -X POST "$VERCEL_DEPLOY_HOOK"
+
+      - name: Deploy to Vercel via CLI
+        if: ${{ env.VERCEL_DEPLOY_HOOK == '' && env.VERCEL_TOKEN != '' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          echo "Triggering Vercel CLI production deployment..."
+          npx --yes vercel deploy --prod --token="$VERCEL_TOKEN"
+
+      - name: Notification if Vercel webhook/token not yet configured
+        if: ${{ env.VERCEL_DEPLOY_HOOK == '' && env.VERCEL_TOKEN == '' }}
+        run: |
+          echo "::notice title=Vercel Redeployment::Rust API image built and published to GHCR (ghcr.io/${{ env.IMAGE_NAME }}:latest). To automatically trigger Vercel deployment after CI, configure VERCEL_DEPLOY_HOOK or VERCEL_TOKEN in your GitHub repository secrets."
