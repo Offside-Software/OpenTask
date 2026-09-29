@@ -72,7 +72,13 @@ jobs:
           VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
           echo "Triggering Vercel deployment with fresh GHCR image..."
-          curl -sS -X POST "$VERCEL_DEPLOY_HOOK"
+          HOOK_URL="${VERCEL_DEPLOY_HOOK}"
+          if [[ "$HOOK_URL" == *"?"* ]]; then
+            HOOK_URL="${HOOK_URL}&buildCache=false"
+          else
+            HOOK_URL="${HOOK_URL}?buildCache=false"
+          fi
+          curl -sS -X POST "$HOOK_URL"
 
       - name: Deploy to Vercel via CLI
         if: ${{ env.VERCEL_DEPLOY_HOOK == '' && env.VERCEL_TOKEN != '' }}

@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "git": {
+    "deploymentEnabled": {
+      "master": false,
+      "main": false
+    }
+  },
   "services": {
     "web": {
       "root": "opentask-app",
