@@ -80,7 +80,7 @@ pub async fn list_user_alerts(
         SELECT id, user_id, context_id, project_id,
                title, description, type as alert_type, severity, suggested_actions, is_resolved, pr_url, created_at, updated_at
         FROM opentask.alerts
-        WHERE user_id = $1 OR user_id IS NULL
+        WHERE (user_id = $1 OR user_id IS NULL) AND is_resolved = FALSE
         ORDER BY created_at DESC;
         "#
     )

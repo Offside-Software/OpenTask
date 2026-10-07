@@ -1,5 +1,5 @@
-from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from config import settings
 from routers.auth import get_current_user_optional, get_current_user
@@ -26,7 +26,7 @@ class PushSubscriptionPayload(BaseModel):
 
 
 class TestNotificationPayload(BaseModel):
-    title: Optional[str] = "🔔 OpenTask Alert Test"
+    title: Optional[str] = "OpenTask Alert Test"
     body: Optional[str] = "Web Push system is fully functional and connected to the backend!"
     url: Optional[str] = "/notifications"
 

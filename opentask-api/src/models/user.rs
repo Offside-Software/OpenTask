@@ -9,9 +9,11 @@ pub struct DatabaseUser {
     pub created_at: Option<DateTime<Utc>>,
     pub telegram_chat_id: Option<String>,
     pub gh_username: Option<String>,
+    #[serde(skip_serializing)]
     pub gh_access_token: Option<String>,
     pub gh_id: Option<String>,
     pub email: Option<String>,
+    #[serde(skip_serializing)]
     pub custom_ai_api_key: Option<String>,
 }
 

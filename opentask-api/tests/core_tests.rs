@@ -3,6 +3,7 @@ use opentask_api::routes::agent::parse_task_id;
 use opentask_api::services::github::verify_webhook_signature;
 use opentask_api::services::id_generator::{next_id, SnowflakeGenerator};
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct TaskDto {
@@ -111,6 +112,53 @@ async fn test_router_construction() {
     let config = Config::load();
     let state = AppState { pool, config };
     let _app = build_router(state);
+}
+
+#[tokio::test]
+async fn replace_api() {
+    use opentask_api::config::Config;
+    use opentask_api::routes::auth::AppState;
+    use opentask_api::routes::build_router;
+    use opentask_api::db;
+
+    let config = Config::load();
+    tracing::info!("Configuration loaded. Database target configured.");
+
+    // 3. Initialize Database Connection Pool
+    let pool = match db::create_pool(&config.database_url).await {
+        Ok(p) => {
+            tracing::info!("Connected to PostgreSQL database pool successfully.");
+            p
+        }
+        Err(e) => {
+            tracing::warn!("Could not connect to PostgreSQL on startup: {e}");
+            tracing::info!("Falling back to offline/lazy pool initialization. Please check POSTGRESQL_DATABASE_URL.");
+            let options = db::get_connect_options(&config.database_url).unwrap();
+
+            sqlx::postgres::PgPoolOptions::new()
+                .connect_lazy_with(options)
+        }
+    };
+
+    let state = AppState { pool: pool.clone(), config };
+    let _app = build_router(state);
+
+    // Run once or include in an admin migration handler:
+    let rows = sqlx::query("SELECT id, custom_ai_api_key FROM opentask.projects WHERE custom_ai_api_key IS NOT NULL AND custom_ai_api_key NOT LIKE '$argon2%';")
+        .fetch_all(&pool)
+        .await.unwrap();
+
+    for r in rows {
+        let id: i64 = r.get("id");
+        let raw_key: String = r.get("custom_ai_api_key");
+        if let Ok(hashed) = opentask_api::services::hasher::hash_string(&raw_key) {
+            sqlx::query("UPDATE opentask.projects SET custom_ai_api_key = $1, updated_at = NOW() WHERE id = $2;")
+                .bind(&hashed)
+                .bind(id)
+                .execute(&pool)
+                .await.unwrap();
+        }
+    }
 }
 
 #[test]

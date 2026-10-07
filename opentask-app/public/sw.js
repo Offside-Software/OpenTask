@@ -41,7 +41,13 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    (async () => {
+      await self.registration.showNotification(title, options);
+      const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of allClients) {
+        client.postMessage({ type: 'OPENTASK_PUSH_RECEIVED', data });
+      }
+    })()
   );
 });
 

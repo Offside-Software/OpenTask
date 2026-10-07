@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
 import { Badge } from '../../design-system/Badge';
-import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
 import { userService } from '../../services/userService';
@@ -42,6 +42,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     // Custom Integrated AI (Gemini Key) State
     const [customAiKeyInfo, setCustomAiKeyInfo] = useState<ProjectAiKeyResponse | null>(null);
     const [customAiInput, setCustomAiInput] = useState('');
+    const [isReplacingKey, setIsReplacingKey] = useState(false);
     const [showCustomAiKey, setShowCustomAiKey] = useState(false);
     const [aiKeyTesting, setAiKeyTesting] = useState(false);
     const [aiKeySaving, setAiKeySaving] = useState(false);
@@ -125,6 +126,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             setCustomAiInput('');
             setAiKeyTestResult(null);
             setShowCustomAiKey(false);
+            setIsReplacingKey(false);
             showToast("Project Custom AI key saved and verified successfully!", "success");
         } catch (e: any) {
             showToast(e.message || "Failed to save API key", "error");
@@ -140,6 +142,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             setCustomAiKeyInfo({ project_id: String(projectId), has_custom_key: false, masked_key: null });
             setCustomAiInput('');
             setAiKeyTestResult(null);
+            setIsReplacingKey(false);
             showToast("Custom AI key removed. Reverted to system default key.", "info");
         } catch (e: any) {
             showToast(e.message || "Failed to remove custom AI key", "error");
@@ -152,7 +155,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             const res = await projectService.generateProjectApiKey(projectId);
             setApiKey(res.api_key);
             setShowApiKey(true);
-            showToast("Project API key generated successfully", "success");
+            showToast("Project API key generated and stored to database", "success");
         } catch (e) {
             console.error(e);
             showToast("Failed to generate project API key", "error");
@@ -470,111 +473,148 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                         Configure a custom Google Gemini API key for this project. When active, all internal AI operations (automated PR code reviews, meeting analysis, task estimation) will utilize your token and quotas instead of the shared system token.
                     </p>
 
-                    {customAiKeyInfo?.has_custom_key && (
-                        <div className="p-3.5 bg-[#121417] border-2 border-black rounded-none flex items-center justify-between gap-3 shadow-[2px_2px_0px_0px_#000000]">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="p-1.5 bg-[#00FF66] text-black border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000]">
-                                    <CheckCircle2 size={14} strokeWidth={2.5} />
+                    {customAiKeyInfo?.has_custom_key && !isReplacingKey ? (
+                        <div className="p-4 bg-[#121417] border-2 border-black rounded-none flex items-center justify-between gap-4 shadow-[3px_3px_0px_0px_#000000] flex-wrap">
+                            <div className="flex items-center gap-3.5 min-w-0">
+                                <div className="p-2 bg-[#00FF66] text-black border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000] shrink-0">
+                                    <CheckCircle2 size={16} strokeWidth={2.5} />
                                 </div>
                                 <div className="min-w-0 font-mono">
-                                    <div className="text-[10px] font-black uppercase text-neutral-400">// ACTIVE PROJECT KEY</div>
-                                    <div className="text-[13px] font-bold text-white tracking-widest truncate">{customAiKeyInfo.masked_key}</div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-[#00FF66] bg-black px-1.5 py-0.5 border border-neutral-700">
+                                            // ACTIVE PROJECT KEY
+                                        </span>
+                                    </div>
+                                    <div className="text-[14px] font-bold text-white tracking-widest mt-1 truncate">
+                                        {customAiKeyInfo.masked_key}
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                                        Dedicated quotas active for PR reviews, MoM parser, and task automation.
+                                    </p>
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
-                                className="px-3 py-1.5 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                            >
-                                <Trash2 size={12} />
-                                <span>REMOVE</span>
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsReplacingKey(true);
+                                        setCustomAiInput('');
+                                        setAiKeyTestResult(null);
+                                    }}
+                                    className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    <RefreshCw size={12} strokeWidth={2.5} />
+                                    <span>REPLACE KEY</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
+                                    className="px-3.5 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    <Trash2 size={12} />
+                                    <span>REMOVE</span>
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-[11px] font-bold uppercase text-neutral-400 font-mono">
+                                        // {isReplacingKey ? "ENTER REPLACEMENT GEMINI API KEY" : "ENTER GOOGLE GEMINI API KEY"}
+                                    </label>
+                                    <a
+                                        href="https://aistudio.google.com/app/apikey"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#FFE600] hover:underline"
+                                    >
+                                        <span>GET FREE KEY (AI STUDIO)</span>
+                                        <ExternalLink size={11} />
+                                    </a>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                    <div className="relative flex-1 min-w-[280px]">
+                                        <input
+                                            type={showCustomAiKey ? "text" : "password"}
+                                            value={customAiInput}
+                                            onChange={(e) => {
+                                                setCustomAiInput(e.target.value);
+                                                setAiKeyTestResult(null);
+                                            }}
+                                            placeholder={isReplacingKey ? "Enter new API key (AIzaSy...)" : "AIzaSy..."}
+                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-white tracking-wider focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCustomAiKey(!showCustomAiKey)}
+                                        className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        title={showCustomAiKey ? "Hide Key" : "Reveal Key"}
+                                    >
+                                        {showCustomAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        <span>{showCustomAiKey ? "HIDE" : "REVEAL"}</span>
+                                    </button>
+                                    {isReplacingKey && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsReplacingKey(false);
+                                                setCustomAiInput('');
+                                                setAiKeyTestResult(null);
+                                            }}
+                                            className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-400 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <X size={14} />
+                                            <span>CANCEL</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleTestCustomAiKey}
+                                        disabled={aiKeyTesting || !customAiInput.trim()}
+                                        className="px-4 py-2.5 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    >
+                                        <Bot size={14} />
+                                        <span>{aiKeyTesting ? "TESTING..." : "TEST KEY"}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveCustomAiKey}
+                                        disabled={aiKeySaving || !customAiInput.trim()}
+                                        className="px-4 py-2.5 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    >
+                                        <Save size={14} strokeWidth={2.5} />
+                                        <span>{aiKeySaving ? "SAVING..." : "SAVE KEY"}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Test Feedback banner */}
+                            {aiKeyTestResult && (
+                                <div
+                                    className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${
+                                        aiKeyTestResult.valid
+                                            ? "bg-[#00FF66] text-black font-bold"
+                                            : "bg-[#FF3333] text-white font-bold"
+                                    }`}
+                                >
+                                    {aiKeyTestResult.valid ? (
+                                        <>
+                                            <CheckCircle2 size={15} strokeWidth={2.5} />
+                                            <span>KEY VALID & READY! PING VERIFIED WITH MODEL: {aiKeyTestResult.model?.toUpperCase()}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <AlertTriangle size={15} strokeWidth={2.5} />
+                                            <span>VALIDATION ERROR: {aiKeyTestResult.error || "INVALID KEY"}</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
-
-                    <div className="space-y-3">
-                        <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="block text-[11px] font-bold uppercase text-neutral-400 font-mono">
-                                    // {customAiKeyInfo?.has_custom_key ? "REPLACE GEMINI API KEY" : "ENTER GOOGLE GEMINI API KEY"}
-                                </label>
-                                <a
-                                    href="https://aistudio.google.com/app/apikey"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#FFE600] hover:underline"
-                                >
-                                    <span>GET FREE KEY (AI STUDIO)</span>
-                                    <ExternalLink size={11} />
-                                </a>
-                            </div>
-
-                            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                                <div className="relative flex-1 min-w-[280px]">
-                                    <input
-                                        type={showCustomAiKey ? "text" : "password"}
-                                        value={customAiInput}
-                                        onChange={(e) => {
-                                            setCustomAiInput(e.target.value);
-                                            setAiKeyTestResult(null);
-                                        }}
-                                        placeholder={customAiKeyInfo?.has_custom_key ? "Enter new API key (AIzaSy...)" : "AIzaSy..."}
-                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-white tracking-wider focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCustomAiKey(!showCustomAiKey)}
-                                    className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    title={showCustomAiKey ? "Hide Key" : "Reveal Key"}
-                                >
-                                    {showCustomAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                                    <span>{showCustomAiKey ? "HIDE" : "REVEAL"}</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleTestCustomAiKey}
-                                    disabled={aiKeyTesting || !customAiInput.trim()}
-                                    className="px-4 py-2.5 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                >
-                                    <Bot size={14} />
-                                    <span>{aiKeyTesting ? "TESTING..." : "TEST KEY"}</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveCustomAiKey}
-                                    disabled={aiKeySaving || !customAiInput.trim()}
-                                    className="px-4 py-2.5 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                >
-                                    <Save size={14} strokeWidth={2.5} />
-                                    <span>{aiKeySaving ? "SAVING..." : "SAVE KEY"}</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Test Feedback banner */}
-                        {aiKeyTestResult && (
-                            <div
-                                className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${
-                                    aiKeyTestResult.valid
-                                        ? "bg-[#00FF66] text-black font-bold"
-                                        : "bg-[#FF3333] text-white font-bold"
-                                }`}
-                            >
-                                {aiKeyTestResult.valid ? (
-                                    <>
-                                        <CheckCircle2 size={15} strokeWidth={2.5} />
-                                        <span>KEY VALID & READY! PING VERIFIED WITH MODEL: {aiKeyTestResult.model?.toUpperCase()}</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <AlertTriangle size={15} strokeWidth={2.5} />
-                                        <span>VALIDATION ERROR: {aiKeyTestResult.error || "INVALID KEY"}</span>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
                 </div>
             </SurfaceCard>
 

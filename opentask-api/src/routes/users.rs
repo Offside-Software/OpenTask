@@ -28,7 +28,7 @@ pub async fn list_users(
     State(state): State<AppState>,
     Query(query): Query<UserListQuery>,
 ) -> Result<Json<Vec<DatabaseUser>>, AppError> {
-    let rows = if let Some(search) = query.username {
+    let mut rows = if let Some(search) = query.username {
         let pattern = format!("%{search}%");
         sqlx::query_as::<_, DatabaseUser>(
             r#"
@@ -52,6 +52,18 @@ pub async fn list_users(
         .fetch_all(&state.pool)
         .await?
     };
+
+    for u in &mut rows {
+        if let Some(ref cid) = u.telegram_chat_id {
+            if !cid.is_empty() {
+                u.telegram_chat_id = Some(if cid.len() > 4 {
+                    format!("{}••••", &cid[..2])
+                } else {
+                    "••••".to_string()
+                });
+            }
+        }
+    }
 
     Ok(Json(rows))
 }

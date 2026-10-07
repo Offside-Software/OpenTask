@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::Row;
 
@@ -25,6 +25,21 @@ pub struct TaskSearchQuery {
     pub q: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct BucketTasksQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BucketTasksResponse {
+    pub tasks: Vec<DatabaseTask>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+    pub has_more: bool,
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/tasks", post(create_task).get(list_tasks))
@@ -34,6 +49,10 @@ pub fn router() -> Router<AppState> {
         )
         .route("/tasks/{task_id}/redirect", get(redirect_task))
         .route("/projects/{project_id}/tasks/search", get(search_tasks))
+        .route(
+            "/projects/{project_id}/buckets/{bucket_id}/tasks",
+            get(get_bucket_tasks),
+        )
         .route(
             "/projects/{project_id}/buckets/{bucket_id}/tasks/reorder",
             axum::routing::put(reorder_tasks),
@@ -455,6 +474,12 @@ pub async fn reorder_tasks(
             .collect(),
     };
 
+    if items.len() > 500 {
+        return Err(AppError::BadRequest(
+            "A maximum of 500 tasks can be reordered at once".to_string(),
+        ));
+    }
+
     let mut tx = state.pool.begin().await?;
     let mut ordered_ids = Vec::with_capacity(items.len());
 
@@ -491,6 +516,12 @@ pub async fn batch_review_tasks(
     State(state): State<AppState>,
     Json(payload): Json<BatchReviewPayload>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    if payload.tasks.len() > 100 {
+        return Err(AppError::BadRequest(
+            "A maximum of 100 tasks can be reviewed at once".to_string(),
+        ));
+    }
+
     let mut tx = state.pool.begin().await?;
 
     // 1. Lock the alert row FOR UPDATE to guard against double-processing
@@ -583,3 +614,51 @@ pub async fn batch_review_tasks(
         "task_ids": inserted_ids
     })))
 }
+
+pub async fn get_bucket_tasks(
+    State(state): State<AppState>,
+    Path((project_id, bucket_id)): Path<(SafeId, SafeId)>,
+    Query(query): Query<BucketTasksQuery>,
+) -> Result<Json<BucketTasksResponse>, AppError> {
+    let limit = query.limit.unwrap_or(20);
+    let offset = query.offset.unwrap_or(0);
+
+    let tasks = sqlx::query_as::<_, DatabaseTask>(
+        r#"
+        SELECT id, project_id, bucket_id, meeting_id,
+               parent_task_id, lead_assignee_id, suggested_assignee_id,
+               title, description, type as task_type, weight, branch_name, repo_url,
+               last_activity_at, order_idx, created_at, updated_at
+        FROM opentask.tasks
+        WHERE project_id = $1 AND bucket_id = $2
+        ORDER BY order_idx ASC
+        LIMIT $3 OFFSET $4;
+        "#
+    )
+    .bind(project_id.0)
+    .bind(bucket_id.0)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let count_row = sqlx::query(
+        "SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = $1 AND bucket_id = $2;"
+    )
+    .bind(project_id.0)
+    .bind(bucket_id.0)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let total: i64 = count_row.try_get("count").unwrap_or(0);
+    let has_more = (offset + tasks.len() as i64) < total;
+
+    Ok(Json(BucketTasksResponse {
+        tasks,
+        total,
+        limit,
+        offset,
+        has_more,
+    }))
+}
+

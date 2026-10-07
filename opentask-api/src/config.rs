@@ -106,12 +106,8 @@ impl Config {
 
     fn resolve_database_url() -> String {
         if let Some(url) = get_clean_env("POSTGRESQL_DATABASE_URL").or_else(|| get_clean_env("DATABASE_URL")) {
-            // Supabase Pooler note: Port 6543 is Transaction Mode (which does not support SQLx prepared statements).
-            // Port 5432 on the pooler is Session Mode (officially designated by Supabase for SQLx/Prisma with prepared statements).
-            if url.contains(".pooler.supabase.com:6543") {
-                tracing::info!("Switching Supabase pooler from Transaction Mode (:6543) to Session Mode (:5432) for SQLx prepared statement support.");
-                return url.replace(".pooler.supabase.com:6543", ".pooler.supabase.com:5432");
-            }
+            // Keep Supabase transaction pooling (:6543). Statement caching is
+            // disabled in get_connect_options for PgBouncer compatibility.
             return url;
         }
 

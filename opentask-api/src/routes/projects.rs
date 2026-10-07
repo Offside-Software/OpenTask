@@ -271,11 +271,11 @@ pub async fn get_project_board(
 
     for b in &mut buckets {
         if let Some(id) = b.id {
-            b.task_count = count_map.get(&Some(id.0)).copied();
+            b.task_count = Some(count_map.get(&Some(id.0)).copied().unwrap_or(0));
         }
     }
 
-    let limit = query.limit_per_bucket.unwrap_or(50);
+    let limit = query.limit_per_bucket.unwrap_or(20);
     let tasks = sqlx::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
@@ -495,11 +495,15 @@ pub async fn create_project_api_key(
         rand::random::<u128>()
     );
 
-    sqlx::query("UPDATE opentask.projects SET api_key = $1, updated_at = NOW() WHERE id = $2;")
+    let res = sqlx::query("UPDATE opentask.projects SET api_key = $1, updated_at = NOW() WHERE id = $2;")
         .bind(&generated)
         .bind(project_id.0)
         .execute(&state.pool)
         .await?;
+
+    if res.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("Project {project_id} not found")));
+    }
 
     Ok(Json(ProjectApiKeyResponse {
         project_id,
@@ -511,10 +515,14 @@ pub async fn delete_project_api_key(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<StatusCode, AppError> {
-    sqlx::query("UPDATE opentask.projects SET api_key = NULL, updated_at = NOW() WHERE id = $1;")
+    let res = sqlx::query("UPDATE opentask.projects SET api_key = NULL, updated_at = NOW() WHERE id = $1;")
         .bind(project_id.0)
         .execute(&state.pool)
         .await?;
+
+    if res.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("Project {project_id} not found")));
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

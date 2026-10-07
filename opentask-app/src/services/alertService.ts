@@ -30,6 +30,16 @@ export const alertService = {
       method: "PUT",
       body: JSON.stringify({ is_resolved: true }),
     });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("opentask:alerts-updated"));
+      try {
+        const channel = new BroadcastChannel("opentask:alerts-channel");
+        channel.postMessage("updated");
+        channel.close();
+      } catch {
+        // Ignore
+      }
+    }
   },
 
   confirmTasks: async (

@@ -75,6 +75,10 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     }
   };
 
+  const hasRemainingByTotal = totalTasks != null && totalTasks > taskCount;
+  const canLoadMore = taskCount > 0 && (hasMoreTasks ?? hasRemainingByTotal);
+  const remainingTasks = totalTasks != null ? Math.max(0, totalTasks - taskCount) : 0;
+
   return (
     <div
       draggable={!!onDragStartColumn}
@@ -100,9 +104,9 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             <span
               className="px-1.5 py-0.5 rounded-none bg-black text-[#FFE600] border border-neutral-700 font-mono text-[10px] font-black"
-              title={totalTasks !== undefined && totalTasks > taskCount ? `Loaded ${taskCount} of ${totalTasks} tasks` : `${taskCount} tasks`}
+              title={hasRemainingByTotal ? `Loaded ${taskCount} of ${totalTasks} tasks` : `${taskCount} tasks`}
             >
-              {totalTasks !== undefined && totalTasks > taskCount
+              {hasRemainingByTotal
                 ? `${taskCount}/${totalTasks}`
                 : String(taskCount).padStart(2, '0')}
             </span>
@@ -150,7 +154,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       <div className="p-3 overflow-y-auto space-y-3 no-scrollbar flex-1 relative min-h-[140px]">
         {children}
 
-        {(hasMoreTasks || (totalTasks !== undefined && taskCount < totalTasks)) && (
+        {canLoadMore && (
           <button
             onClick={() => onLoadMore && onLoadMore(id)}
             disabled={isLoadingMore}
@@ -165,7 +169,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             ) : (
               <>
                 <ChevronDown size={14} strokeWidth={3} />
-                <span>LOAD MORE {totalTasks !== undefined && totalTasks > taskCount ? `(${totalTasks - taskCount} MORE)` : '(+20)'}</span>
+                <span>LOAD MORE {remainingTasks > 0 ? `(${remainingTasks} MORE)` : '(+20)'}</span>
               </>
             )}
           </button>

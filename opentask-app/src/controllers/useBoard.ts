@@ -32,7 +32,7 @@ export const useBoard = (projectId: string | number) => {
         if (!silent) {
           setLoading(true);
         }
-        const data = await apiFetch<BoardData>(`/projects/${projectId}/board`);
+        const data = await apiFetch<BoardData>(`/projects/${projectId}/board?limit_per_bucket=20`);
         const sortedBuckets = [...(data.buckets ?? [])].sort(
           (a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0),
         );
@@ -79,13 +79,28 @@ export const useBoard = (projectId: string | number) => {
    */
   const moveTaskLocally = useCallback(
     (taskId: number | string, newBucketId: number | string) => {
-      setTasks((prev) =>
-        prev.map((t) =>
+      setTasks((prev) => {
+        const movedTask = prev.find((t) => String(t.id) === String(taskId));
+        if (movedTask && String(movedTask.bucket_id) !== String(newBucketId)) {
+          const oldBucketId = movedTask.bucket_id;
+          setBuckets((bucketsPrev) =>
+            bucketsPrev.map((b) => {
+              if (String(b.id) === String(oldBucketId)) {
+                return { ...b, task_count: Math.max(0, (b.task_count ?? 1) - 1) };
+              }
+              if (String(b.id) === String(newBucketId)) {
+                return { ...b, task_count: (b.task_count ?? 0) + 1 };
+              }
+              return b;
+            })
+          );
+        }
+        return prev.map((t) =>
           String(t.id) === String(taskId)
             ? { ...t, bucket_id: newBucketId }
             : t,
-        ),
-      );
+        );
+      });
     },
     [],
   );
@@ -158,13 +173,34 @@ export const useBoard = (projectId: string | number) => {
       }
       return [...prev, newTask];
     });
+    if (newTask.bucket_id) {
+      setBuckets((bucketsPrev) =>
+        bucketsPrev.map((b) =>
+          String(b.id) === String(newTask.bucket_id)
+            ? { ...b, task_count: (b.task_count ?? 0) + 1 }
+            : b
+        )
+      );
+    }
   }, []);
 
   /**
    * Optimistically remove a task from local state
    */
   const removeTaskLocally = useCallback((taskId: number | string) => {
-    setTasks((prev) => prev.filter((t) => String(t.id) !== String(taskId)));
+    setTasks((prev) => {
+      const taskToRemove = prev.find((t) => String(t.id) === String(taskId));
+      if (taskToRemove?.bucket_id) {
+        setBuckets((bucketsPrev) =>
+          bucketsPrev.map((b) =>
+            String(b.id) === String(taskToRemove.bucket_id)
+              ? { ...b, task_count: Math.max(0, (b.task_count ?? 1) - 1) }
+              : b
+          )
+        );
+      }
+      return prev.filter((t) => String(t.id) !== String(taskId));
+    });
   }, []);
 
   const [loadingBuckets, setLoadingBuckets] = useState<Record<string, boolean>>({});
@@ -185,8 +221,8 @@ export const useBoard = (projectId: string | number) => {
 
         if (res.tasks && res.tasks.length > 0) {
           setTasks((prev) => {
-            const existingIds = new Set(prev.map((t) => t.id));
-            const newTasks = res.tasks.filter((t) => !existingIds.has(t.id));
+            const existingIds = new Set(prev.map((t) => String(t.id)));
+            const newTasks = res.tasks.filter((t) => !existingIds.has(String(t.id)));
             return [...prev, ...newTasks];
           });
         }

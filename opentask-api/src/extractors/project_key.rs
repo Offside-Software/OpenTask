@@ -46,21 +46,35 @@ where
             .filter(|k| !k.is_empty())
             .ok_or_else(|| AppError::Unauthorized("Missing X-Project-Key or Bearer token".to_string()))?;
 
-        let row = sqlx::query("SELECT id, name FROM opentask.projects WHERE api_key = $1 LIMIT 1;")
-            .bind(key)
-            .fetch_optional(&pool)
+        let rows = sqlx::query("SELECT id, name, api_key FROM opentask.projects WHERE api_key IS NOT NULL;")
+            .fetch_all(&pool)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to verify project API key: {e}")))?;
 
-        match row {
-            Some(r) => {
-                let id: i64 = r.try_get("id").unwrap_or(0);
-                let name: String = r.try_get("name").unwrap_or_default();
-                Ok(ProjectContext {
-                    id: SafeId(id),
-                    name,
-                })
+        let mut matched = None;
+        for r in rows {
+            let stored_key: Option<String> = r.try_get("api_key").ok().flatten();
+            if let Some(stored) = stored_key {
+                let is_valid = if stored.starts_with("$argon2") {
+                    crate::services::hasher::verify_hash(&key, &stored)
+                } else {
+                    stored == key
+                };
+
+                if is_valid {
+                    let id: i64 = r.try_get("id").unwrap_or(0);
+                    let name: String = r.try_get("name").unwrap_or_default();
+                    matched = Some(ProjectContext {
+                        id: SafeId(id),
+                        name,
+                    });
+                    break;
+                }
             }
+        }
+
+        match matched {
+            Some(ctx) => Ok(ctx),
             None => Err(AppError::Forbidden("Invalid project API key".to_string())),
         }
     }

@@ -185,6 +185,12 @@ pub async fn reorder_buckets(
             .collect(),
     };
 
+    if items.len() > 100 {
+        return Err(AppError::BadRequest(
+            "A maximum of 100 buckets can be reordered at once".to_string(),
+        ));
+    }
+
     let mut tx = state.pool.begin().await?;
     let mut ordered_ids = Vec::with_capacity(items.len());
 

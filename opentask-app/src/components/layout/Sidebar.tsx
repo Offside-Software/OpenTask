@@ -23,7 +23,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const { alerts } = useAlerts();
+  const { alerts } = useAlerts({ userId: user?.db_user?.id });
 
   const [isHovered, setIsHovered] = useState(false);
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
@@ -86,7 +86,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                   <div className="w-10 h-full flex items-center justify-center shrink-0 relative">
                     <Icon size={19} strokeWidth={2.5} />
                     {hasUnread && (
-                      <div className="absolute top-1 right-0.5 min-w-[16px] h-[16px] bg-[#FF3333] text-white border-2 border-black rounded-none flex items-center justify-center text-[8px] font-mono font-black px-0.5 shadow-[1px_1px_0px_0px_#000000]">
+                      <div className="absolute top-1 right-0.5 min-w-[16px] h-[16px] bg-[#FF3333] text-white border-2 border-black rounded-none flex items-center justify-center text-[11px] font-mono font-black shadow-[1px_1px_0px_0px_#000000]">
                         {alerts.length > 99 ? '99+' : alerts.length}
                       </div>
                     )}

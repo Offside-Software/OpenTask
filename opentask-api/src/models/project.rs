@@ -11,7 +11,9 @@ pub struct DatabaseProject {
     pub name: String,
     pub gh_repo_url: Option<Vec<String>>,
     pub description: Option<String>,
+    #[serde(skip_serializing)]
     pub custom_ai_api_key: Option<String>,
+    #[serde(skip_serializing)]
     pub api_key: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,

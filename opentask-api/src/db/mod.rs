@@ -14,10 +14,11 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
     let options = get_connect_options(database_url)?;
 
     let pool = PgPoolOptions::new()
-        .max_connections(20)
-        .min_connections(2)
-        .acquire_timeout(Duration::from_secs(10))
+        .max_connections(5)
+        .min_connections(0)
+        .acquire_timeout(Duration::from_secs(5))
         .idle_timeout(Duration::from_secs(60))
+        .max_lifetime(Duration::from_secs(30 * 60))
         .connect_with(options)
         .await?;
 

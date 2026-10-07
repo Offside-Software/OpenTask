@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { pushNotificationService } from "../services/pushNotificationService";
 import { useToast } from "../design-system/Toast";
 import { useAuth } from "../auth/useAuth";
+import { notifyAlertsUpdated } from "./useAlerts";
 
 export const usePushNotifications = () => {
   const { user } = useAuth();
@@ -55,6 +56,7 @@ export const usePushNotifications = () => {
       } else {
         showToast(res.message || "No active device subscriptions found", "info");
       }
+      notifyAlertsUpdated();
       return res;
     } catch (err: any) {
       console.error("Send test alert error:", err);

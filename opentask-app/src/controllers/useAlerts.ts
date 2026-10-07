@@ -9,6 +9,19 @@ interface UseAlertsOptions {
   pageSize?: number;
 }
 
+export const notifyAlertsUpdated = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("opentask:alerts-updated"));
+    try {
+      const channel = new BroadcastChannel("opentask:alerts-channel");
+      channel.postMessage("updated");
+      channel.close();
+    } catch {
+      // Ignore if BroadcastChannel is not supported
+    }
+  }
+};
+
 export const useAlerts = (
   projectIdOrOptions?: string | number | UseAlertsOptions,
 ) => {
@@ -100,6 +113,49 @@ export const useAlerts = (
 
   useEffect(() => {
     fetchAlerts();
+
+    const handleUpdate = () => {
+      fetchAlerts(true);
+    };
+
+    window.addEventListener("opentask:alerts-updated", handleUpdate);
+    window.addEventListener("focus", handleUpdate);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("opentask:alerts-channel");
+      channel.onmessage = () => {
+        fetchAlerts(true);
+      };
+    } catch {
+      // Ignore
+    }
+
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "OPENTASK_PUSH_RECEIVED") {
+        fetchAlerts(true);
+      }
+    };
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", handleSwMessage);
+    }
+
+    // 15-second auto-update interval for background alert synchronization
+    const intervalId = setInterval(() => {
+      fetchAlerts(true);
+    }, 15000);
+
+    return () => {
+      window.removeEventListener("opentask:alerts-updated", handleUpdate);
+      window.removeEventListener("focus", handleUpdate);
+      if (channel) {
+        channel.close();
+      }
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", handleSwMessage);
+      }
+      clearInterval(intervalId);
+    };
   }, [fetchAlerts]);
 
   const resolveAlert = useCallback(async (id: number | string) => {
@@ -109,13 +165,12 @@ export const useAlerts = (
         ? prev.map((a) => (a.id === id ? { ...a, is_resolved: true } : a))
         : prev.filter((a) => a.id !== id),
     );
+    notifyAlertsUpdated();
   }, [includeResolved]);
 
   // When includeResolved is true, return full array so the caller can filter.
-  // For other callers, preserve existing active-only behavior.
+  // For other callers, preserve existing active-only behavior (filter out resolved alerts).
   const activeAlerts = includeResolved
-    ? alerts
-    : userId
     ? alerts
     : alerts.filter((a) => !a.is_resolved);
 

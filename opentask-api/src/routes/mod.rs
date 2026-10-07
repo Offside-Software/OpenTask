@@ -13,7 +13,7 @@ pub mod tasks;
 pub mod telegram;
 pub mod users;
 
-use axum::{routing::get, Json, Router};
+use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde_json::{json, Value};
 use crate::routes::auth::AppState;
 
@@ -39,6 +39,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/", get(root_handler))
         .route("/health", get(health_handler))
+        .route("/api/health", get(health_handler))
         .merge(api_routes.clone())
         .nest("/api", api_routes)
         .with_state(state)
@@ -48,6 +49,30 @@ async fn root_handler() -> Json<Value> {
     Json(json!({ "Message": "OpenTask Rust Tokio API is running!" }))
 }
 
-async fn health_handler() -> Json<Value> {
-    Json(json!({ "status": "healthy", "service": "opentask-api" }))
+async fn health_handler(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
+    let start = std::time::Instant::now();
+    let db_res = sqlx::query("SELECT 1;").execute(&state.pool).await;
+    let db_latency_ms = start.elapsed().as_millis();
+
+    match db_res {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(json!({
+                "status": "healthy",
+                "service": "opentask-api",
+                "database": "connected",
+                "db_latency_ms": db_latency_ms,
+            })),
+        ),
+        Err(e) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({
+                "status": "degraded",
+                "service": "opentask-api",
+                "database": "disconnected",
+                "error": e.to_string(),
+                "db_latency_ms": db_latency_ms,
+            })),
+        ),
+    }
 }

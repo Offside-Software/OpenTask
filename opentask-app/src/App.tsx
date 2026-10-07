@@ -14,6 +14,7 @@ import { SettingsModal } from "./components/modals/SettingsModal";
 import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPrompt";
 import { useState } from "react";
 import { ThemeProvider } from "./context/themeContext";
+import { NetworkBadge } from "./components/ui/NetworkBadge";
 import "./App.css";
 
 function AppShell() {
@@ -24,8 +25,11 @@ function AppShell() {
   if (!user) return <LoginPage />;
 
   return (
-    <div className="h-screen w-full bg-[var(--cmd-app-bg)] text-[var(--cmd-text-body)] font-sans flex overflow-hidden selection:bg-[#FFE600]/30 transition-colors duration-150">
+    <div className="h-screen w-full bg-[var(--cmd-app-bg)] text-[var(--cmd-text-body)] font-sans flex overflow-hidden selection:bg-[#FFE600]/30 transition-colors duration-150 relative">
       <Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
+
+      {/* Global Telemetry & Network Status Badge */}
+      <NetworkBadge />
 
       <main className="flex-1 overflow-y-auto no-scrollbar bg-dots">
         <div className="px-4 pt-8 pb-12">
