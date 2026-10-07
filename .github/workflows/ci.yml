@@ -6,7 +6,9 @@ on:
       - master
     paths:
       - 'opentask-api/**'
+      - 'opentask-app/**'
       - '.github/workflows/ci.yml'
+      - 'vercel.json'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 env:
@@ -74,3 +76,19 @@ jobs:
             docker run -d --name rust-api --restart unless-stopped -p 80:8000 --env-file ~/OpenTask/.env \
               ghcr.io/${{ env.IMAGE_NAME }}:latest
             docker image prune -af --filter "until=24h"
+
+  deploy-to-vercel:
+    # Deploy the web app (and API rewrites) only after the Rust API is live.
+    needs: deploy-to-dewacloud
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy web to Vercel
+        run: npx --yes vercel deploy --prod --yes --token="$VERCEL_TOKEN"

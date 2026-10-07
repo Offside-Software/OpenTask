@@ -24,12 +24,6 @@
   },
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": {
-        "service": "web"
-      }
-    },
-    {
       "source": "/api/(.*)",
       "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
     },
@@ -39,7 +33,13 @@
     },
     {
       "source": "/health",
-      "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/health"
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
     }
   ]
 }

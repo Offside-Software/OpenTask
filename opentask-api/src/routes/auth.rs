@@ -428,6 +428,14 @@ pub async fn auth_logout() -> Response {
 }
 
 fn get_redirect_uri(config: &Config, headers: &HeaderMap) -> String {
+    // An explicitly configured non-local URI (production) always wins; request
+    // headers are unreliable behind the Vercel -> DewaCloud proxy.
+    if !config.gh_oauth_redirect_uri.contains("localhost")
+        && !config.gh_oauth_redirect_uri.contains("127.0.0.1")
+    {
+        return config.gh_oauth_redirect_uri.clone();
+    }
+
     let host = headers
         .get("x-forwarded-host")
         .or_else(|| headers.get("host"))
@@ -447,6 +455,10 @@ fn get_redirect_uri(config: &Config, headers: &HeaderMap) -> String {
 }
 
 fn get_frontend_url(config: &Config, headers: &HeaderMap) -> String {
+    if !config.frontend_url.contains("localhost") && !config.frontend_url.contains("127.0.0.1") {
+        return config.frontend_url.clone();
+    }
+
     let host = headers
         .get("x-forwarded-host")
         .or_else(|| headers.get("host"))
