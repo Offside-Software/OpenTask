@@ -13,7 +13,13 @@
       "framework": "vite",
       "buildCommand": "bun run build",
       "installCommand": "bun install",
-      "outputDirectory": "dist"
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/(.*)",
+          "destination": "/index.html"
+        }
+      ]
     },
     "tokio-api": {
       "root": ".",
