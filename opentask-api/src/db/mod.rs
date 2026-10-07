@@ -42,14 +42,14 @@ where
 
 pub fn get_pool_options() -> PgPoolOptions {
     PgPoolOptions::new()
-        // Vercel can run multiple container instances. Keep each instance's
-        // session-pooler footprint small so the Supabase session limit is not
-        // exhausted across replicas.
-        .max_connections(2)
+        // Supabase Session Pooler has a global per-project session limit.
+        // Vercel can run many Fluid instances, so allow only one database
+        // session per instance and release idle sessions quickly.
+        .max_connections(1)
         .min_connections(0)
         .acquire_timeout(Duration::from_secs(5))
-        .idle_timeout(Duration::from_secs(60))
-        .max_lifetime(Duration::from_secs(30 * 60))
+        .idle_timeout(Duration::from_secs(15))
+        .max_lifetime(Duration::from_secs(10 * 60))
 }
 
 pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
