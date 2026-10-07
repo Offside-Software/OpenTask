@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, Query, State},
     routing::get,
     Json, Router,
@@ -30,7 +30,7 @@ pub async fn list_users(
 ) -> Result<Json<Vec<DatabaseUser>>, AppError> {
     let mut rows = if let Some(search) = query.username {
         let pattern = format!("%{search}%");
-        sqlx::query_as::<_, DatabaseUser>(
+        crate::db::query_as::<_, DatabaseUser>(
             r#"
             SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id::TEXT, email, custom_ai_api_key
             FROM opentask.users
@@ -42,7 +42,7 @@ pub async fn list_users(
         .fetch_all(&state.pool)
         .await?
     } else {
-        sqlx::query_as::<_, DatabaseUser>(
+        crate::db::query_as::<_, DatabaseUser>(
             r#"
             SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id::TEXT, email, custom_ai_api_key
             FROM opentask.users
@@ -72,7 +72,7 @@ pub async fn get_user_by_id(
     State(state): State<AppState>,
     Path(user_id): Path<SafeId>,
 ) -> Result<Json<DatabaseUser>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseUser>(
+    let row = crate::db::query_as::<_, DatabaseUser>(
         r#"
         SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id::TEXT, email, custom_ai_api_key
         FROM opentask.users
@@ -93,7 +93,7 @@ pub async fn update_user_by_id(
     Path(user_id): Path<SafeId>,
     Json(payload): Json<UserUpdate>,
 ) -> Result<Json<DatabaseUser>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseUser>(
+    let row = crate::db::query_as::<_, DatabaseUser>(
         r#"
         UPDATE opentask.users
         SET display_name = COALESCE($1, display_name),
@@ -126,7 +126,7 @@ pub async fn delete_user_by_id(
     State(state): State<AppState>,
     Path(user_id): Path<SafeId>,
 ) -> Result<Json<Value>, AppError> {
-    let res = sqlx::query("DELETE FROM opentask.users WHERE id = $1;")
+    let res = crate::db::query("DELETE FROM opentask.users WHERE id = $1;")
         .bind(user_id.0)
         .execute(&state.pool)
         .await?;

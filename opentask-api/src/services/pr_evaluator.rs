@@ -1,4 +1,4 @@
-use reqwest::Client;
+﻿use reqwest::Client;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 
@@ -64,7 +64,7 @@ pub async fn evaluate_pull_request(
     }
 
     // 4. Find matching project
-    let project_row = sqlx::query(
+    let project_row = crate::db::query(
         "SELECT id, name FROM opentask.projects WHERE $1 = ANY(gh_repo_url) LIMIT 1;"
     )
     .bind(repo_full_name)
@@ -81,7 +81,7 @@ pub async fn evaluate_pull_request(
 
     // 6. Find tasks in project
     let tasks_summary = if let Some(pid) = project_id {
-        let tasks = sqlx::query(
+        let tasks = crate::db::query(
             "SELECT id, title, description, branch_name FROM opentask.tasks WHERE project_id = $1 LIMIT 50;"
         )
         .bind(pid)
@@ -133,7 +133,7 @@ pub async fn evaluate_pull_request(
 
     // 8. Save review to DB
     let review_id = next_id();
-    let _ = sqlx::query(
+    let _ = crate::db::query(
         r#"
         INSERT INTO opentask.pr_reviews
             (id, project_id, task_id, repo_full_name, pr_number, pr_title, pr_url, verdict, feedback, completeness_score, reviewed_at)
@@ -173,7 +173,7 @@ pub async fn evaluate_pull_request(
     // 10. Dispatch Web Push notification and persistent in-app alert
     let mut assignee_id = None;
     if let Some(tid) = matched_id {
-        if let Ok(Some(t_row)) = sqlx::query("SELECT lead_assignee_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
+        if let Ok(Some(t_row)) = crate::db::query("SELECT lead_assignee_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
             .bind(tid)
             .fetch_optional(pool)
             .await

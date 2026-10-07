@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post, put},
@@ -33,7 +33,7 @@ pub async fn create_bucket(
         .project_id
         .ok_or_else(|| AppError::BadRequest("project_id is required".to_string()))?;
 
-    let max_idx_row = sqlx::query("SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.buckets WHERE project_id = $1;")
+    let max_idx_row = crate::db::query("SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.buckets WHERE project_id = $1;")
         .bind(project_id.0)
         .fetch_one(&state.pool)
         .await?;
@@ -43,7 +43,7 @@ pub async fn create_bucket(
     let name = payload.name.unwrap_or_else(|| "Untitled".to_string());
     let state_str = payload.state.unwrap_or_else(|| "BACKLOG".to_string());
 
-    let row = sqlx::query_as::<_, DatabaseBucket>(
+    let row = crate::db::query_as::<_, DatabaseBucket>(
         r#"
         INSERT INTO opentask.buckets (id, project_id, name, description, state, is_system_locked, order_idx, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
@@ -67,7 +67,7 @@ pub async fn list_buckets(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<Vec<DatabaseBucket>>, AppError> {
-    let rows = sqlx::query_as::<_, DatabaseBucket>(
+    let rows = crate::db::query_as::<_, DatabaseBucket>(
         r#"
         SELECT id, project_id, name, description, state, is_system_locked, NULL::BIGINT as task_count, order_idx, created_at, updated_at
         FROM opentask.buckets
@@ -86,7 +86,7 @@ pub async fn get_bucket(
     State(state): State<AppState>,
     Path((_project_id, bucket_id)): Path<(SafeId, SafeId)>,
 ) -> Result<Json<DatabaseBucket>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseBucket>(
+    let row = crate::db::query_as::<_, DatabaseBucket>(
         r#"
         SELECT id, project_id, name, description, state, is_system_locked, NULL::BIGINT as task_count, order_idx, created_at, updated_at
         FROM opentask.buckets
@@ -107,7 +107,7 @@ pub async fn update_bucket(
     Path((_project_id, bucket_id)): Path<(SafeId, SafeId)>,
     Json(payload): Json<DatabaseBucket>,
 ) -> Result<Json<DatabaseBucket>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseBucket>(
+    let row = crate::db::query_as::<_, DatabaseBucket>(
         r#"
         UPDATE opentask.buckets
         SET name = COALESCE($1, name),
@@ -143,7 +143,7 @@ pub async fn delete_bucket(
     State(state): State<AppState>,
     Path((_project_id, bucket_id)): Path<(SafeId, SafeId)>,
 ) -> Result<StatusCode, AppError> {
-    let locked_row = sqlx::query("SELECT is_system_locked FROM opentask.buckets WHERE id = $1;")
+    let locked_row = crate::db::query("SELECT is_system_locked FROM opentask.buckets WHERE id = $1;")
         .bind(bucket_id.0)
         .fetch_optional(&state.pool)
         .await?;
@@ -156,7 +156,7 @@ pub async fn delete_bucket(
         return Err(AppError::Forbidden("Cannot delete a system-locked bucket".to_string()));
     }
 
-    let res = sqlx::query("DELETE FROM opentask.buckets WHERE id = $1;")
+    let res = crate::db::query("DELETE FROM opentask.buckets WHERE id = $1;")
         .bind(bucket_id.0)
         .execute(&state.pool)
         .await?;
@@ -196,7 +196,7 @@ pub async fn reorder_buckets(
 
     for (b_id, order_idx) in &items {
         ordered_ids.push(b_id.to_string());
-        sqlx::query("UPDATE opentask.buckets SET order_idx = $1, updated_at = NOW() WHERE id = $2 AND project_id = $3;")
+        crate::db::query("UPDATE opentask.buckets SET order_idx = $1, updated_at = NOW() WHERE id = $2 AND project_id = $3;")
             .bind(order_idx)
             .bind(b_id.0)
             .bind(project_id.0)

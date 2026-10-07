@@ -106,14 +106,15 @@ impl Config {
 
     fn resolve_database_url() -> String {
         if let Some(mut url) = get_clean_env("POSTGRESQL_DATABASE_URL").or_else(|| get_clean_env("DATABASE_URL")) {
-            // Supabase pooler compatibility:
-            // Port 6543 uses Supavisor Transaction Pooling, which is incompatible with
-            // SQLx named prepared statements (causes 42P05 "prepared statement sqlx_s_X already exists" errors).
-            // Port 5432 uses Supavisor Session Pooling, which assigns dedicated backend connections per session,
-            // supports prepared statements, and is reachable over IPv4 from serverless / Vercel container runtimes.
-            if url.contains("pooler.supabase.com:6543") {
-                eprintln!("[INFO] Detected Supabase pooler on port 6543 (Transaction Mode). Rewriting to port 5432 (Session Mode) for SQLx prepared statement compatibility.");
-                url = url.replace(":6543", ":5432");
+            // Supabase Supavisor pooler compatibility:
+            // In serverless environments (Vercel), Session Mode (port 5432) has a strict limit
+            // of 15 connections total (causing "(EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15").
+            // Transaction Mode (port 6543) supports thousands of concurrent client connections.
+            // With all queries across opentask-api configured with .persistent(false) (unnamed prepared statements),
+            // Transaction Mode (port 6543) is fully supported without any statement collisions.
+            if url.contains("pooler.supabase.com:5432") {
+                eprintln!("[INFO] Detected Supabase pooler on port 5432 (Session Mode, capped at 15 clients). Rewriting to port 6543 (Transaction Mode) for high-concurrency serverless scaling.");
+                url = url.replace(":5432", ":6543");
             }
             return url;
         }

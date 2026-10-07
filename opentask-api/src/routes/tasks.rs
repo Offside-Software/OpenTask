@@ -73,7 +73,7 @@ pub async fn create_task(
 
     // If bucket_id is None, default to DRAFT bucket
     if target_bucket_id.is_none() {
-        let draft_row = sqlx::query(
+        let draft_row = crate::db::query(
             "SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;",
         )
         .bind(project_id.0)
@@ -86,7 +86,7 @@ pub async fn create_task(
     let b_id = target_bucket_id
         .ok_or_else(|| AppError::BadRequest("No valid bucket found for task".to_string()))?;
 
-    let max_idx_row = sqlx::query(
+    let max_idx_row = crate::db::query(
         "SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.tasks WHERE bucket_id = $1;",
     )
     .bind(b_id)
@@ -96,7 +96,7 @@ pub async fn create_task(
 
     let order_idx = payload.order_idx.unwrap_or(max_idx + 1);
 
-    let row = sqlx::query_as::<_, DatabaseTask>(
+    let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         INSERT INTO opentask.tasks
             (id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -174,7 +174,7 @@ pub async fn list_tasks(
     let pid = query.project_id.map(|p| p.0);
     let bid = query.bucket_id.map(|b| b.0);
 
-    let rows = sqlx::query_as::<_, DatabaseTask>(
+    let rows = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -197,7 +197,7 @@ pub async fn get_task(
     State(state): State<AppState>,
     Path(task_id): Path<SafeId>,
 ) -> Result<Json<DatabaseTask>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseTask>(
+    let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -276,6 +276,7 @@ pub async fn update_task(
 
     let row = builder
         .build_query_as::<DatabaseTask>()
+        .persistent(false)
         .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
@@ -338,7 +339,7 @@ pub async fn update_task(
         let tid = task_id.0;
         let aid = row.lead_assignee_id.as_ref().map(|l| l.0);
         tokio::spawn(async move {
-            if let Ok(Some(b_row)) = sqlx::query("SELECT title FROM opentask.buckets WHERE id = $1 LIMIT 1;")
+            if let Ok(Some(b_row)) = crate::db::query("SELECT title FROM opentask.buckets WHERE id = $1 LIMIT 1;")
                 .bind(b_id.0)
                 .fetch_optional(&pool)
                 .await
@@ -369,12 +370,12 @@ pub async fn delete_task(
     State(state): State<AppState>,
     Path(task_id): Path<SafeId>,
 ) -> Result<StatusCode, AppError> {
-    let task_info = sqlx::query("SELECT project_id, title FROM opentask.tasks WHERE id = $1;")
+    let task_info = crate::db::query("SELECT project_id, title FROM opentask.tasks WHERE id = $1;")
         .bind(task_id.0)
         .fetch_optional(&state.pool)
         .await?;
 
-    let res = sqlx::query("DELETE FROM opentask.tasks WHERE id = $1;")
+    let res = crate::db::query("DELETE FROM opentask.tasks WHERE id = $1;")
         .bind(task_id.0)
         .execute(&state.pool)
         .await?;
@@ -412,7 +413,7 @@ pub async fn redirect_task(
     Path(task_id): Path<SafeId>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let row =
-        sqlx::query("SELECT project_id, bucket_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
+        crate::db::query("SELECT project_id, bucket_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
             .bind(task_id.0)
             .fetch_optional(&state.pool)
             .await?
@@ -434,7 +435,7 @@ pub async fn search_tasks(
 ) -> Result<Json<Vec<DatabaseTask>>, AppError> {
     let pattern = format!("%{}%", query.q.trim());
 
-    let rows = sqlx::query_as::<_, DatabaseTask>(
+    let rows = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -485,7 +486,7 @@ pub async fn reorder_tasks(
 
     for (t_id, order_idx, b_id) in &items {
         ordered_ids.push(t_id.to_string());
-        sqlx::query(
+        crate::db::query(
             "UPDATE opentask.tasks SET order_idx = $1, bucket_id = $2, updated_at = NOW() WHERE id = $3 AND project_id = $4;"
         )
         .bind(order_idx)
@@ -526,7 +527,7 @@ pub async fn batch_review_tasks(
 
     // 1. Lock the alert row FOR UPDATE to guard against double-processing
     let alert_row =
-        sqlx::query("SELECT is_resolved FROM opentask.alerts WHERE id = $1 FOR UPDATE;")
+        crate::db::query("SELECT is_resolved FROM opentask.alerts WHERE id = $1 FOR UPDATE;")
             .bind(payload.alert_id.0)
             .fetch_optional(&mut *tx)
             .await?;
@@ -548,7 +549,7 @@ pub async fn batch_review_tasks(
     }
 
     // 2. Resolve default DRAFT bucket
-    let bucket_row = sqlx::query(
+    let bucket_row = crate::db::query(
         "SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;",
     )
     .bind(payload.project_id.0)
@@ -563,7 +564,7 @@ pub async fn batch_review_tasks(
     let mut inserted_ids = Vec::new();
     for (idx, task) in payload.tasks.into_iter().enumerate() {
         let task_id = next_id();
-        sqlx::query(
+        crate::db::query(
             r#"
             INSERT INTO opentask.tasks
                 (id, project_id, bucket_id, title, description, weight, type, lead_assignee_id, order_idx, created_at, updated_at)
@@ -586,7 +587,7 @@ pub async fn batch_review_tasks(
     }
 
     // 4. Mark alert as resolved
-    sqlx::query("UPDATE opentask.alerts SET is_resolved = TRUE, updated_at = NOW() WHERE id = $1;")
+    crate::db::query("UPDATE opentask.alerts SET is_resolved = TRUE, updated_at = NOW() WHERE id = $1;")
         .bind(payload.alert_id.0)
         .execute(&mut *tx)
         .await?;
@@ -623,7 +624,7 @@ pub async fn get_bucket_tasks(
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
 
-    let tasks = sqlx::query_as::<_, DatabaseTask>(
+    let tasks = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -642,7 +643,7 @@ pub async fn get_bucket_tasks(
     .fetch_all(&state.pool)
     .await?;
 
-    let count_row = sqlx::query(
+    let count_row = crate::db::query(
         "SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = $1 AND bucket_id = $2;"
     )
     .bind(project_id.0)

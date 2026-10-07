@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, Query, State},
     routing::get,
     Json, Router,
@@ -37,7 +37,7 @@ pub async fn list_all_alerts(
     let offset = query.offset.unwrap_or(0);
 
     let rows = if let Some(uid) = query.user_id {
-        sqlx::query_as::<_, DatabaseAlert>(
+        crate::db::query_as::<_, DatabaseAlert>(
             r#"
             SELECT id, user_id, context_id, project_id,
                    title, description, type as alert_type, severity, suggested_actions, is_resolved, pr_url, created_at, updated_at
@@ -53,7 +53,7 @@ pub async fn list_all_alerts(
         .fetch_all(&state.pool)
         .await?
     } else {
-        sqlx::query_as::<_, DatabaseAlert>(
+        crate::db::query_as::<_, DatabaseAlert>(
             r#"
             SELECT id, user_id, context_id, project_id,
                    title, description, type as alert_type, severity, suggested_actions, is_resolved, pr_url, created_at, updated_at
@@ -75,7 +75,7 @@ pub async fn list_user_alerts(
     State(state): State<AppState>,
     Path(user_id): Path<SafeId>,
 ) -> Result<Json<Vec<DatabaseAlert>>, AppError> {
-    let rows = sqlx::query_as::<_, DatabaseAlert>(
+    let rows = crate::db::query_as::<_, DatabaseAlert>(
         r#"
         SELECT id, user_id, context_id, project_id,
                title, description, type as alert_type, severity, suggested_actions, is_resolved, pr_url, created_at, updated_at
@@ -95,7 +95,7 @@ pub async fn get_alert(
     State(state): State<AppState>,
     Path(alert_id): Path<SafeId>,
 ) -> Result<Json<DatabaseAlert>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseAlert>(
+    let row = crate::db::query_as::<_, DatabaseAlert>(
         r#"
         SELECT id, user_id, context_id, project_id,
                title, description, type as alert_type, severity, suggested_actions, is_resolved, pr_url, created_at, updated_at
@@ -117,7 +117,7 @@ pub async fn update_alert(
     Path(alert_id): Path<SafeId>,
     Json(payload): Json<UpdateAlertPayload>,
 ) -> Result<Json<DatabaseAlert>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseAlert>(
+    let row = crate::db::query_as::<_, DatabaseAlert>(
         r#"
         UPDATE opentask.alerts
         SET is_resolved = COALESCE($1, is_resolved),

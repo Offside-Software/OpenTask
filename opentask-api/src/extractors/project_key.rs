@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::FromRequestParts,
     http::request::Parts,
 };
@@ -46,7 +46,7 @@ where
             .filter(|k| !k.is_empty())
             .ok_or_else(|| AppError::Unauthorized("Missing X-Project-Key or Bearer token".to_string()))?;
 
-        let rows = sqlx::query("SELECT id, name, api_key FROM opentask.projects WHERE api_key IS NOT NULL;")
+        let rows = crate::db::query("SELECT id, name, api_key FROM opentask.projects WHERE api_key IS NOT NULL;")
             .fetch_all(&pool)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to verify project API key: {e}")))?;

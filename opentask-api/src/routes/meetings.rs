@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, State},
     routing::{get, post},
     Json, Router,
@@ -39,7 +39,7 @@ pub async fn create_meeting(
     let meeting_id = next_id();
     let project_id = payload.project_id.map(|p| p.0);
 
-    let row = sqlx::query_as::<_, DatabaseMeeting>(
+    let row = crate::db::query_as::<_, DatabaseMeeting>(
         r#"
         INSERT INTO opentask.meetings
             (id, project_id, user_uuid, title, date, time, duration, source_type, mom_summary, key_decisions, action_items, created_at)
@@ -68,7 +68,7 @@ pub async fn list_project_meetings(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<Vec<DatabaseMeeting>>, AppError> {
-    let rows = sqlx::query_as::<_, DatabaseMeeting>(
+    let rows = crate::db::query_as::<_, DatabaseMeeting>(
         r#"
         SELECT id, project_id, user_uuid, title, date, time, duration, source_type, mom_summary, key_decisions, action_items, created_at
         FROM opentask.meetings

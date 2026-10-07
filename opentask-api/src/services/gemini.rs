@@ -1,4 +1,4 @@
-use reqwest::Client;
+﻿use reqwest::Client;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 
@@ -84,7 +84,7 @@ pub async fn resolve_gemini_key(
 
     // 2. Project custom key
     if let Some(pid) = project_id {
-        let row = sqlx::query("SELECT custom_ai_api_key FROM opentask.projects WHERE id = $1 LIMIT 1;")
+        let row = crate::db::query("SELECT custom_ai_api_key FROM opentask.projects WHERE id = $1 LIMIT 1;")
             .bind(pid)
             .fetch_optional(pool)
             .await
@@ -103,7 +103,7 @@ pub async fn resolve_gemini_key(
 
     // 3. User personal key
     if let Some(uid) = user_id {
-        let row = sqlx::query("SELECT custom_ai_api_key FROM opentask.users WHERE id = $1 LIMIT 1;")
+        let row = crate::db::query("SELECT custom_ai_api_key FROM opentask.users WHERE id = $1 LIMIT 1;")
             .bind(uid)
             .fetch_optional(pool)
             .await

@@ -10,6 +10,36 @@ pub fn get_connect_options(database_url: &str) -> Result<PgConnectOptions, sqlx:
     Ok(options)
 }
 
+/// Helper to construct queries with `.persistent(false)` for PgBouncer / Supavisor compatibility.
+/// Prevents named prepared statement collisions (`sqlx_s_... already exists`) in transaction pooling mode.
+pub fn query<'q>(
+    sql: &'q str,
+) -> sqlx::query::Query<'q, sqlx::Postgres, <sqlx::Postgres as sqlx::Database>::Arguments<'q>> {
+    sqlx::query(sql).persistent(false)
+}
+
+/// Helper to construct query_as with `.persistent(false)` for PgBouncer / Supavisor compatibility.
+pub fn query_as<'q, DB, O>(
+    sql: &'q str,
+) -> sqlx::query::QueryAs<'q, DB, O, <DB as sqlx::Database>::Arguments<'q>>
+where
+    DB: sqlx::Database + sqlx::database::HasStatementCache,
+    O: for<'r> sqlx::FromRow<'r, DB::Row>,
+{
+    sqlx::query_as(sql).persistent(false)
+}
+
+/// Helper to construct query_scalar with `.persistent(false)` for PgBouncer / Supavisor compatibility.
+pub fn query_scalar<'q, DB, O>(
+    sql: &'q str,
+) -> sqlx::query::QueryScalar<'q, DB, O, <DB as sqlx::Database>::Arguments<'q>>
+where
+    DB: sqlx::Database + sqlx::database::HasStatementCache,
+    (O,): for<'r> sqlx::FromRow<'r, DB::Row>,
+{
+    sqlx::query_scalar(sql).persistent(false)
+}
+
 pub fn get_pool_options() -> PgPoolOptions {
     PgPoolOptions::new()
         .max_connections(5)

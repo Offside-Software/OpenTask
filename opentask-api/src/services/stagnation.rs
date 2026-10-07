@@ -1,4 +1,4 @@
-use chrono::{Duration, Utc};
+﻿use chrono::{Duration, Utc};
 use sqlx::{PgPool, Row};
 
 use crate::config::Config;
@@ -9,7 +9,7 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
     tracing::info!("Running Stagnation Radar check...");
 
     // 1. Find ongoing buckets
-    let ongoing_rows = sqlx::query("SELECT id FROM opentask.buckets WHERE state = 'ONGOING';")
+    let ongoing_rows = crate::db::query("SELECT id FROM opentask.buckets WHERE state = 'ONGOING';")
         .fetch_all(pool)
         .await?;
 
@@ -26,7 +26,7 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
     // 2. Find stagnant tasks (> 48h without activity)
     let threshold = Utc::now() - Duration::hours(48);
 
-    let stagnant_tasks = sqlx::query(
+    let stagnant_tasks = crate::db::query(
         r#"
         SELECT id, title, project_id, lead_assignee_id, suggested_assignee_id
         FROM opentask.tasks
@@ -60,7 +60,7 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
 
         // 3. Nudge developer via Telegram if configured
         if let (Some(assignee_id), Some(bot_token)) = (lead_assignee_id, &config.telegram_bot_token) {
-            let user = sqlx::query("SELECT telegram_chat_id FROM opentask.users WHERE id = $1 LIMIT 1;")
+            let user = crate::db::query("SELECT telegram_chat_id FROM opentask.users WHERE id = $1 LIMIT 1;")
                 .bind(assignee_id)
                 .fetch_optional(pool)
                 .await?;
@@ -79,7 +79,7 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
         }
 
         // 4. Find candidate with minimum load
-        let cand = sqlx::query(
+        let cand = crate::db::query(
             r#"
             SELECT user_id, current_load
             FROM opentask.project_member
@@ -99,7 +99,7 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
             let cand_user_id: i64 = cand_row.try_get("user_id").unwrap_or(0);
 
             // Update task with suggested assignee
-            let _ = sqlx::query(
+            let _ = crate::db::query(
                 "UPDATE opentask.tasks SET suggested_assignee_id = $1, updated_at = NOW() WHERE id = $2;"
             )
             .bind(cand_user_id)
@@ -108,7 +108,7 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
             .await;
 
             // 5. Alert the project manager
-            let pm = sqlx::query(
+            let pm = crate::db::query(
                 "SELECT user_id FROM opentask.project_member WHERE project_id = $1 AND role = 'MANAGER' LIMIT 1;"
             )
             .bind(pid)
@@ -121,7 +121,7 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
                 let title = format!("Task Reallocation Suggestion: {task_title}");
                 let desc = format!("Task #{task_id} has had no activity for >48h. Suggested reallocation to user #{cand_user_id}.");
 
-                let _ = sqlx::query(
+                let _ = crate::db::query(
                     r#"
                     INSERT INTO opentask.alerts (id, user_id, context_id, project_id, title, description, type, severity, is_resolved, created_at)
                     VALUES ($1, $2, $3, $4, $5, $6, 'STAGNATION', 'warning', FALSE, NOW());

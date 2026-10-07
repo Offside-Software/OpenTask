@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post},
@@ -35,7 +35,7 @@ pub async fn get_project_ai_key(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<ApiKeyStatusResponse>, AppError> {
-    let row = sqlx::query("SELECT custom_ai_api_key FROM opentask.projects WHERE id = $1;")
+    let row = crate::db::query("SELECT custom_ai_api_key FROM opentask.projects WHERE id = $1;")
         .bind(project_id.0)
         .fetch_optional(&state.pool)
         .await?;
@@ -64,7 +64,7 @@ pub async fn set_project_ai_key(
         ));
     }
 
-    sqlx::query("UPDATE opentask.projects SET custom_ai_api_key = $1, updated_at = NOW() WHERE id = $2;")
+    crate::db::query("UPDATE opentask.projects SET custom_ai_api_key = $1, updated_at = NOW() WHERE id = $2;")
         .bind(payload.api_key.trim())
         .bind(project_id.0)
         .execute(&state.pool)
@@ -77,7 +77,7 @@ pub async fn delete_project_ai_key(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<StatusCode, AppError> {
-    sqlx::query("UPDATE opentask.projects SET custom_ai_api_key = NULL, updated_at = NOW() WHERE id = $1;")
+    crate::db::query("UPDATE opentask.projects SET custom_ai_api_key = NULL, updated_at = NOW() WHERE id = $1;")
         .bind(project_id.0)
         .execute(&state.pool)
         .await?;
@@ -89,7 +89,7 @@ pub async fn get_user_ai_key(
     State(state): State<AppState>,
     CurrentUser(user, _token): CurrentUser,
 ) -> Result<Json<ApiKeyStatusResponse>, AppError> {
-    let row = sqlx::query("SELECT custom_ai_api_key FROM opentask.users WHERE gh_id = $1 OR gh_username = $2;")
+    let row = crate::db::query("SELECT custom_ai_api_key FROM opentask.users WHERE gh_id = $1 OR gh_username = $2;")
         .bind(user.id.to_string())
         .bind(&user.login)
         .fetch_optional(&state.pool)
@@ -119,7 +119,7 @@ pub async fn set_user_ai_key(
         ));
     }
 
-    sqlx::query("UPDATE opentask.users SET custom_ai_api_key = $1 WHERE gh_id = $2 OR gh_username = $3;")
+    crate::db::query("UPDATE opentask.users SET custom_ai_api_key = $1 WHERE gh_id = $2 OR gh_username = $3;")
         .bind(payload.api_key.trim())
         .bind(user.id.to_string())
         .bind(&user.login)
@@ -133,7 +133,7 @@ pub async fn delete_user_ai_key(
     State(state): State<AppState>,
     CurrentUser(user, _token): CurrentUser,
 ) -> Result<StatusCode, AppError> {
-    sqlx::query("UPDATE opentask.users SET custom_ai_api_key = NULL WHERE gh_id = $1 OR gh_username = $2;")
+    crate::db::query("UPDATE opentask.users SET custom_ai_api_key = NULL WHERE gh_id = $1 OR gh_username = $2;")
         .bind(user.id.to_string())
         .bind(&user.login)
         .execute(&state.pool)

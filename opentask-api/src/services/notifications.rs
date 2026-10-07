@@ -1,4 +1,4 @@
-use std::time::Duration;
+﻿use std::time::Duration;
 use base64ct::{Base64UrlUnpadded, Encoding as _};
 use sqlx::{PgPool, Row};
 use serde_json::json;
@@ -97,7 +97,7 @@ pub async fn send_push_notification(
     url: &str,
     tag: &str,
 ) -> Result<(usize, usize), AppError> {
-    let rows = sqlx::query(
+    let rows = crate::db::query(
         "SELECT id, endpoint, p256dh, auth FROM opentask.push_subscriptions WHERE user_id = $1;"
     )
     .bind(user_id)
@@ -138,7 +138,7 @@ pub async fn send_push_notification(
         {
             Ok(true) => delivered += 1,
             Ok(false) => {
-                let _ = sqlx::query("DELETE FROM opentask.push_subscriptions WHERE id = $1;")
+                let _ = crate::db::query("DELETE FROM opentask.push_subscriptions WHERE id = $1;")
                     .bind(sub_id)
                     .execute(pool)
                     .await;
@@ -176,7 +176,7 @@ pub async fn notify_task_assigned(
     let alert_id = next_id();
     let context_id = task_id.unwrap_or(project_id);
 
-    let _ = sqlx::query(
+    let _ = crate::db::query(
         r#"
         INSERT INTO opentask.alerts (
             id, user_id, context_id, project_id, title, description,
@@ -231,7 +231,7 @@ pub async fn notify_task_unassigned(
     let alert_id = next_id();
     let context_id = task_id.unwrap_or(project_id);
 
-    let _ = sqlx::query(
+    let _ = crate::db::query(
         r#"
         INSERT INTO opentask.alerts (
             id, user_id, context_id, project_id, title, description,
@@ -297,7 +297,7 @@ pub async fn notify_task_completed(
 
     for uid in targets {
         let alert_id = next_id();
-        let _ = sqlx::query(
+        let _ = crate::db::query(
             r#"
             INSERT INTO opentask.alerts (
                 id, user_id, context_id, project_id, title, description,
@@ -356,7 +356,7 @@ pub async fn notify_task_reopened(
 
     for uid in targets {
         let alert_id = next_id();
-        let _ = sqlx::query(
+        let _ = crate::db::query(
             r#"
             INSERT INTO opentask.alerts (
                 id, user_id, context_id, project_id, title, description,
@@ -414,7 +414,7 @@ pub async fn notify_pr_reviewed(
 
     for uid in targets {
         let alert_id = next_id();
-        let _ = sqlx::query(
+        let _ = crate::db::query(
             r#"
             INSERT INTO opentask.alerts (
                 id, user_id, context_id, project_id, title, description,

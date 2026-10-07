@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, State},
     routing::post,
     Json, Router,
@@ -89,7 +89,7 @@ pub async fn get_agent_task(
 ) -> Result<Json<DatabaseTask>, AppError> {
     let task_id = parse_task_id(&identifier)?;
 
-    let row = sqlx::query_as::<_, DatabaseTask>(
+    let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -112,7 +112,7 @@ pub async fn list_agent_tasks(
     State(state): State<AppState>,
     project: ProjectContext,
 ) -> Result<Json<Vec<DatabaseTask>>, AppError> {
-    let rows = sqlx::query_as::<_, DatabaseTask>(
+    let rows = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -138,27 +138,27 @@ pub async fn create_agent_task(
 
     // Resolve bucket
     let bucket_id: i64 = if let Some(name) = payload.bucket_name {
-        let b = sqlx::query("SELECT id FROM opentask.buckets WHERE project_id = $1 AND (name ILIKE $2 OR state ILIKE $2) LIMIT 1;")
+        let b = crate::db::query("SELECT id FROM opentask.buckets WHERE project_id = $1 AND (name ILIKE $2 OR state ILIKE $2) LIMIT 1;")
             .bind(project.id.0)
             .bind(name)
             .fetch_optional(&state.pool)
             .await?;
         b.and_then(|r| r.try_get("id").ok()).unwrap_or(1)
     } else {
-        let b = sqlx::query("SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;")
+        let b = crate::db::query("SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'DRAFT' LIMIT 1;")
             .bind(project.id.0)
             .fetch_optional(&state.pool)
             .await?;
         b.and_then(|r| r.try_get("id").ok()).unwrap_or(1)
     };
 
-    let max_idx_row = sqlx::query("SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.tasks WHERE bucket_id = $1;")
+    let max_idx_row = crate::db::query("SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.tasks WHERE bucket_id = $1;")
         .bind(bucket_id)
         .fetch_one(&state.pool)
         .await?;
     let max_idx: i32 = max_idx_row.try_get("max_idx").unwrap_or(-1);
 
-    let row = sqlx::query_as::<_, DatabaseTask>(
+    let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         INSERT INTO opentask.tasks
             (id, project_id, bucket_id, title, description, type, weight, branch_name, repo_url, order_idx, last_activity_at, created_at, updated_at)
@@ -192,7 +192,7 @@ pub async fn complete_agent_task(
     let task_id = parse_task_id(&identifier)?;
 
     // Find COMPLETED or DONE bucket
-    let completed_bucket_row = sqlx::query(
+    let completed_bucket_row = crate::db::query(
         r#"
         SELECT id FROM opentask.buckets
         WHERE project_id = $1 AND (state = 'COMPLETED' OR state = 'DONE' OR name ILIKE '%done%' OR name ILIKE '%complete%')
@@ -208,7 +208,7 @@ pub async fn complete_agent_task(
         .and_then(|r| r.try_get("id").ok())
         .ok_or_else(|| AppError::Internal("No completed bucket found in project".to_string()))?;
 
-    let row = sqlx::query_as::<_, DatabaseTask>(
+    let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         UPDATE opentask.tasks
         SET bucket_id = $1,
@@ -241,7 +241,7 @@ pub async fn move_agent_task(
     let target_name = payload.bucket_name.as_deref().unwrap_or("");
     let target_state = payload.bucket_state.as_deref().unwrap_or("");
 
-    let bucket_row = sqlx::query(
+    let bucket_row = crate::db::query(
         r#"
         SELECT id FROM opentask.buckets
         WHERE project_id = $1 AND (name ILIKE $2 OR state ILIKE $3)
@@ -258,7 +258,7 @@ pub async fn move_agent_task(
         .and_then(|r| r.try_get("id").ok())
         .ok_or_else(|| AppError::NotFound("Target bucket not found".to_string()))?;
 
-    let row = sqlx::query_as::<_, DatabaseTask>(
+    let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         UPDATE opentask.tasks
         SET bucket_id = $1,
@@ -288,7 +288,7 @@ pub async fn update_agent_task(
 ) -> Result<Json<DatabaseTask>, AppError> {
     let task_id = parse_task_id(&identifier)?;
 
-    let row = sqlx::query_as::<_, DatabaseTask>(
+    let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         UPDATE opentask.tasks
         SET title = COALESCE($1, title),
@@ -327,7 +327,7 @@ pub async fn lookup_agent_task(
 ) -> Result<Json<Vec<DatabaseTask>>, AppError> {
     let pattern = format!("%{}%", payload.query.trim());
 
-    let rows = sqlx::query_as::<_, DatabaseTask>(
+    let rows = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -350,13 +350,13 @@ pub async fn agent_summary(
     State(state): State<AppState>,
     project: ProjectContext,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let count_row = sqlx::query("SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = $1;")
+    let count_row = crate::db::query("SELECT COUNT(*) as count FROM opentask.tasks WHERE project_id = $1;")
         .bind(project.id.0)
         .fetch_one(&state.pool)
         .await?;
     let total_tasks: i64 = count_row.try_get("count").unwrap_or(0);
 
-    let active_buckets = sqlx::query("SELECT id, name, state FROM opentask.buckets WHERE project_id = $1 ORDER BY order_idx ASC;")
+    let active_buckets = crate::db::query("SELECT id, name, state FROM opentask.buckets WHERE project_id = $1 ORDER BY order_idx ASC;")
         .bind(project.id.0)
         .fetch_all(&state.pool)
         .await?;

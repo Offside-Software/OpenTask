@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::State,
     http::StatusCode,
     routing::{get, post},
@@ -60,7 +60,7 @@ pub async fn subscribe_push(
     let mut resolved_user_id: Option<i64> = None;
 
     if let Some(u) = user {
-        let row = sqlx::query("SELECT id FROM opentask.users WHERE gh_id = $1 OR gh_username = $2 LIMIT 1;")
+        let row = crate::db::query("SELECT id FROM opentask.users WHERE gh_id = $1 OR gh_username = $2 LIMIT 1;")
             .bind(u.id.to_string())
             .bind(&u.login)
             .fetch_optional(&state.pool)
@@ -79,7 +79,7 @@ pub async fn subscribe_push(
     }
 
     let sub_id = next_id();
-    sqlx::query(
+    crate::db::query(
         r#"
         INSERT INTO opentask.push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
@@ -110,7 +110,7 @@ pub async fn test_push(
     let mut target_user_id: Option<i64> = None;
 
     if let Some(u) = user {
-        let row = sqlx::query("SELECT id FROM opentask.users WHERE gh_id = $1 OR gh_username = $2 LIMIT 1;")
+        let row = crate::db::query("SELECT id FROM opentask.users WHERE gh_id = $1 OR gh_username = $2 LIMIT 1;")
             .bind(u.id.to_string())
             .bind(&u.login)
             .fetch_optional(&state.pool)
@@ -122,7 +122,7 @@ pub async fn test_push(
 
     // Fallback if session user wasn't resolved: look for the most recently active push subscriber
     if target_user_id.is_none() {
-        let sub_row = sqlx::query("SELECT user_id FROM opentask.push_subscriptions WHERE user_id IS NOT NULL ORDER BY updated_at DESC LIMIT 1;")
+        let sub_row = crate::db::query("SELECT user_id FROM opentask.push_subscriptions WHERE user_id IS NOT NULL ORDER BY updated_at DESC LIMIT 1;")
             .fetch_optional(&state.pool)
             .await?;
         if let Some(r) = sub_row {
@@ -160,7 +160,7 @@ pub async fn test_push(
 
     // Record persistent alert in opentask.alerts for in-app display
     let test_alert_id = next_id();
-    let _ = sqlx::query(
+    let _ = crate::db::query(
         r#"
         INSERT INTO opentask.alerts (
             id, user_id, context_id, project_id, title, description,

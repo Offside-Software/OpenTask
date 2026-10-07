@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, Query, State},
     routing::{get, post},
     Json, Router,
@@ -61,7 +61,7 @@ pub async fn record_project_event(
     let act_id = next_id();
     let meta_val = metadata.unwrap_or_else(|| serde_json::json!({}));
 
-    let _ = sqlx::query(
+    let _ = crate::db::query(
         r#"
         INSERT INTO opentask.project_history
             (id, project_id, user_id, user_name, event_type, entity_type, entity_id, description, metadata, created_at)
@@ -80,7 +80,7 @@ pub async fn record_project_event(
     .execute(pool)
     .await;
 
-    let _ = sqlx::query(
+    let _ = crate::db::query(
         r#"
         INSERT INTO opentask.activities
             (id, project_id, user_name, action, target, created_at)
@@ -110,7 +110,7 @@ pub async fn create_activity(
         None
     };
 
-    let mut row = sqlx::query_as::<_, DatabaseActivity>(
+    let mut row = crate::db::query_as::<_, DatabaseActivity>(
         r#"
         INSERT INTO opentask.activities (id, project_id, user_name, action, target, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
@@ -148,7 +148,7 @@ pub async fn list_project_activities(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<Vec<DatabaseActivity>>, AppError> {
-    let mut rows = sqlx::query_as::<_, DatabaseActivity>(
+    let mut rows = crate::db::query_as::<_, DatabaseActivity>(
         r#"
         SELECT id, project_id, user_name, action, target, created_at, NULL::TEXT as avatar_url
         FROM opentask.activities
@@ -181,7 +181,7 @@ pub async fn list_project_history(
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let items = sqlx::query_as::<_, DatabaseProjectHistory>(
+    let items = crate::db::query_as::<_, DatabaseProjectHistory>(
         r#"
         SELECT id, project_id, user_id, user_name,
                event_type, entity_type, entity_id, description, metadata, created_at
@@ -198,7 +198,7 @@ pub async fn list_project_history(
     .await
     .unwrap_or_default();
 
-    let total_row = sqlx::query("SELECT COUNT(*) as count FROM opentask.project_history WHERE project_id = $1;")
+    let total_row = crate::db::query("SELECT COUNT(*) as count FROM opentask.project_history WHERE project_id = $1;")
         .bind(project_id.0)
         .fetch_one(&state.pool)
         .await
@@ -290,7 +290,7 @@ pub async fn get_project_activities_timeline(
     }
 
     // 1. Fetch from opentask.activities
-    let mut raw_acts = sqlx::query_as::<_, DatabaseActivity>(
+    let mut raw_acts = crate::db::query_as::<_, DatabaseActivity>(
         r#"
         SELECT id, project_id, user_name, action, target, created_at, NULL::TEXT as avatar_url
         FROM opentask.activities
@@ -307,7 +307,7 @@ pub async fn get_project_activities_timeline(
 
     // 2. Fallback: if opentask.activities is empty, query opentask.project_history
     if raw_acts.is_empty() {
-        let hist_rows = sqlx::query_as::<_, DatabaseProjectHistory>(
+        let hist_rows = crate::db::query_as::<_, DatabaseProjectHistory>(
             r#"
             SELECT id, project_id, user_id, user_name, event_type, entity_type, entity_id, description, metadata, created_at
             FROM opentask.project_history

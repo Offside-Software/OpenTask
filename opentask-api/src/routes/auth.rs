@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
@@ -57,7 +57,7 @@ pub async fn get_or_create_user(
     // 1. Check by GitHub ID (as string)
     if let Some(gh_id_num) = github_id {
         let gh_id_str = gh_id_num.to_string();
-        let existing = sqlx::query_as::<_, DatabaseUser>(
+        let existing = crate::db::query_as::<_, DatabaseUser>(
             r#"
             SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id::TEXT, email, custom_ai_api_key
             FROM opentask.users
@@ -72,7 +72,7 @@ pub async fn get_or_create_user(
         if let Some(mut u) = existing {
             if let Some(token) = gh_access_token {
                 if u.gh_access_token.as_deref() != Some(token) {
-                    let _ = sqlx::query("UPDATE opentask.users SET gh_access_token = $1 WHERE id = $2;")
+                    let _ = crate::db::query("UPDATE opentask.users SET gh_access_token = $1 WHERE id = $2;")
                         .bind(token)
                         .bind(u.id.as_ref().map(|s| s.0))
                         .execute(pool)
@@ -82,7 +82,7 @@ pub async fn get_or_create_user(
             }
             if let (Some(dn), Some(un)) = (display_name, username) {
                 if u.display_name.as_deref() != Some(dn) || u.gh_username.as_deref() != Some(un) {
-                    let _ = sqlx::query("UPDATE opentask.users SET display_name = $1, gh_username = $2 WHERE id = $3;")
+                    let _ = crate::db::query("UPDATE opentask.users SET display_name = $1, gh_username = $2 WHERE id = $3;")
                         .bind(dn)
                         .bind(un)
                         .bind(u.id.as_ref().map(|s| s.0))
@@ -99,7 +99,7 @@ pub async fn get_or_create_user(
     // 2. Check by username
     if let Some(un) = username {
         if !un.trim().is_empty() {
-            let existing = sqlx::query_as::<_, DatabaseUser>(
+            let existing = crate::db::query_as::<_, DatabaseUser>(
                 r#"
                 SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id::TEXT, email, custom_ai_api_key
                 FROM opentask.users
@@ -113,7 +113,7 @@ pub async fn get_or_create_user(
 
             if let Some(mut u) = existing {
                 let gh_id_str = github_id.map(|id| id.to_string());
-                let _ = sqlx::query(
+                let _ = crate::db::query(
                     r#"
                     UPDATE opentask.users
                     SET gh_id = COALESCE($1, gh_id),
@@ -146,7 +146,7 @@ pub async fn get_or_create_user(
     // 3. Check by email
     if let Some(em) = email {
         if !em.trim().is_empty() {
-            let existing = sqlx::query_as::<_, DatabaseUser>(
+            let existing = crate::db::query_as::<_, DatabaseUser>(
                 r#"
                 SELECT id, display_name, created_at, telegram_chat_id, gh_username, gh_access_token, gh_id::TEXT, email, custom_ai_api_key
                 FROM opentask.users
@@ -160,7 +160,7 @@ pub async fn get_or_create_user(
 
             if let Some(mut u) = existing {
                 let gh_id_str = github_id.map(|id| id.to_string());
-                let _ = sqlx::query(
+                let _ = crate::db::query(
                     r#"
                     UPDATE opentask.users
                     SET gh_id = COALESCE($1, gh_id),
@@ -191,7 +191,7 @@ pub async fn get_or_create_user(
     let safe_chat_id = telegram_chat_id.unwrap_or("");
     let gh_id_str = github_id.map(|id| id.to_string());
 
-    let inserted = sqlx::query_as::<_, DatabaseUser>(
+    let inserted = crate::db::query_as::<_, DatabaseUser>(
         r#"
         INSERT INTO opentask.users (id, display_name, telegram_chat_id, gh_username, gh_access_token, gh_id, email, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())

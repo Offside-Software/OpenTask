@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::{Path, State},
     routing::{get, post},
     Json, Router,
@@ -32,7 +32,7 @@ pub async fn list_project_pr_reviews(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<Vec<DatabasePrReview>>, AppError> {
-    let rows = sqlx::query_as::<_, DatabasePrReview>(
+    let rows = crate::db::query_as::<_, DatabasePrReview>(
         r#"
         SELECT id, project_id, task_id,
                repo_full_name, pr_number, pr_title, pr_url, verdict, feedback, matched_task_title, completeness_score, reviewed_at
@@ -52,7 +52,7 @@ pub async fn list_task_pr_reviews(
     State(state): State<AppState>,
     Path(task_id): Path<SafeId>,
 ) -> Result<Json<Vec<DatabasePrReview>>, AppError> {
-    let rows = sqlx::query_as::<_, DatabasePrReview>(
+    let rows = crate::db::query_as::<_, DatabasePrReview>(
         r#"
         SELECT id, project_id, task_id,
                repo_full_name, pr_number, pr_title, pr_url, verdict, feedback, matched_task_title, completeness_score, reviewed_at
@@ -104,7 +104,7 @@ pub async fn list_project_pulls(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<Value>, AppError> {
-    let row = sqlx::query("SELECT gh_repo_url FROM opentask.projects WHERE id = $1;")
+    let row = crate::db::query("SELECT gh_repo_url FROM opentask.projects WHERE id = $1;")
         .bind(project_id.0)
         .fetch_optional(&state.pool)
         .await?;

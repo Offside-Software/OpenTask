@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     extract::State,
     http::StatusCode,
     routing::{get, post},
@@ -42,7 +42,7 @@ pub async fn get_chat_id(
     State(state): State<AppState>,
     CurrentUser(user, _token): CurrentUser,
 ) -> Result<Json<Value>, AppError> {
-    let row = sqlx::query("SELECT telegram_chat_id FROM opentask.users WHERE gh_id = $1 OR gh_username = $2;")
+    let row = crate::db::query("SELECT telegram_chat_id FROM opentask.users WHERE gh_id = $1 OR gh_username = $2;")
         .bind(user.id.to_string())
         .bind(&user.login)
         .fetch_optional(&state.pool)

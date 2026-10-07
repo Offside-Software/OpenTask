@@ -1,4 +1,4 @@
-use axum::{
+﻿use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
@@ -73,7 +73,7 @@ pub async fn create_project(
 
     let mut tx = state.pool.begin().await?;
 
-    let row = sqlx::query_as::<_, DatabaseProject>(
+    let row = crate::db::query_as::<_, DatabaseProject>(
         r#"
         INSERT INTO opentask.projects (id, name, gh_repo_url, description, created_at, updated_at)
         VALUES ($1, $2, $3, $4, NOW(), NOW())
@@ -89,7 +89,7 @@ pub async fn create_project(
 
     // Create default "AI Drafts" bucket
     let bucket_id = next_id();
-    sqlx::query(
+    crate::db::query(
         r#"
         INSERT INTO opentask.buckets (id, project_id, name, state, is_system_locked, order_idx, created_at)
         VALUES ($1, $2, 'AI Drafts', 'DRAFT', TRUE, 0, NOW());
@@ -103,7 +103,7 @@ pub async fn create_project(
     // Add creator as MANAGER if authenticated
     if let Some(u) = user {
         let member_id = next_id();
-        let _ = sqlx::query(
+        let _ = crate::db::query(
             r#"
             INSERT INTO opentask.project_member (id, project_id, user_id, role, current_load, gh_username)
             SELECT $1, $2, id, 'MANAGER', 0, gh_username
@@ -129,7 +129,7 @@ pub async fn create_project(
 pub async fn list_projects(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DatabaseProject>>, AppError> {
-    let rows = sqlx::query_as::<_, DatabaseProject>(
+    let rows = crate::db::query_as::<_, DatabaseProject>(
         r#"
         SELECT id, name, gh_repo_url, description, custom_ai_api_key, api_key, created_at, updated_at
         FROM opentask.projects
@@ -151,7 +151,7 @@ pub async fn list_my_projects(
         None => return list_projects(State(state)).await,
     };
 
-    let rows = sqlx::query_as::<_, DatabaseProject>(
+    let rows = crate::db::query_as::<_, DatabaseProject>(
         r#"
         SELECT DISTINCT p.id, p.name, p.gh_repo_url, p.description, p.custom_ai_api_key, p.api_key, p.created_at, p.updated_at
         FROM opentask.projects p
@@ -173,7 +173,7 @@ pub async fn get_project(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<DatabaseProject>, AppError> {
-    let row = sqlx::query_as::<_, DatabaseProject>(
+    let row = crate::db::query_as::<_, DatabaseProject>(
         r#"
         SELECT id, name, gh_repo_url, description, custom_ai_api_key, api_key, created_at, updated_at
         FROM opentask.projects
@@ -196,7 +196,7 @@ pub async fn update_project(
 ) -> Result<Json<DatabaseProject>, AppError> {
     let repos = payload.gh_repo_url.unwrap_or_default();
 
-    let row = sqlx::query_as::<_, DatabaseProject>(
+    let row = crate::db::query_as::<_, DatabaseProject>(
         r#"
         UPDATE opentask.projects
         SET name = COALESCE($1, name),
@@ -222,7 +222,7 @@ pub async fn delete_project(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<StatusCode, AppError> {
-    let res = sqlx::query("DELETE FROM opentask.projects WHERE id = $1;")
+    let res = crate::db::query("DELETE FROM opentask.projects WHERE id = $1;")
         .bind(project_id.0)
         .execute(&state.pool)
         .await?;
@@ -241,7 +241,7 @@ pub async fn get_project_board(
     Path(project_id): Path<SafeId>,
     Query(query): Query<BoardQuery>,
 ) -> Result<Json<BoardResponse>, AppError> {
-    let mut buckets = sqlx::query_as::<_, DatabaseBucket>(
+    let mut buckets = crate::db::query_as::<_, DatabaseBucket>(
         r#"
         SELECT id, project_id, name, description, state, is_system_locked, order_idx, NULL::BIGINT as task_count, created_at, updated_at
         FROM opentask.buckets
@@ -253,7 +253,7 @@ pub async fn get_project_board(
     .fetch_all(&state.pool)
     .await?;
 
-    let counts = sqlx::query(
+    let counts = crate::db::query(
         "SELECT bucket_id, COUNT(*) as count FROM opentask.tasks WHERE project_id = $1 GROUP BY bucket_id;"
     )
     .bind(project_id.0)
@@ -276,7 +276,7 @@ pub async fn get_project_board(
     }
 
     let limit = query.limit_per_bucket.unwrap_or(20);
-    let tasks = sqlx::query_as::<_, DatabaseTask>(
+    let tasks = crate::db::query_as::<_, DatabaseTask>(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
@@ -304,7 +304,7 @@ pub async fn get_project_dashboard(
 ) -> Result<Json<ProjectDashboardResponse>, AppError> {
 
     // 1. Fetch project mebers with user info
-    let mut members = sqlx::query_as::<_, ProjectMember>(
+    let mut members = crate::db::query_as::<_, ProjectMember>(
         r#"
             SELECT pm.id, pm.user_id, pm.project_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load,
                 COALESCE(pm.gh_username, u.gh_username) as gh_username,
@@ -333,7 +333,7 @@ pub async fn get_project_dashboard(
         bucket_state: Option<String>,
     }
 
-    let task_rows = sqlx::query(
+    let task_rows = crate::db::query(
         r#"
             SELECT t.id, t.lead_assignee_id, COALESCE(t.weight, 3) AS weight, b.state AS bucket_state
             FROM opentask.tasks t
@@ -397,7 +397,7 @@ pub async fn get_project_dashboard(
         m.task_points = Some(m_weight);
 
         if let Some(mid) = m.id {
-            let _ = sqlx::query("UPDATE opentask.project_member SET current_load = $1 WHERE id = $2;")
+            let _ = crate::db::query("UPDATE opentask.project_member SET current_load = $1 WHERE id = $2;")
                 .bind(calc_load)
                 .bind(mid.0)
                 .execute(&state.pool)
@@ -406,7 +406,7 @@ pub async fn get_project_dashboard(
     }
 
     // 4. Fetch recent activities (limit 20)
-    let activities = sqlx::query_as::<_, DatabaseActivity>(
+    let activities = crate::db::query_as::<_, DatabaseActivity>(
             r#"
             SELECT id, project_id, user_name, action, target, created_at
             FROM opentask.activities
@@ -421,7 +421,7 @@ pub async fn get_project_dashboard(
         .unwrap_or_default();
 
     // 5. Calculate metrics (e.g task completion)
-    let counts_row = sqlx::query(
+    let counts_row = crate::db::query(
             r#"
             SELECT 
                 COUNT(*) FILTER (WHERE b.state = 'COMPLETED') AS completed,
@@ -469,7 +469,7 @@ pub async fn get_project_api_key(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<ProjectApiKeyResponse>, AppError> {
-    let row = sqlx::query("SELECT api_key FROM opentask.projects WHERE id = $1;")
+    let row = crate::db::query("SELECT api_key FROM opentask.projects WHERE id = $1;")
         .bind(project_id.0)
         .fetch_optional(&state.pool)
         .await?;
@@ -495,7 +495,7 @@ pub async fn create_project_api_key(
         rand::random::<u128>()
     );
 
-    let res = sqlx::query("UPDATE opentask.projects SET api_key = $1, updated_at = NOW() WHERE id = $2;")
+    let res = crate::db::query("UPDATE opentask.projects SET api_key = $1, updated_at = NOW() WHERE id = $2;")
         .bind(&generated)
         .bind(project_id.0)
         .execute(&state.pool)
@@ -515,7 +515,7 @@ pub async fn delete_project_api_key(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<StatusCode, AppError> {
-    let res = sqlx::query("UPDATE opentask.projects SET api_key = NULL, updated_at = NOW() WHERE id = $1;")
+    let res = crate::db::query("UPDATE opentask.projects SET api_key = NULL, updated_at = NOW() WHERE id = $1;")
         .bind(project_id.0)
         .execute(&state.pool)
         .await?;
@@ -554,7 +554,7 @@ pub async fn add_project_member(
         }
     } else if let Some(uid) = resolved_user_id {
         if resolved_gh_username.is_none() {
-            let row = sqlx::query("SELECT gh_username FROM opentask.users WHERE id = $1;")
+            let row = crate::db::query("SELECT gh_username FROM opentask.users WHERE id = $1;")
                 .bind(uid)
                 .fetch_optional(&state.pool)
                 .await
@@ -575,7 +575,7 @@ pub async fn add_project_member(
         }
     };
 
-    let row = sqlx::query_as::<_, ProjectMember>(
+    let row = crate::db::query_as::<_, ProjectMember>(
         r#"
         INSERT INTO opentask.project_member (id, project_id, user_id, role, kpi_score, max_capacity, current_load, gh_username)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -609,7 +609,7 @@ pub async fn list_project_members(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
 ) -> Result<Json<Vec<ProjectMember>>, AppError> {
-    let rows = sqlx::query_as::<_, ProjectMember>(
+    let rows = crate::db::query_as::<_, ProjectMember>(
         r#"
         SELECT pm.id, pm.project_id, pm.user_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load,
                COALESCE(pm.gh_username, u.gh_username) as gh_username,
@@ -641,7 +641,7 @@ pub async fn list_my_project_members(
         None => return Ok(Json(vec![])),
     };
 
-    let rows = sqlx::query_as::<_, ProjectMember>(
+    let rows = crate::db::query_as::<_, ProjectMember>(
         r#"
         SELECT pm.id, pm.project_id, pm.user_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load,
                COALESCE(pm.gh_username, u.gh_username) as gh_username,
@@ -668,7 +668,7 @@ pub async fn get_project_member_by_id(
     State(state): State<AppState>,
     Path((project_id, member_id)): Path<(SafeId, SafeId)>,
 ) -> Result<Json<ProjectMember>, AppError> {
-    let row = sqlx::query_as::<_, ProjectMember>(
+    let row = crate::db::query_as::<_, ProjectMember>(
         r#"
         SELECT pm.id, pm.project_id, pm.user_id, pm.role, pm.kpi_score, pm.max_capacity, pm.current_load,
                COALESCE(pm.gh_username, u.gh_username) as gh_username,
