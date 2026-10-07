@@ -1,5 +1,5 @@
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::{Executor, PgPool};
+use sqlx::PgPool;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -42,26 +42,14 @@ where
 
 pub fn get_pool_options() -> PgPoolOptions {
     PgPoolOptions::new()
-        .max_connections(5)
+        // Vercel can run multiple container instances. Keep each instance's
+        // session-pooler footprint small so the Supabase session limit is not
+        // exhausted across replicas.
+        .max_connections(2)
         .min_connections(0)
         .acquire_timeout(Duration::from_secs(5))
         .idle_timeout(Duration::from_secs(60))
         .max_lifetime(Duration::from_secs(30 * 60))
-        .after_connect(|conn, _meta| {
-            Box::pin(async move {
-                let _ = conn.execute("DEALLOCATE ALL;").await;
-                Ok(())
-            })
-        })
-        .before_acquire(|conn, _meta| {
-            Box::pin(async move {
-                if let Err(e) = conn.execute("DEALLOCATE ALL;").await {
-                    tracing::warn!("Failed to deallocate prepared statements before acquire: {e}");
-                    return Ok(false);
-                }
-                Ok(true)
-            })
-        })
 }
 
 pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {

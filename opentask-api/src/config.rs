@@ -105,16 +105,16 @@ impl Config {
     }
 
     fn resolve_database_url() -> String {
-        if let Some(mut url) = get_clean_env("POSTGRESQL_DATABASE_URL").or_else(|| get_clean_env("DATABASE_URL")) {
-            // Supabase Supavisor pooler compatibility:
-            // In serverless environments (Vercel), Session Mode (port 5432) has a strict limit
-            // of 15 connections total (causing "(EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15").
-            // Transaction Mode (port 6543) supports thousands of concurrent client connections.
-            // With all queries across opentask-api configured with .persistent(false) (unnamed prepared statements),
-            // Transaction Mode (port 6543) is fully supported without any statement collisions.
-            if url.contains("pooler.supabase.com:5432") {
-                eprintln!("[INFO] Detected Supabase pooler on port 5432 (Session Mode, capped at 15 clients). Rewriting to port 6543 (Transaction Mode) for high-concurrency serverless scaling.");
-                url = url.replace(":5432", ":6543");
+        if let Some(url) = get_clean_env("POSTGRESQL_DATABASE_URL").or_else(|| get_clean_env("DATABASE_URL")) {
+            // Keep Supabase Session Pooler (port 5432) for SQLx.
+            // SQLx 0.8 still uses the PostgreSQL extended protocol for bound
+            // parameters, and Supavisor transaction pooling (port 6543) can
+            // route Parse and Bind messages to different backend sessions.
+            if url.contains(".pooler.supabase.com:6543") {
+                tracing::warn!(
+                    "Supabase transaction pooler detected; switching from :6543 to Session Pooler :5432 for SQLx compatibility"
+                );
+                return url.replace(".pooler.supabase.com:6543", ".pooler.supabase.com:5432");
             }
             return url;
         }
