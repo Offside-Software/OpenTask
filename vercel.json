@@ -20,37 +20,26 @@
           "destination": "/index.html"
         }
       ]
-    },
-    "tokio-api": {
-      "root": ".",
-      "runtime": "container",
-      "entrypoint": "Dockerfile.vercel"
     }
   },
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": {
-        "service": "tokio-api"
-      }
-    },
-    {
-      "source": "/github/(.*)",
-      "destination": {
-        "service": "tokio-api"
-      }
-    },
-    {
-      "source": "/health",
-      "destination": {
-        "service": "tokio-api"
-      }
-    },
     {
       "source": "/(.*)",
       "destination": {
         "service": "web"
       }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
+    },
+    {
+      "source": "/github/(.*)",
+      "destination": "https://env-opentask.user.cloudjkt02.com/github/$1"
+    },
+    {
+      "source": "/health",
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
     }
   ]
 }
