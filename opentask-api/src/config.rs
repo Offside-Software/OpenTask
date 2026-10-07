@@ -105,9 +105,16 @@ impl Config {
     }
 
     fn resolve_database_url() -> String {
-        if let Some(url) = get_clean_env("POSTGRESQL_DATABASE_URL").or_else(|| get_clean_env("DATABASE_URL")) {
-            // Keep Supabase transaction pooling (:6543). Statement caching is
-            // disabled in get_connect_options for PgBouncer compatibility.
+        if let Some(mut url) = get_clean_env("POSTGRESQL_DATABASE_URL").or_else(|| get_clean_env("DATABASE_URL")) {
+            // Supabase pooler compatibility:
+            // Port 6543 uses Supavisor Transaction Pooling, which is incompatible with
+            // SQLx named prepared statements (causes 42P05 "prepared statement sqlx_s_X already exists" errors).
+            // Port 5432 uses Supavisor Session Pooling, which assigns dedicated backend connections per session,
+            // supports prepared statements, and is reachable over IPv4 from serverless / Vercel container runtimes.
+            if url.contains("pooler.supabase.com:6543") {
+                eprintln!("[INFO] Detected Supabase pooler on port 6543 (Transaction Mode). Rewriting to port 5432 (Session Mode) for SQLx prepared statement compatibility.");
+                url = url.replace(":6543", ":5432");
+            }
             return url;
         }
 

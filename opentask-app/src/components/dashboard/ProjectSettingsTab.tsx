@@ -80,7 +80,29 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             setRepoUrls(p.gh_repo_url || []);
             setMembers(m);
             setApiKey(keyData?.api_key || null);
-            setCustomAiKeyInfo(customKeyData);
+            const hasCustom = Boolean(
+                customKeyData?.has_custom_key ||
+                customKeyData?.has_key ||
+                customKeyData?.masked_key ||
+                p?.custom_ai_api_key
+            );
+            setCustomAiKeyInfo(
+                customKeyData
+                    ? {
+                        ...customKeyData,
+                        has_custom_key: hasCustom,
+                        has_key: hasCustom,
+                        masked_key: customKeyData.masked_key || (p?.custom_ai_api_key ? 'AIzaSy••••••••••••' : null),
+                    }
+                    : hasCustom
+                    ? {
+                        project_id: String(projectId),
+                        has_custom_key: true,
+                        has_key: true,
+                        masked_key: 'AIzaSy••••••••••••',
+                    }
+                    : null
+            );
         } catch (e) {
             console.error(e);
         } finally {
@@ -123,6 +145,9 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
         try {
             const res = await aiKeyService.saveProjectAiKey(projectId, keyToSave, true);
             setCustomAiKeyInfo(res);
+            if (project) {
+                setProject({ ...project, custom_ai_api_key: keyToSave });
+            }
             setCustomAiInput('');
             setAiKeyTestResult(null);
             setShowCustomAiKey(false);
@@ -139,7 +164,10 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
         setIsRemoveProjectAiKeyModalOpen(false);
         try {
             await aiKeyService.deleteProjectAiKey(projectId);
-            setCustomAiKeyInfo({ project_id: String(projectId), has_custom_key: false, masked_key: null });
+            setCustomAiKeyInfo({ project_id: String(projectId), has_custom_key: false, has_key: false, masked_key: null });
+            if (project) {
+                setProject({ ...project, custom_ai_api_key: undefined });
+            }
             setCustomAiInput('');
             setAiKeyTestResult(null);
             setIsReplacingKey(false);
@@ -369,6 +397,14 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
         );
     }
 
+    const hasCustomAiKey = Boolean(
+        customAiKeyInfo?.has_custom_key ||
+        customAiKeyInfo?.has_key ||
+        customAiKeyInfo?.masked_key ||
+        project?.custom_ai_api_key
+    );
+    const displayMaskedAiKey = customAiKeyInfo?.masked_key || 'AIzaSy••••••••••••••••••••';
+
     return (
         <div className="space-y-6 select-none font-mono">
             {/* General Settings */}
@@ -457,7 +493,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                 subtitle="BRING YOUR OWN GEMINI KEY FOR PR REVIEWS, MEETINGS & TASK EVALUATIONS"
                 icon={Sparkles}
                 rightElement={
-                    customAiKeyInfo?.has_custom_key ? (
+                    hasCustomAiKey ? (
                         <Badge variant="success">
                             <CheckCircle2 size={11} className="mr-1 inline" /> CUSTOM TOKEN ACTIVE
                         </Badge>
@@ -473,7 +509,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                         Configure a custom Google Gemini API key for this project. When active, all internal AI operations (automated PR code reviews, meeting analysis, task estimation) will utilize your token and quotas instead of the shared system token.
                     </p>
 
-                    {customAiKeyInfo?.has_custom_key && !isReplacingKey ? (
+                    {hasCustomAiKey && !isReplacingKey ? (
                         <div className="p-4 bg-[#121417] border-2 border-black rounded-none flex items-center justify-between gap-4 shadow-[3px_3px_0px_0px_#000000] flex-wrap">
                             <div className="flex items-center gap-3.5 min-w-0">
                                 <div className="p-2 bg-[#00FF66] text-black border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000] shrink-0">
@@ -486,7 +522,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                                         </span>
                                     </div>
                                     <div className="text-[14px] font-bold text-white tracking-widest mt-1 truncate">
-                                        {customAiKeyInfo.masked_key}
+                                        {displayMaskedAiKey}
                                     </div>
                                     <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
                                         Dedicated quotas active for PR reviews, MoM parser, and task automation.

@@ -63,6 +63,8 @@ export interface Project {
   tags?: string[];
   isLead?: boolean;
   tasksPending?: number;
+  custom_ai_api_key?: string;
+  api_key?: string;
 }
 
 export interface ProjectMember {

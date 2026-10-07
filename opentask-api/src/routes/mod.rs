@@ -51,7 +51,7 @@ async fn root_handler() -> Json<Value> {
 
 async fn health_handler(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
     let start = std::time::Instant::now();
-    let db_res = sqlx::query("SELECT 1;").execute(&state.pool).await;
+    let db_res = sqlx::raw_sql("SELECT 1;").execute(&state.pool).await;
     let db_latency_ms = start.elapsed().as_millis();
 
     match db_res {

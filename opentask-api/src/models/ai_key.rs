@@ -21,6 +21,7 @@ pub struct SetApiKeyRequest {
 #[derive(Debug, Clone, Serialize)]
 pub struct ApiKeyStatusResponse {
     pub has_key: bool,
+    pub has_custom_key: bool,
     pub masked_key: Option<String>,
     pub source: String,
 }

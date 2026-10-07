@@ -46,6 +46,7 @@ pub async fn get_project_ai_key(
 
     Ok(Json(ApiKeyStatusResponse {
         has_key,
+        has_custom_key: has_key,
         masked_key: masked,
         source: if has_key { "project".to_string() } else { "none".to_string() },
     }))
@@ -100,6 +101,7 @@ pub async fn get_user_ai_key(
 
     Ok(Json(ApiKeyStatusResponse {
         has_key,
+        has_custom_key: has_key,
         masked_key: masked,
         source: if has_key { "user".to_string() } else { "none".to_string() },
     }))

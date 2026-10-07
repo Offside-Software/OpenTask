@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
             tracing::warn!("Could not connect to PostgreSQL on startup: {e}");
             tracing::info!("Falling back to offline/lazy pool initialization. Please check POSTGRESQL_DATABASE_URL.");
             let options = db::get_connect_options(&config.database_url)?;
-            sqlx::postgres::PgPoolOptions::new()
+            db::get_pool_options()
                 .connect_lazy_with(options)
         }
     };
