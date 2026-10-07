@@ -41,14 +41,20 @@ where
 }
 
 pub fn get_pool_options() -> PgPoolOptions {
+    // Vercel freezes instances between requests, so SQLx's background idle
+    // reaper never runs and frozen instances keep their Supabase session
+    // forever (EMAXCONNSESSION). Close connections as soon as they're released.
+    let serverless = std::env::var("VERCEL").is_ok();
+
     PgPoolOptions::new()
+        .after_release(move |_conn, _meta| Box::pin(async move { Ok(!serverless) }))
         // Supabase Session Pooler has a global per-project session limit.
         // Vercel can run many Fluid instances, so allow only one database
         // session per instance and release idle sessions quickly.
         .max_connections(1)
         .min_connections(0)
         .acquire_timeout(Duration::from_secs(5))
-        .idle_timeout(Duration::from_secs(15))
+        .idle_timeout(Duration::from_secs(2))
         .max_lifetime(Duration::from_secs(10 * 60))
 }
 

@@ -106,17 +106,16 @@ impl Config {
 
     fn resolve_database_url() -> String {
         if let Some(url) = get_clean_env("POSTGRESQL_DATABASE_URL").or_else(|| get_clean_env("DATABASE_URL")) {
-            // On serverless (Vercel) every instance holds its own DB session, so
-            // the Supabase Session Pooler (:5432, 15 clients) is exhausted fast
-            // (EMAXCONNSESSION). Use the Transaction Pooler (:6543) there; it is
-            // safe because the statement cache is disabled and queries are
-            // non-persistent (see db/mod.rs).
-            let on_vercel = get_clean_env("VERCEL").is_some();
-            if on_vercel && url.contains(".pooler.supabase.com:5432") {
+            // Keep Supabase Session Pooler (port 5432) for SQLx.
+            // SQLx uses the PostgreSQL extended protocol for bound parameters,
+            // and Supavisor transaction pooling (port 6543) can route Parse and
+            // Bind messages to different backend sessions, returning another
+            // query's rows (e.g. "Value Buffer exceeds 8 bytes" decode errors).
+            if url.contains(".pooler.supabase.com:6543") {
                 tracing::warn!(
-                    "Vercel detected; switching Supabase Session Pooler :5432 to Transaction Pooler :6543"
+                    "Supabase transaction pooler detected; switching from :6543 to Session Pooler :5432 for SQLx compatibility"
                 );
-                return url.replace(".pooler.supabase.com:5432", ".pooler.supabase.com:6543");
+                return url.replace(".pooler.supabase.com:6543", ".pooler.supabase.com:5432");
             }
             return url;
         }
