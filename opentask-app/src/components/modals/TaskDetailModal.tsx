@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
+import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw } from 'lucide-react';
 import type { Task, Bucket, ProjectMember, PrReview } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
 import { useToast } from '../../design-system/Toast';
 import { Badge } from '../../design-system/Badge';
+import { MarkdownRenderer } from '../../design-system/MarkdownRenderer';
 import { prReviewService } from '../../services/prReviewService';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -25,8 +26,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description || '');
     const [repoUrl, setRepoUrl] = useState(task.repo_url || '');
+    const [prUrl, setPrUrl] = useState(task.prUrl || '');
     const [reviews, setReviews] = useState<PrReview[]>([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
+    const [reviewsError, setReviewsError] = useState<string | null>(null);
     const [expandedReviewId, setExpandedReviewId] = useState<string | number | null>(null);
     const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
         const parsed = parseTaskTypes(task.type);
@@ -95,14 +98,28 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         }
     };
 
-    useEffect(() => {
-        if (task.id) {
-            setLoadingReviews(true);
-            prReviewService.getTaskReviews(task.id)
-                .then(data => setReviews(data || []))
-                .catch(err => console.error("Failed to load task PR reviews", err))
-                .finally(() => setLoadingReviews(false));
+    const loadReviews = async () => {
+        if (!task.id) return;
+        setLoadingReviews(true);
+        setReviewsError(null);
+        try {
+            const data = await prReviewService.getTaskReviews(task.id);
+            const list = data || [];
+            setReviews(list);
+            if (list.length > 0) {
+                // Automatically expand the latest review so feedback is immediately visible
+                setExpandedReviewId(prev => prev ?? list[0].id);
+            }
+        } catch (err: any) {
+            console.error("Failed to load task PR reviews", err);
+            setReviewsError(err?.message || "Failed to load PR reviews.");
+        } finally {
+            setLoadingReviews(false);
         }
+    };
+
+    useEffect(() => {
+        loadReviews();
     }, [task.id]);
 
     const [triggeringReview, setTriggeringReview] = useState(false);
@@ -111,18 +128,37 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const handleTriggerReview = async () => {
         const pId = task.project_id;
         if (!pId || !task.id) return;
+        const selectedRepo = repoUrl
+            .trim()
+            .replace(/^https?:\/\/github\.com\//i, '')
+            .replace(/\/+$/, '')
+            .replace(/\.git$/i, '');
         setTriggeringReview(true);
         setTriggerError(null);
         try {
             const review = await prReviewService.triggerReview(pId, {
                 task_id: task.id,
-                repo_full_name: repoUrl ? repoUrl.replace('https://github.com/', '') : undefined,
+                repo_full_name: selectedRepo || undefined,
+                pr_url: prUrl.trim() || undefined,
             });
-            showToast(`AI Code Review Completed: ${review.verdict}!`, review.verdict === 'PASS' ? 'success' : 'error');
+            const queuedRepo = review.repo_full_name.toLowerCase();
+            const queuedPr = Number(review.pr_number);
             const updated = await prReviewService.getTaskReviews(task.id);
-            setReviews(updated || []);
-            if (review.id) {
-                setExpandedReviewId(review.id);
+            setReviews(updated);
+            const completedReview = updated.find(r =>
+                r.repo_full_name.toLowerCase() === queuedRepo && Number(r.pr_number) === queuedPr,
+            );
+            if (completedReview) {
+                setExpandedReviewId(completedReview.id);
+                showToast(
+                    `AI Code Review completed for ${review.repo_full_name}#${review.pr_number}: ${completedReview.verdict}`,
+                    completedReview.verdict === 'PASS' ? 'success' : 'error',
+                );
+            } else {
+                if (updated.length > 0) {
+                    setExpandedReviewId(updated[0].id);
+                }
+                showToast(`AI Code Review finished for ${review.repo_full_name}#${review.pr_number}`, 'info');
             }
         } catch (err: any) {
             console.error("Failed to trigger review", err);
@@ -140,6 +176,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         title !== task.title ||
         description !== (task.description || '') ||
         repoUrl !== (task.repo_url || '') ||
+        prUrl !== (task.prUrl || '') ||
         branchName !== (task.branch_name || '') ||
         weight !== task.weight ||
         bucketId !== (task.bucket_id ? String(task.bucket_id) : undefined) ||
@@ -164,6 +201,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
         setBranchName(task.branch_name || '');
         setRepoUrl(task.repo_url || '');
+        setPrUrl(task.prUrl || '');
         setAvailableTypes(getAllTaskTypes([task.type]));
     }, [task, isDirty]);
 
@@ -340,10 +378,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                         className="w-full bg-[#121417] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] transition-all"
                                     />
                                 </div>
-                                {task.prUrl && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">PULL REQUEST URL</label>
+                                    <input
+                                        value={prUrl}
+                                        onChange={(e) => setPrUrl(e.target.value)}
+                                        placeholder="https://github.com/OWNER/REPO/pull/123"
+                                        className="w-full bg-[#121417] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] transition-all"
+                                    />
+                                </div>
+                                {prUrl && (
                                     <div className="text-[11px] font-mono">
                                         <span className="text-neutral-400 uppercase">PULL REQUEST: </span>
-                                        <a href={task.prUrl} target="_blank" rel="noopener noreferrer" className="text-[#FFE600] hover:underline font-bold">{task.prUrl}</a>
+                                        <a href={prUrl} target="_blank" rel="noopener noreferrer" className="text-[#FFE600] hover:underline font-bold">{prUrl}</a>
                                     </div>
                                 )}
                             </div>
@@ -362,6 +409,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                             {reviews.length} REVIEW{reviews.length !== 1 ? 'S' : ''}
                                         </span>
                                     )}
+                                    <button
+                                        type="button"
+                                        onClick={loadReviews}
+                                        disabled={loadingReviews}
+                                        title="Reload reviews"
+                                        className="p-1 text-neutral-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                        <RotateCcw size={11} className={loadingReviews ? 'animate-spin' : ''} />
+                                    </button>
                                     <button
                                         type="button"
                                         onClick={handleTriggerReview}
@@ -395,6 +451,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                     <div className="flex items-center gap-2 text-neutral-500 font-mono text-[11px] uppercase py-3 justify-center">
                                         <Loader2 size={13} className="animate-spin text-[#FFE600]" />
                                         <span>RETRIEVING AI VERDICTS...</span>
+                                    </div>
+                                ) : reviewsError ? (
+                                    <div className="text-center py-4 space-y-2">
+                                        <div className="text-red-400 font-mono text-[11px] uppercase">
+                                            ⚠ {reviewsError}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={loadReviews}
+                                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black font-mono uppercase bg-neutral-800 text-white border-2 border-black hover:bg-neutral-700 transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000]"
+                                        >
+                                            <RotateCcw size={12} />
+                                            <span>RETRY LOADING REVIEWS</span>
+                                        </button>
                                     </div>
                                 ) : reviews.length === 0 ? (
                                     <div className="text-center py-4 space-y-2">
@@ -433,7 +503,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                                     key={String(rev.id)}
                                                     className="border-2 border-black p-3 bg-[#121417] transition-all shadow-[2px_2px_0px_0px_#000000]"
                                                 >
-                                                    <div className="flex items-center justify-between gap-2">
+                                                    <div
+                                                        className="flex items-center justify-between gap-2 cursor-pointer select-none"
+                                                        onClick={() => setExpandedReviewId(isExpanded ? null : rev.id)}
+                                                    >
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <span className={`px-2 py-0.5 text-[10px] font-mono font-black border border-black uppercase shadow-[1px_1px_0px_0px_#000000] ${
                                                                 isPass ? 'bg-[#00FF66] text-black' : 'bg-[#EF4444] text-white'
@@ -455,26 +528,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                                                     href={rev.pr_url}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
+                                                                    onClick={(e) => e.stopPropagation()}
                                                                     className="p-1 hover:text-[#FFE600] text-neutral-400 transition-colors"
                                                                     title="View Pull Request"
                                                                 >
                                                                     <ExternalLink size={12} />
                                                                 </a>
                                                             )}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setExpandedReviewId(isExpanded ? null : rev.id)}
-                                                                className="p-1 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                                                            >
+                                                            <div className="p-1 text-neutral-400 hover:text-white transition-colors">
                                                                 {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                                            </button>
+                                                            </div>
                                                         </div>
                                                     </div>
 
-                                                    {/* Expanded Feedback */}
+                                                    {/* Expanded Feedback in Markdown */}
                                                     {isExpanded && rev.feedback && (
-                                                        <div className="mt-3 pt-3 border-t border-neutral-800 text-[11px] font-mono text-neutral-300 whitespace-pre-wrap leading-relaxed bg-[#0B0E14] p-3 border border-neutral-800">
-                                                            {rev.feedback}
+                                                        <div className="mt-3 pt-3 border-t border-neutral-800 bg-[#0B0E14] dark:bg-[#0B0E14] light:bg-[#F9F9F6] p-3 border border-neutral-800 dark:border-neutral-800 light:border-neutral-300">
+                                                            <MarkdownRenderer content={rev.feedback} />
                                                         </div>
                                                     )}
                                                 </div>

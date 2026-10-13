@@ -77,6 +77,45 @@ pub async fn get_installation_token(
     Ok(token_resp.token)
 }
 
+pub async fn get_repository_installation(
+    app_id: u64,
+    private_key_pem: &str,
+    repo_full_name: &str,
+) -> Result<(u64, String, String), AppError> {
+    let jwt = generate_app_jwt(app_id, private_key_pem)?;
+    let authorization = format!("Bearer {jwt}");
+    let response = Client::new()
+        .get(format!(
+            "https://api.github.com/repos/{repo_full_name}/installation"
+        ))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "OpenTask-App")
+        .header("X-GitHub-App-Authorization", authorization)
+        .header("Authorization", format!("Bearer {}", jwt))
+        .send()
+        .await
+        .map_err(|error| AppError::Internal(format!("Failed to find GitHub installation: {error}")))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::BadRequest(format!(
+            "GitHub App is not installed for {repo_full_name}"
+        )));
+    }
+
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|error| AppError::Internal(format!("Failed to parse GitHub installation: {error}")))?;
+    let installation_id = data["id"]
+        .as_u64()
+        .ok_or_else(|| AppError::Internal("GitHub returned an invalid installation ID".to_string()))?;
+    let account_login = data["account"]["login"].as_str().unwrap_or("GitHub").to_string();
+    let account_type = data["account"]["type"].as_str().unwrap_or("User").to_string();
+
+    Ok((installation_id, account_login, account_type))
+}
+
 pub fn verify_webhook_signature(secret: &str, payload: &[u8], signature_header: Option<&str>) -> bool {
     let sig_header = match signature_header {
         Some(s) if s.starts_with("sha256=") => &s[7..],

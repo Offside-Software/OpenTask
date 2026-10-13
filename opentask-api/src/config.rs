@@ -1,4 +1,6 @@
 use std::env;
+use std::fs;
+use std::io::Cursor;
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -38,17 +40,72 @@ fn get_clean_env(key: &str) -> Option<String> {
     env::var(key).ok().map(clean_val).filter(|s| !s.is_empty())
 }
 
+fn load_env_file(path: &Path) -> Result<(), String> {
+    let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    let mut normalized = String::with_capacity(content.len());
+    let mut in_private_key = false;
+    let mut private_key = String::new();
+
+    for line in content.lines() {
+        if line.starts_with("GH_APP_PRIVATE_KEY=") {
+            in_private_key = true;
+            private_key.push_str(line.trim_start_matches("GH_APP_PRIVATE_KEY="));
+            continue;
+        }
+
+        let is_assignment = line
+            .split_once('=')
+            .map(|(name, _)| {
+                !name.is_empty()
+                    && name
+                        .chars()
+                        .all(|character| character == '_' || character.is_ascii_alphanumeric())
+            })
+            .unwrap_or(false);
+
+        if in_private_key && is_assignment {
+            normalized.push_str("GH_APP_PRIVATE_KEY=\"");
+            normalized.push_str(&private_key.replace('"', "\\\""));
+            normalized.push_str("\"\n");
+            private_key.clear();
+            in_private_key = false;
+        }
+
+        if !in_private_key {
+            normalized.push_str(line);
+            normalized.push('\n');
+        } else {
+            if !private_key.ends_with("\\n") {
+                private_key.push_str("\\n");
+            }
+            private_key.push_str(line);
+        }
+    }
+
+    if in_private_key {
+        normalized.push_str("GH_APP_PRIVATE_KEY=\"");
+        normalized.push_str(&private_key.replace('"', "\\\""));
+        normalized.push_str("\"\n");
+    }
+
+    dotenvy::from_read(Cursor::new(normalized)).map_err(|error| error.to_string())
+}
+
 impl Config {
     pub fn load() -> Self {
         // Try to load env files from known paths
         let candidates = [
+            Path::new(".env"),
+            Path::new(".env.local"),
             Path::new("../.env"),
             Path::new("../.env.local"),
         ];
 
         for path in candidates {
             if path.exists() {
-                let _ = dotenvy::from_path(path);
+                if let Err(error) = load_env_file(path) {
+                    tracing::warn!("Failed to load environment file {}: {error}", path.display());
+                }
             }
         }
 
@@ -71,6 +128,12 @@ impl Config {
 
         let frontend_url = get_clean_env("FRONTEND_URL")
             .unwrap_or_else(|| "http://localhost:5173".to_string());
+
+        if gh_app_id == 0 || get_clean_env("GH_APP_PRIVATE_KEY").is_none() {
+            tracing::warn!(
+                "GitHub App credentials are not configured: set GH_APP_ID and GH_APP_PRIVATE_KEY on the Rust API host"
+            );
+        }
 
         Self {
             port,

@@ -20,7 +20,9 @@ pub struct DatabasePrReview {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriggerPrReviewPayload {
-    pub repo_full_name: String,
-    pub pr_number: i64,
+    pub repo_full_name: Option<String>,
+    pub pr_number: Option<i64>,
+    pub pr_url: Option<String>,
+    pub task_id: Option<SafeId>,
     pub installation_id: Option<i64>,
 }
