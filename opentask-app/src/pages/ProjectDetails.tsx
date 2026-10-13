@@ -283,9 +283,17 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     if (selectedAssigneeFilter === 'UNASSIGNED') {
       result = result.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id);
     } else if (selectedAssigneeFilter !== 'ALL') {
+      const targetMember = members.find(m => String(m.user_id) === String(selectedAssigneeFilter) || String(m.id) === String(selectedAssigneeFilter));
+      const targetIds = new Set<string>();
+      targetIds.add(String(selectedAssigneeFilter));
+      if (targetMember) {
+        if (targetMember.user_id) targetIds.add(String(targetMember.user_id));
+        if (targetMember.id) targetIds.add(String(targetMember.id));
+      }
+
       result = result.filter(t => {
-        const inAssigneeIds = t.assignee_ids && t.assignee_ids.map(String).includes(selectedAssigneeFilter);
-        const inLead = t.lead_assignee_id && String(t.lead_assignee_id) === selectedAssigneeFilter;
+        const inAssigneeIds = t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)));
+        const inLead = t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id));
         return Boolean(inAssigneeIds || inLead);
       });
     }
@@ -321,7 +329,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         ? t.assignee_ids.map(String)
         : (t.lead_assignee_id ? [String(t.lead_assignee_id)] : []);
       for (const uid of allAssigneeIds) {
-        const assignedMember = members.find(m => String(m.user_id) === uid);
+        const assignedMember = members.find(m => String(m.user_id) === uid || String(m.id) === uid);
         if (assignedMember) {
           if (assignedMember.gh_username && assignedMember.gh_username.toLowerCase().includes(q)) return true;
           if (assignedMember.display_name && assignedMember.display_name.toLowerCase().includes(q)) return true;
@@ -799,9 +807,12 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                     </option>
                     {members.map(m => {
                       const uid = String(m.user_id);
+                      const targetIds = new Set<string>([uid]);
+                      if (m.id) targetIds.add(String(m.id));
+
                       const count = tasks.filter(t =>
-                        (t.assignee_ids && t.assignee_ids.map(String).includes(uid)) ||
-                        (t.lead_assignee_id && String(t.lead_assignee_id) === uid)
+                        (t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)))) ||
+                        (t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id)))
                       ).length;
                       return (
                         <option key={uid} value={uid} className="bg-[#141619] text-white">
@@ -844,8 +855,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
             ) : (
               <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4 flex-1 no-scrollbar items-start">
                 {buckets.map(bucket => {
-                  const displayTasks = taskSearchQuery.trim() ? matchingTasks : tasks;
-                  const colTasks = displayTasks.filter(t => String(t.bucket_id) === String(bucket.id));
+                  const isFiltered = Boolean(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL');
+                  const colTasks = matchingTasks.filter(t => String(t.bucket_id) === String(bucket.id));
                   return (
                     <KanbanColumn
                       key={bucket.id}
@@ -855,7 +866,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                       colorClass={STATUS_COLORS[bucket.state] || 'bg-slate-500'}
                       statusText="ACTIVE"
                       taskCount={colTasks.length}
-                      totalTasks={taskSearchQuery.trim() ? colTasks.length : bucket.task_count}
+                      totalTasks={isFiltered ? colTasks.length : bucket.task_count}
                       isLoadingMore={!!loadingBuckets[String(bucket.id)]}
                       onLoadMore={loadMoreBucketTasks}
                       onDropTask={handleDropTask}
