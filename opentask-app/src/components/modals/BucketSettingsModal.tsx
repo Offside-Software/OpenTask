@@ -60,8 +60,7 @@ export const BucketSettingsModal: React.FC<BucketSettingsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none animate-in fade-in duration-100"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none animate-in fade-in duration-100"
     >
       <div
         className="bg-[#121417] border-3 border-black rounded-none w-full max-w-md shadow-[8px_8px_0px_0px_#000000] overflow-hidden animate-in zoom-in-95 duration-100 font-mono"

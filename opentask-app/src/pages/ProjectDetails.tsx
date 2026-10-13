@@ -48,11 +48,62 @@ const STATUS_COLORS: Record<BucketState, string> = {
   'COMPLETED': 'bg-slate-400',
 };
 
+const tabToKey = (t: string) => {
+  switch (t.toLowerCase()) {
+    case 'overview': return 'overview';
+    case 'tasks': return 'tasks';
+    case 'mom & meetings':
+    case 'meetings':
+    case 'mom':
+      return 'meetings';
+    case 'settings': return 'settings';
+    default: return 'overview';
+  }
+};
+
+const keyToTab = (k: string) => {
+  switch (k.toLowerCase()) {
+    case 'overview': return 'Overview';
+    case 'tasks': return 'Tasks';
+    case 'mom & meetings':
+    case 'meetings':
+    case 'mom':
+      return 'MoM & Meetings';
+    case 'settings': return 'Settings';
+    default: return 'Overview';
+  }
+};
+
 export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const taskIdParam = searchParams.get('taskId');
-  const [activeTab, setActiveTab] = useState(() => (taskIdParam ? 'Tasks' : 'Overview'));
+  const [activeTab, setActiveTabState] = useState(() => {
+    const param = searchParams.get('tab') || searchParams.get('tabs');
+    if (param) {
+      return keyToTab(param);
+    }
+    return taskIdParam ? 'Tasks' : 'Overview';
+  });
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', tabToKey(tab));
+      return next;
+    }, { replace: true });
+  };
+
+  useEffect(() => {
+    const param = searchParams.get('tab') || searchParams.get('tabs');
+    if (param) {
+      const resolved = keyToTab(param);
+      if (resolved !== activeTab) {
+        setActiveTabState(resolved);
+      }
+    }
+  }, [searchParams, activeTab]);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | null>(null);
   const [selectedBucketTarget, setSelectedBucketTarget] = useState<number | string | undefined>(undefined);

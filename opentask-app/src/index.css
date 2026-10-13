@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 :root {
   /* Brutalist Industrial Dark Palette (Default) */
   --cmd-app-bg: #0C0D0E;
@@ -210,8 +212,32 @@ html.light {
   color: #9CA3AF !important;
 }
 
+/* Yellow Icons & Text Overrides for high contrast in Light Mode */
+[data-theme="light"] .text-\[\#FFE600\]:not(
+  .bg-black, .bg-black *,
+  .bg-\[\#000000\], .bg-\[\#000000\] *,
+  button.bg-black, button.bg-black *,
+  a.bg-black, a.bg-black *,
+  [class*="bg-black"]
+) {
+  color: #B45309 !important;
+}
+
+[data-theme="light"] svg.text-\[\#FFE600\]:not(
+  .bg-black, .bg-black *,
+  .bg-\[\#000000\], .bg-\[\#000000\] *,
+  button.bg-black, button.bg-black *
+) {
+  color: #B45309 !important;
+}
+
+[data-theme="light"] .text-accent:not(.bg-black *, .bg-\[\#000000\] *) {
+  color: #B45309 !important;
+}
+
 /* Modals & Dialogs in Light Mode */
-[data-theme="light"] .fixed.inset-0.bg-black\/80 {
+[data-theme="light"] .fixed.inset-0.bg-black\/80,
+[data-theme="light"] .fixed.inset-0.bg-black\/85 {
   background-color: rgba(0, 0, 0, 0.5) !important;
 }
 

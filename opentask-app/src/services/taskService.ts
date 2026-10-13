@@ -34,6 +34,7 @@ export const taskService = {
       "project_id",
       "lead_assignee_id",
       "suggested_assignee_id",
+      "assignee_ids",
       "type",
       "weight",
       "branch_name",
@@ -43,8 +44,16 @@ export const taskService = {
 
     for (const key of allowedKeys) {
       if (key in data) {
-        // Convert empty string or undefined IDs (e.g unassigned assignee) to null
         let val = data[key];
+        if (key === "assignee_ids") {
+          if (Array.isArray(val)) {
+            payload[key] = val.map((id) => String(id));
+          } else {
+            payload[key] = [];
+          }
+          continue;
+        }
+        // Convert empty string or undefined IDs (e.g unassigned assignee) to null
         if (
           (key === "lead_assignee_id" || key === "suggested_assignee_id" || key === "bucket_id") &&
           (val === "" || val === undefined)

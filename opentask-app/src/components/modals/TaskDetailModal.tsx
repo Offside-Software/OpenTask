@@ -324,7 +324,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 select-none">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
             <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-5xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
@@ -852,8 +852,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <button
                         type="submit"
                         form="task-detail-form"
-                        disabled={saving || !title.trim()}
-                        className="px-6 py-2.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-50 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                        disabled={saving || !title.trim() || !isDirty}
+                        className="px-6 py-2.5 rounded-none border-2 border-black bg-[#FFE600] text-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         {saving ? 'SAVING...' : 'SAVE CHANGES'}
                     </button>
