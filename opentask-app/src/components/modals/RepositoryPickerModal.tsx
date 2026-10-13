@@ -70,7 +70,7 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 select-none" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 select-none">
             <div
                 className="bg-[#121417] border-2 border-black rounded-none w-full max-w-3xl shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[85vh]"
                 onClick={e => e.stopPropagation()}

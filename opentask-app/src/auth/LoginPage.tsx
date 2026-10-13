@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import './LoginPage.css';
 import logo from '../assets/logo.svg';
-import { resolveApiUrl } from '../services/apiClient';
+import { resolveApiUrl, isTauriEnvironment } from '../services/apiClient';
+import { useAuth } from './useAuth';
+import { RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 
 function GitHubMark() {
   return (
@@ -11,6 +14,31 @@ function GitHubMark() {
 }
 
 export function LoginPage() {
+  const isTauri = isTauriEnvironment();
+  const { refreshUser } = useAuth();
+  const [isWaitingForBrowser, setIsWaitingForBrowser] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const handleTauriLogin = async () => {
+    setIsWaitingForBrowser(true);
+    setLoginError(null);
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const authUrl = resolveApiUrl('/auth/login');
+      const token = await invoke<string>('start_desktop_oauth', { authUrl });
+      if (token) {
+        localStorage.setItem('gh_token', token);
+        await refreshUser();
+        window.location.reload();
+      }
+    } catch (err: any) {
+      console.error('Desktop login error:', err);
+      setLoginError(err?.message || String(err) || 'Failed to authenticate via browser');
+    } finally {
+      setIsWaitingForBrowser(false);
+    }
+  };
+
   return (
     <div className="login-root">
       <div className="login-card">
@@ -30,23 +58,91 @@ export function LoginPage() {
         </div>
         <div className="login-title">
           <h2>ACCESS CONTROL // SIGN IN</h2>
-          <p>AUTHENTICATE VIA GITHUB OAUTH PROTOCOL</p>
+          <p>{isTauri ? 'SIGN IN VIA DEFAULT SYSTEM BROWSER' : 'AUTHENTICATE VIA GITHUB OAUTH PROTOCOL'}</p>
         </div>
 
-        <a
-          href={resolveApiUrl(
-            `/auth/login?return_to=${encodeURIComponent(
-              typeof window !== 'undefined' ? window.location.origin : ''
-            )}`
-          )}
-          className="login-btn"
-        >
-          <GitHubMark />
-          CONTINUE WITH GITHUB
-        </a>
+        {isTauri ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {isWaitingForBrowser ? (
+              <div style={{
+                background: '#0B0E14',
+                border: '2px solid #FFE600',
+                padding: '1.25rem',
+                textAlign: 'center',
+                boxShadow: '3px 3px 0px 0px #000',
+                fontFamily: 'monospace'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FFE600', fontWeight: 'bold', fontSize: '12px', marginBottom: '0.5rem' }}>
+                  <RefreshCw size={14} className="animate-spin" />
+                  <span>WAITING FOR BROWSER AUTH...</span>
+                </div>
+                <p style={{ color: '#9CA3AF', fontSize: '11px', margin: '0 0 1rem' }}>
+                  Complete authorization in your browser where you are already signed into GitHub.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsWaitingForBrowser(false)}
+                  style={{
+                    background: '#1E2227',
+                    color: '#FFF',
+                    border: '2px solid #000',
+                    padding: '0.4rem 1rem',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  CANCEL
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleTauriLogin}
+                className="login-btn"
+              >
+                <GitHubMark />
+                <span>CONTINUE IN BROWSER</span>
+                <ExternalLink size={14} />
+              </button>
+            )}
+
+            {loginError && (
+              <div style={{
+                background: '#FF3333',
+                color: '#FFF',
+                border: '2px solid #000',
+                padding: '0.6rem 0.8rem',
+                fontSize: '11px',
+                fontFamily: 'monospace',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '2px 2px 0px 0px #000'
+              }}>
+                <AlertTriangle size={14} />
+                <span>{loginError}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <a
+            href={resolveApiUrl(
+              `/auth/login?return_to=${encodeURIComponent(
+                typeof window !== 'undefined' ? window.location.origin : ''
+              )}`
+            )}
+            className="login-btn"
+          >
+            <GitHubMark />
+            CONTINUE WITH GITHUB
+          </a>
+        )}
 
         <p className="login-footer">
-          NOTICE: AUTHORIZED DEVELOPERS ONLY. BY CONNECTING YOU BIND TO THE OPENTASK REPOSITORY SPECIFICATION SYSTEM.
+          {isTauri
+            ? 'OPENTASK DESKTOP // ZERO PASSWORD RETYPING VIA SEAMLESS LOOPBACK PROTOCOL'
+            : 'NOTICE: AUTHORIZED DEVELOPERS ONLY. BY CONNECTING YOU BIND TO THE OPENTASK REPOSITORY SPECIFICATION SYSTEM.'}
         </p>
       </div>
     </div>

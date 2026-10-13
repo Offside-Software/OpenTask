@@ -101,7 +101,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     }
   };
 
-  const handleCopyIdToClipboard = async() => {
+  const handleCopyIdToClipboard = async () => {
     try {
       const taskId = `[${title}](#${String(id)})`;
       await navigator.clipboard.writeText(taskId);
@@ -127,17 +127,16 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`p-3.5 rounded-none bg-[#16191D] border-2 group flex flex-col gap-2.5 transition-all duration-75 cursor-grab active:cursor-grabbing select-none ${
-        isOver
-          ? 'border-[#FFE600] shadow-[4px_4px_0px_0px_#FFE600] bg-[#1E2227]'
-          : warnStagnant
+      className={`p-3.5 rounded-none bg-[#16191D] border-2 group flex flex-col gap-2.5 transition-all duration-75 cursor-grab active:cursor-grabbing select-none ${isOver
+        ? 'border-[#FFE600] shadow-[4px_4px_0px_0px_#FFE600] bg-[#1E2227]'
+        : warnStagnant
           ? 'border-[#FF3333] shadow-[3px_3px_0px_0px_#FF3333]'
           : isSuggested
-          ? 'border-[#FFE600] shadow-[3px_3px_0px_0px_#FFE600]'
-          : isCompleted
-          ? 'border-neutral-800 opacity-80 hover:opacity-100 shadow-[3px_3px_0px_0px_#000000] hover:border-neutral-600'
-          : 'border-black shadow-[3px_3px_0px_0px_#000000] hover:border-[#FFE600] hover:shadow-[4px_4px_0px_0px_#000000]'
-      }`}
+            ? 'border-[#FFE600] shadow-[3px_3px_0px_0px_#FFE600]'
+            : isCompleted
+              ? 'border-neutral-800 opacity-80 hover:opacity-100 shadow-[3px_3px_0px_0px_#000000] hover:border-neutral-600'
+              : 'border-black shadow-[3px_3px_0px_0px_#000000] hover:border-[#FFE600] hover:shadow-[4px_4px_0px_0px_#000000]'
+        }`}
     >
       <div className="flex items-start gap-2.5">
         {onToggleComplete && (
@@ -147,33 +146,31 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               e.stopPropagation();
               onToggleComplete(!isCompleted);
             }}
-            className={`shrink-0 mt-0.5 w-4 h-4 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer shadow-[1px_1px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] ${
-              isCompleted
-                ? 'bg-[#00FF66] border-black text-black'
-                : 'bg-[#0E1012] border-neutral-600 hover:border-[#FFE600] text-transparent hover:text-neutral-500'
-            }`}
+            className={`shrink-0 mt-0.5 w-4 h-4 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer shadow-[1px_1px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] ${isCompleted
+              ? 'bg-[#00FF66] border-black text-black'
+              : 'bg-[#0E1012] border-neutral-600 hover:border-[#FFE600] text-transparent hover:text-neutral-500'
+              }`}
             title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
             aria-label={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
           >
             <Check size={11} strokeWidth={3.5} className={isCompleted ? 'opacity-100' : 'opacity-0 hover:opacity-50'} />
           </button>
         )}
-        <h4 className={`text-[13px] font-bold leading-tight flex-1 transition-colors ${
-          isCompleted ? 'line-through text-neutral-400' : 'text-white'
-        }`}>
+        <h4 className={`text-[13px] font-bold leading-tight flex-1 transition-colors ${isCompleted ? 'line-through text-neutral-400' : 'text-white'
+          }`}>
           {title}
         </h4>
         <div className="flex items-center gap-1.5 shrink-0 -mt-0.5">
           <button type='button' onClick={(e) => {
-              e.stopPropagation();
-              handleCopyIdToClipboard();
-            }} 
-          className="font-mono text-[13px] px-2 text-neutral-500 font-bold hover:bg-[#00FF66] hover:text-black hover:border hover:shadow-[1.5px_1.5px_0px_0px_#000000]">
+            e.stopPropagation();
+            handleCopyIdToClipboard();
+          }}
+            className="font-mono text-[13px] px-2 text-neutral-500 font-bold hover:bg-[#00FF66] hover:text-black hover:border hover:shadow-[1.5px_1.5px_0px_0px_#000000]">
             #{String(id).slice(-4)}
           </button>
 
           {onDelete && (
-            <TrashButton 
+            <TrashButton
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
@@ -247,9 +244,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 />
               ) : null}
               <span
-                className={`w-3.5 h-3.5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black ${
-                  effectiveAssignees[0].avatarUrl ? 'hidden' : ''
-                }`}
+                className={`w-3.5 h-3.5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black ${effectiveAssignees[0].avatarUrl ? 'hidden' : ''
+                  }`}
               >
                 {getInitials(effectiveAssignees[0].name)}
               </span>
@@ -257,38 +253,36 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             </div>
           ) : (
             <div
-              className="flex items-center gap-1.5"
+              className="flex items-center gap-1 py-0.5"
               title={effectiveAssignees.map((a) => a.name).join(', ')}
             >
-              <div className="flex items-center -space-x-1.5">
-                {effectiveAssignees.slice(0, 3).map((a, idx) => (
-                  <div key={idx} className="relative">
-                    {a.avatarUrl ? (
-                      <img
-                        src={a.avatarUrl}
-                        alt={a.name}
-                        className="w-4 h-4 rounded-none border border-black object-cover bg-neutral-900"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling;
-                          if (fallback) fallback.classList.remove('hidden');
-                        }}
-                      />
-                    ) : null}
-                    <span
-                      className={`w-4 h-4 rounded-none bg-black text-[#00E5FF] font-mono text-[7px] font-black flex items-center justify-center border border-black ${
-                        a.avatarUrl ? 'hidden' : ''
+              {effectiveAssignees.slice(0, 4).map((a, idx) => (
+                <div key={idx} className="relative">
+                  {a.avatarUrl ? (
+                    <img
+                      src={a.avatarUrl}
+                      alt={a.name}
+                      className="w-5 h-5 rounded-none border-2 border-black object-cover bg-neutral-900 shadow-[1px_1px_0px_0px_#000000]"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling;
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    className={`w-5 h-5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center border-2 border-black shadow-[1px_1px_0px_0px_#000000] ${a.avatarUrl ? 'hidden' : ''
                       }`}
-                    >
-                      {getInitials(a.name)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <span className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[10px] font-black shadow-[1px_1px_0px_0px_#000000]">
-                {effectiveAssignees[0].name.slice(0, 7)}
-                {effectiveAssignees.length > 1 ? ` +${effectiveAssignees.length - 1}` : ''}
-              </span>
+                  >
+                    {getInitials(a.name)}
+                  </span>
+                </div>
+              ))}
+              {effectiveAssignees.length > 4 && (
+                <span className="w-5 h-5 rounded-none bg-[#FFE600] text-black font-mono text-[8px] font-black flex items-center justify-center border-2 border-black shadow-[1px_1px_0px_0px_#000000]">
+                  +{effectiveAssignees.length - 4}
+                </span>
+              )}
             </div>
           )
         ) : (

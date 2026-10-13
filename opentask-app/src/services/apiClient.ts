@@ -1,5 +1,19 @@
 import JSONBig from "json-bigint";
 
+export const DEFAULT_PRODUCTION_API_URL = "https://env-opentask.user.cloudjkt02.com";
+export const DEFAULT_DEV_API_URL = "http://localhost:8000";
+
+export function isTauriEnvironment(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    (window as any).__TAURI_INTERNALS__ ||
+    (window as any).__TAURI__ ||
+    window.location.protocol === "tauri:" ||
+    window.location.protocol === "asset:" ||
+    window.location.hostname === "tauri.localhost"
+  );
+}
+
 export function getBaseUrl(): string {
   if (typeof window !== "undefined") {
     const override = localStorage.getItem("opentask_api_url");
@@ -7,11 +21,22 @@ export function getBaseUrl(): string {
       return override.trim();
     }
   }
-  return (
+
+  const envUrl = (
     import.meta.env.VITE_API_BASE_URL ||
     import.meta.env.VITE_API_URL ||
     ""
   ).trim();
+
+  if (envUrl) {
+    return envUrl;
+  }
+
+  if (isTauriEnvironment()) {
+    return import.meta.env.DEV ? DEFAULT_DEV_API_URL : DEFAULT_PRODUCTION_API_URL;
+  }
+
+  return "";
 }
 
 export const BASE_URL = getBaseUrl();

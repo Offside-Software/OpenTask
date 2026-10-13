@@ -1,4 +1,4 @@
-name: Build & Deploy Rust API
+name: CI & Auto Release
 
 on:
   push:
@@ -9,7 +9,13 @@ on:
       - 'opentask-app/**'
       - '.github/workflows/ci.yml'
       - 'vercel.json'
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Force build & release the desktop even if the version already exists'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -92,3 +98,94 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: npx --yes vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+
+  # ==========================================
+  # JOB 4: Build & Auto Release Desktop App
+  # Runs automatically when tauri version changes inside tauri.conf.json
+  # ==========================================
+  release-desktop:
+    name: Build & Release Desktop App
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Tauri Version Changes
+        id: version_check
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./opentask-app/src-tauri/tauri.conf.json').version")
+          echo "Target Desktop Version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          TAG_EXISTS=false
+          if git ls-remote --tags origin "refs/tags/v$VERSION" | grep -q "v$VERSION"; then
+            TAG_EXISTS=true
+          fi
+
+          FORCE="${{ inputs.force_release }}"
+
+          if [ "$TAG_EXISTS" = "false" ] || [ "$FORCE" = "true" ]; then
+            echo "Tag v$VERSION not found on GitHub (or force_release active). Starting desktop build..."
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag v$VERSION already exists on GitHub Release. Skipping desktop build."
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Bun Environment
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust Toolchain
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo & Rust
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./opentask-app/src-tauri"
+
+      - name: Install Frontend Dependencies
+        if: steps.version_check.outputs.should_release == 'true'
+        working-directory: ./opentask-app
+        run: bun install
+
+      - name: Build & Sign Desktop App
+        if: steps.version_check.outputs.should_release == 'true'
+        working-directory: ./opentask-app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: bun run tauri:build:signed
+
+      - name: Publish GitHub Release (Tag & Assets)
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version_check.outputs.version }}
+          name: OpenTask Desktop v${{ steps.version_check.outputs.version }}
+          body: |
+            ### OpenTask Desktop v${{ steps.version_check.outputs.version }}
+            Automated release built and signed by GitHub Actions CI/CD.
+
+            #### Downloads:
+            * Download the Windows installer (`-setup.exe`) below.
+            * Existing OpenTask desktop installations will automatically detect and install this update.
+          draft: false
+          prerelease: false
+          files: |
+            opentask-app/src-tauri/target/release/bundle/nsis/OpenTask_${{ steps.version_check.outputs.version }}_x64-setup.exe
+            opentask-app/src-tauri/target/release/bundle/nsis/OpenTask_${{ steps.version_check.outputs.version }}_x64-setup.exe.sig
+            opentask-app/src-tauri/target/release/bundle/nsis/latest.json
+

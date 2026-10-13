@@ -155,8 +155,7 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-[2px] animate-in fade-in duration-100"
-      onClick={onClose}
+      className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-sm animate-in fade-in duration-100"
     >
       <div
         className="bg-[#121417] dark:bg-[#121417] light:bg-[#FFFFFF] border-3 border-black rounded-none w-full max-w-4xl shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden max-h-[94vh] font-mono text-white dark:text-white light:text-black animate-in zoom-in-95 duration-100"

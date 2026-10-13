@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Send, ExternalLink, Shield, Bell, User, Sun, Moon, Sparkles, Eye, EyeOff, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Send, ExternalLink, Shield, Bell, User, Sun, Moon, Sparkles, Eye, EyeOff, CheckCircle2, AlertTriangle, Monitor, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { updateTelegramChatId } from '../../auth/api';
 import { useTheme } from '../../context/themeContext';
 import { CloseButton } from '../../design-system/CloseButton';
 import { aiKeyService, type UserAiKeyResponse } from '../../services/aiKeyService';
+import { useUpdater } from '../updater/UpdateChecker';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -14,6 +15,7 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     const { user, refreshUser } = useAuth();
     const { theme, setTheme } = useTheme();
+    const { currentVersion, checkForUpdates, isChecking: isCheckingUpdates } = useUpdater();
     const [chatId, setChatId] = useState(user?.db_user?.telegram_chat_id || '');
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -151,7 +153,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 select-none animate-in fade-in duration-100" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-100">
             <div
                 className="bg-[#121417] border-3 border-black rounded-none w-full max-w-lg shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono"
                 onClick={e => e.stopPropagation()}
@@ -435,6 +437,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                     )}
                                 </div>
                             )}
+                        </div>
+                    </section>
+
+                    {/* Desktop Application & Auto-Updater Section */}
+                    <section>
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-white text-[13px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <Monitor size={14} />
+                                <span className="text-[#FFE600] mr-1.5">//</span>DESKTOP APPLICATION & UPDATES
+                            </h4>
+                            <span className="px-2 py-0.5 bg-[#FFE600] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000]">
+                                {currentVersion || "WEB"}
+                            </span>
+                        </div>
+
+                        <div className="p-4 bg-[#141619] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <div className="text-white text-[12px] font-black uppercase tracking-wider mb-0.5">
+                                    TAURI DESKTOP PLATFORM
+                                </div>
+                                <div className="text-neutral-400 text-[10px] font-mono">
+                                    {currentVersion && currentVersion !== "web"
+                                        ? `INSTALLED DESKTOP BINARY: ${currentVersion}`
+                                        : "RUNNING IN WEB / BROWSER RUNTIME"}
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => checkForUpdates(false)}
+                                disabled={isCheckingUpdates}
+                                className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider transition-all disabled:opacity-50 shadow-[2px_2px_0px_0px_#000000] cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                <RefreshCw size={12} className={isCheckingUpdates ? "animate-spin" : ""} />
+                                <span>{isCheckingUpdates ? "CHECKING..." : "CHECK FOR UPDATES"}</span>
+                            </button>
                         </div>
                     </section>
 
