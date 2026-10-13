@@ -158,9 +158,9 @@ export const NetworkBadge: React.FC = () => {
 
   // Badge Status Color
   const getBadgeBg = () => {
-    if (isDown) return 'bg-[#181010] text-[#FF4D4D] border-red-900/80';
-    if (isDegraded) return 'bg-[#181610] text-[#FFE600] border-amber-800/80';
-    return 'bg-[#0E1410] text-[#00FF66] border-[#00FF66]/40';
+    if (isDown) return 'bg-[#FEF2F2] dark:bg-[#181010] text-[#DC2626] dark:text-[#FF4D4D] border-red-500 dark:border-red-900/80';
+    if (isDegraded) return 'bg-[#FFFBEB] dark:bg-[#181610] text-[#B45309] dark:text-[#FFE600] border-amber-500 dark:border-amber-800/80';
+    return 'bg-[#F0FDF4] dark:bg-[#0E1410] text-[#15803D] dark:text-[#00FF66] border-emerald-600 dark:border-[#00FF66]/40';
   };
 
   const getStatusLabel = () => {
@@ -173,9 +173,9 @@ export const NetworkBadge: React.FC = () => {
 
   const getLatencyColor = (ms: number | null) => {
     if (ms === null) return 'text-neutral-500';
-    if (ms < 100) return 'text-[#00FF66]';
-    if (ms < 300) return 'text-[#FFE600]';
-    return 'text-[#FF4D4D]';
+    if (ms < 100) return 'text-emerald-700 dark:text-[#00FF66]';
+    if (ms < 300) return 'text-amber-700 dark:text-[#FFE600]';
+    return 'text-red-700 dark:text-[#FF4D4D]';
   };
 
   return (
@@ -204,13 +204,13 @@ export const NetworkBadge: React.FC = () => {
         </span>
 
         {/* Primary Status Text */}
-        <span className="text-white font-mono font-bold tracking-wider">
+        <span className="text-neutral-900 dark:text-white font-mono font-bold tracking-wider">
           {getStatusLabel()}
         </span>
 
         {/* Live Latency Chip directly on the badge */}
         <span
-          className={`px-1.5 py-0.5 bg-black border border-neutral-700 font-mono text-[10px] font-black tracking-tight shrink-0 ${getLatencyColor(
+          className={`px-1.5 py-0.5 bg-neutral-100 dark:bg-black border border-neutral-300 dark:border-neutral-700 font-mono text-[10px] font-black tracking-tight shrink-0 ${getLatencyColor(
             roundtripLatency
           )}`}
         >
@@ -219,18 +219,18 @@ export const NetworkBadge: React.FC = () => {
 
         <ChevronDown
           size={12}
-          className={`text-neutral-400 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          className={`text-neutral-600 dark:text-neutral-400 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {/* Popover Telemetry HUD */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-[#121417] border-2 border-black rounded-none shadow-[5px_5px_0px_0px_#000000] p-4 text-white z-50 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white dark:bg-[#121417] border-2 border-black rounded-none shadow-[5px_5px_0px_0px_#000000] p-4 text-neutral-900 dark:text-white z-50 animate-in fade-in zoom-in-95 duration-100">
           {/* Header */}
-          <div className="flex items-center justify-between border-b-2 border-neutral-800 pb-2.5 mb-3">
+          <div className="flex items-center justify-between border-b-2 border-neutral-200 dark:border-neutral-800 pb-2.5 mb-3">
             <div className="flex items-center gap-2">
-              <Activity size={14} className="text-[#FFE600]" />
-              <span className="text-[11px] font-black uppercase tracking-wider text-white">
+              <Activity size={14} className="text-[#B45309] dark:text-[#FFE600]" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-neutral-900 dark:text-white">
                 // SYSTEM TELEMETRY
               </span>
             </div>
@@ -250,18 +250,18 @@ export const NetworkBadge: React.FC = () => {
           {/* Details List */}
           <div className="space-y-2.5 text-[11px]">
             {/* 1. Client Network */}
-            <div className="flex items-center justify-between p-2 bg-[#0B0E14] border border-neutral-800 rounded-none">
+            <div className="flex items-center justify-between p-2 bg-[#F4F4F0] dark:bg-[#0B0E14] border border-neutral-300 dark:border-neutral-800 rounded-none">
               <div className="flex items-center gap-2">
                 {isOnline ? (
-                  <Wifi size={13} className="text-[#00FF66]" />
+                  <Wifi size={13} className="text-emerald-600 dark:text-[#00FF66]" />
                 ) : (
-                  <WifiOff size={13} className="text-[#FF3333]" />
+                  <WifiOff size={13} className="text-red-600 dark:text-[#FF3333]" />
                 )}
-                <span className="text-neutral-300 font-bold uppercase">BROWSER LINK</span>
+                <span className="text-neutral-700 dark:text-neutral-300 font-bold uppercase">BROWSER LINK</span>
               </div>
               <span
                 className={`font-black ${
-                  isOnline ? 'text-[#00FF66]' : 'text-[#FF3333]'
+                  isOnline ? 'text-emerald-700 dark:text-[#00FF66]' : 'text-red-700 dark:text-[#FF3333]'
                 }`}
               >
                 {isOnline ? 'ONLINE' : 'OFFLINE'}
@@ -269,19 +269,19 @@ export const NetworkBadge: React.FC = () => {
             </div>
 
             {/* 2. API Gateway */}
-            <div className="flex items-center justify-between p-2 bg-[#0B0E14] border border-neutral-800 rounded-none">
+            <div className="flex items-center justify-between p-2 bg-[#F4F4F0] dark:bg-[#0B0E14] border border-neutral-300 dark:border-neutral-800 rounded-none">
               <div className="flex items-center gap-2">
-                <Server size={13} className={apiStatus === 'connected' ? 'text-[#00FF66]' : 'text-[#FF3333]'} />
-                <span className="text-neutral-300 font-bold uppercase">API (AXUM TOKIO)</span>
+                <Server size={13} className={apiStatus === 'connected' ? 'text-emerald-600 dark:text-[#00FF66]' : 'text-red-600 dark:text-[#FF3333]'} />
+                <span className="text-neutral-700 dark:text-neutral-300 font-bold uppercase">API (AXUM TOKIO)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span
                   className={`font-black ${
                     apiStatus === 'connected'
-                      ? 'text-[#00FF66]'
+                      ? 'text-emerald-700 dark:text-[#00FF66]'
                       : apiStatus === 'degraded'
-                      ? 'text-[#FFE600]'
-                      : 'text-[#FF3333]'
+                      ? 'text-amber-700 dark:text-[#FFE600]'
+                      : 'text-red-700 dark:text-[#FF3333]'
                   }`}
                 >
                   {apiStatus === 'connected' ? 'CONNECTED' : apiStatus === 'degraded' ? 'DEGRADED' : 'DOWN'}
@@ -290,17 +290,17 @@ export const NetworkBadge: React.FC = () => {
             </div>
 
             {/* 3. Database Connection */}
-            <div className="flex items-center justify-between p-2 bg-[#0B0E14] border border-neutral-800 rounded-none">
+            <div className="flex items-center justify-between p-2 bg-[#F4F4F0] dark:bg-[#0B0E14] border border-neutral-300 dark:border-neutral-800 rounded-none">
               <div className="flex items-center gap-2">
-                <Database size={13} className={dbStatus === 'connected' ? 'text-[#00FF66]' : 'text-[#FF3333]'} />
-                <span className="text-neutral-300 font-bold uppercase">POSTGRESQL DB</span>
+                <Database size={13} className={dbStatus === 'connected' ? 'text-emerald-600 dark:text-[#00FF66]' : 'text-red-600 dark:text-[#FF3333]'} />
+                <span className="text-neutral-700 dark:text-neutral-300 font-bold uppercase">POSTGRESQL DB</span>
               </div>
               <div className="flex items-center gap-2">
                 <span
                   className={`font-black ${
                     dbStatus === 'connected'
-                      ? 'text-[#00FF66]'
-                      : 'text-[#FF3333]'
+                      ? 'text-emerald-700 dark:text-[#00FF66]'
+                      : 'text-red-700 dark:text-[#FF3333]'
                   }`}
                 >
                   {dbStatus === 'connected' ? 'CONNECTED' : dbStatus === 'disconnected' ? 'DISCONNECTED' : 'UNKNOWN'}
@@ -310,14 +310,14 @@ export const NetworkBadge: React.FC = () => {
 
             {/* 4. Roundtrip Latency & DB Ping */}
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <div className="p-2 bg-[#0B0E14] border border-neutral-800 rounded-none">
-                <div className="text-[10px] text-neutral-400 uppercase">// ROUNDTRIP PING</div>
+              <div className="p-2 bg-[#F4F4F0] dark:bg-[#0B0E14] border border-neutral-300 dark:border-neutral-800 rounded-none">
+                <div className="text-[10px] text-neutral-600 dark:text-neutral-400 uppercase">// ROUNDTRIP PING</div>
                 <div className={`text-[13px] font-black mt-0.5 ${getLatencyColor(roundtripLatency)}`}>
                   {roundtripLatency !== null ? `${roundtripLatency} ms` : '--'}
                 </div>
               </div>
-              <div className="p-2 bg-[#0B0E14] border border-neutral-800 rounded-none">
-                <div className="text-[10px] text-neutral-400 uppercase">// DB QUERY LATENCY</div>
+              <div className="p-2 bg-[#F4F4F0] dark:bg-[#0B0E14] border border-neutral-300 dark:border-neutral-800 rounded-none">
+                <div className="text-[10px] text-neutral-600 dark:text-neutral-400 uppercase">// DB QUERY LATENCY</div>
                 <div className={`text-[13px] font-black mt-0.5 ${getLatencyColor(dbLatency)}`}>
                   {dbLatency !== null ? `${dbLatency} ms` : '--'}
                 </div>
@@ -326,7 +326,7 @@ export const NetworkBadge: React.FC = () => {
           </div>
 
           {/* Footer with Refresh button */}
-          <div className="mt-3 pt-2.5 border-t border-neutral-800 flex items-center justify-between text-[10px] text-neutral-400">
+          <div className="mt-3 pt-2.5 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between text-[10px] text-neutral-600 dark:text-neutral-400">
             <span>
               {lastChecked
                 ? `CHECKED ${lastChecked.toLocaleTimeString()}`
@@ -336,7 +336,7 @@ export const NetworkBadge: React.FC = () => {
               type="button"
               onClick={checkHealth}
               disabled={isPinging}
-              className="px-2.5 py-1 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border border-black rounded-none font-bold uppercase flex items-center gap-1 shadow-[1px_1px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
+              className="px-2.5 py-1 bg-[#EAEAE4] dark:bg-[#1E2227] hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black text-black dark:text-neutral-200 border-2 border-black rounded-none font-bold uppercase flex items-center gap-1 shadow-[1px_1px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
             >
               <RefreshCw size={10} className={isPinging ? 'animate-spin' : ''} />
               <span>{isPinging ? 'PINGING...' : 'PING NOW'}</span>

@@ -234,6 +234,19 @@ pub async fn update_task(
     Path(task_id): Path<SafeId>,
     Json(payload): Json<TaskUpdatePayload>,
 ) -> Result<Json<DatabaseTask>, AppError> {
+    // 1. Fetch current task state to detect assignee changes & specific updates
+    let old_task: Option<DatabaseTask> = crate::db::query_as(
+        "SELECT id, project_id, bucket_id, meeting_id, \
+                parent_task_id, lead_assignee_id, suggested_assignee_id, \
+                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids, \
+                title, description, type as task_type, weight, branch_name, repo_url, \
+                last_activity_at, order_idx, created_at, updated_at \
+         FROM opentask.tasks WHERE id = $1 LIMIT 1;"
+    )
+    .bind(task_id.0)
+    .fetch_optional(&state.pool)
+    .await?;
+
     let mut builder = sqlx::QueryBuilder::new(
         "UPDATE opentask.tasks SET updated_at = NOW(), last_activity_at = NOW()",
     );
@@ -305,17 +318,61 @@ pub async fn update_task(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
 
-        if let Some(pid) = row.project_id {
-            let action = if payload.bucket_id.is_some() {
-                "moved"
-            } else {
-                "updated"
-            };
-        let event_type = if payload.bucket_id.is_some() {
-            "TASK_MOVED"
+    let old_assignees: Vec<i64> = old_task
+        .as_ref()
+        .and_then(|t| t.assignee_ids.as_ref())
+        .filter(|ids| !ids.is_empty())
+        .map(|ids| ids.iter().map(|id| id.0).collect())
+        .unwrap_or_else(|| {
+            old_task
+                .as_ref()
+                .and_then(|t| t.lead_assignee_id.as_ref())
+                .map(|l| vec![l.0])
+                .unwrap_or_default()
+        });
+
+    let new_assignees: Vec<i64> = row
+        .assignee_ids
+        .as_ref()
+        .filter(|ids| !ids.is_empty())
+        .map(|ids| ids.iter().map(|id| id.0).collect())
+        .unwrap_or_else(|| {
+            row.lead_assignee_id
+                .as_ref()
+                .map(|l| vec![l.0])
+                .unwrap_or_default()
+        });
+
+    let added_assignees: Vec<i64> = new_assignees
+        .iter()
+        .copied()
+        .filter(|id| !old_assignees.contains(id))
+        .collect();
+
+    let removed_assignees: Vec<i64> = old_assignees
+        .iter()
+        .copied()
+        .filter(|id| !new_assignees.contains(id))
+        .collect();
+
+    if let Some(pid) = row.project_id {
+        let (action, event_type) = if payload.bucket_id.is_some() {
+            ("moved", "TASK_MOVED")
+        } else if payload.description.is_some()
+            && old_task.as_ref().and_then(|o| o.description.as_deref()).unwrap_or("")
+                != row.description.as_deref().unwrap_or("")
+        {
+            ("updated task description", "TASK_UPDATED")
+        } else if payload.title.is_some()
+            && old_task.as_ref().map(|o| o.title.as_str()).unwrap_or("") != row.title.as_str()
+        {
+            ("renamed task", "TASK_UPDATED")
+        } else if !added_assignees.is_empty() || !removed_assignees.is_empty() {
+            ("updated assignees on", "TASK_UPDATED")
         } else {
-            "TASK_UPDATED"
+            ("updated", "TASK_UPDATED")
         };
+
         state.realtime.publish(pid.0, "task", action, Some(task_id.0));
         let _ = crate::routes::activities::record_project_event(
             &state.pool,
@@ -332,20 +389,41 @@ pub async fn update_task(
         .await;
     }
 
-    // Trigger notification if assignee was updated to a specific user
-    if let Some(Some(assignee)) = payload.lead_assignee_id {
+    // Trigger notification ONLY if assignees were actually added/assigned
+    for aid in added_assignees {
         let pool = state.pool.clone();
         let config = state.config.clone();
         let task_title = row.title.clone();
         let pid = row.project_id.map(|p| p.0).unwrap_or(0);
         let tid = task_id.0;
-        let aid = assignee.0;
         tokio::spawn(async move {
             crate::services::notifications::notify_task_assigned(
                 &pool,
                 &config,
                 &task_title,
                 aid,
+                pid,
+                None,
+                Some(tid),
+                None,
+            )
+            .await;
+        });
+    }
+
+    // Trigger notification if assignees were removed
+    for uid in removed_assignees {
+        let pool = state.pool.clone();
+        let config = state.config.clone();
+        let task_title = row.title.clone();
+        let pid = row.project_id.map(|p| p.0).unwrap_or(0);
+        let tid = task_id.0;
+        tokio::spawn(async move {
+            crate::services::notifications::notify_task_unassigned(
+                &pool,
+                &config,
+                &task_title,
+                uid,
                 pid,
                 None,
                 Some(tid),

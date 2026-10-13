@@ -100,7 +100,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 select-none animate-in fade-in duration-100" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-100">
             <div
                 className="bg-[#121417] border-3 border-black rounded-none w-full max-w-lg shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono"
                 onClick={e => e.stopPropagation()}

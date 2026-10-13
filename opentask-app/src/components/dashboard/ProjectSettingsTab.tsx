@@ -469,6 +469,11 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
     );
     const displayMaskedAiKey = customAiKeyInfo?.masked_key || 'AIzaSy••••••••••••••••••••';
 
+    const isProjectDirty = project ? (
+        name.trim() !== (project.name || '').trim() ||
+        description.trim() !== (project.description || '').trim()
+    ) : false;
+
     return (
         <div className="space-y-6 select-none font-mono">
             {/* General Settings */}
@@ -494,7 +499,8 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
 
                     <button
                         onClick={handleUpdateProject}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                        disabled={!isProjectDirty || !name.trim()}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
                     >
                         <Save size={14} strokeWidth={2.5} /> Save Changes
                     </button>
