@@ -127,6 +127,7 @@ pub async fn create_project(
     }
 
     tx.commit().await?;
+    state.realtime.publish(project_id, "project", "created", Some(project_id));
 
     Ok(Json(row))
 }
@@ -191,6 +192,7 @@ pub async fn get_project(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Project {project_id} not found")))?;
 
+    state.realtime.publish(project_id.0, "project", "updated", Some(project_id.0));
     Ok(Json(row))
 }
 
@@ -238,6 +240,7 @@ pub async fn delete_project(
         )));
     }
 
+    state.realtime.publish(project_id.0, "project", "deleted", Some(project_id.0));
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -607,6 +610,7 @@ pub async fn add_project_member(
     .fetch_one(&state.pool)
     .await?;
 
+    state.realtime.publish(project_id.0, "member", "upserted", row.id.as_ref().map(|id| id.0));
     Ok(Json(row))
 }
 
@@ -642,6 +646,7 @@ pub async fn update_project_member(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("member: {member_id} not found in project {project_id}")))?;
 
+    state.realtime.publish(project_id.0, "member", "updated", Some(member_id.0));
     Ok(Json(row))
 }
 
@@ -693,6 +698,7 @@ pub async fn remove_project_member(
 
     tx.commit().await?;
 
+    state.realtime.publish(project_id.0, "member", "deleted", Some(member_id.0));
     Ok(StatusCode::NO_CONTENT)
 }
 

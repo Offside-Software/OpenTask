@@ -60,6 +60,7 @@ pub async fn create_bucket(
     .fetch_one(&state.pool)
     .await?;
 
+    state.realtime.publish(project_id.0, "bucket", "created", Some(bucket_id));
     Ok(Json(row))
 }
 
@@ -99,6 +100,7 @@ pub async fn get_bucket(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Bucket {bucket_id} not found")))?;
 
+    state.realtime.publish(row.project_id.as_ref().map(|id| id.0).unwrap_or(0), "bucket", "updated", row.id.as_ref().map(|id| id.0));
     Ok(Json(row))
 }
 
@@ -165,6 +167,7 @@ pub async fn delete_bucket(
         return Err(AppError::NotFound(format!("Bucket {bucket_id} not found")));
     }
 
+    state.realtime.publish(_project_id.0, "bucket", "deleted", Some(bucket_id.0));
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -211,6 +214,7 @@ pub async fn reorder_buckets(
         items.len(),
         project_id
     );
+    state.realtime.publish(project_id.0, "bucket", "reordered", None);
 
     Ok(Json(serde_json::json!({
         "status": "success",
