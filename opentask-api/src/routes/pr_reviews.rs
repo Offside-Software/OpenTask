@@ -8,9 +8,13 @@ use serde_json::{json, Value};
 use sqlx::Row;
 
 use crate::error::AppError;
-use crate::models::pr_review::{DatabasePrReview, TriggerPrReviewPayload};
+use crate::models::pr_review::{
+    DatabasePrReview, ExtractTasksPayload, ExtractTasksResponse, ExtractedTaskItem,
+    TriggerPrReviewPayload,
+};
 use crate::models::safe_id::SafeId;
 use crate::routes::auth::AppState;
+use crate::services::gemini::{generate_content, resolve_gemini_key, DEFAULT_TEXT_MODEL};
 use crate::services::github::{get_installation_token, get_repository_installation};
 use crate::services::pr_evaluator::evaluate_pull_request;
 
@@ -30,6 +34,10 @@ pub fn router() -> Router<AppState> {
             post(sync_project_prs),
         )
         .route("/projects/{project_id}/pulls", get(list_project_pulls))
+        .route(
+            "/projects/{project_id}/pr-reviews/{review_id}/extract-tasks",
+            post(extract_tasks_from_review),
+        )
 }
 
 pub async fn list_project_pr_reviews(
@@ -443,4 +451,217 @@ pub async fn list_project_pulls(
     }
 
     Ok(Json(Value::Array(all_pulls)))
+}
+
+pub async fn extract_tasks_from_review(
+    State(state): State<AppState>,
+    Path((project_id, review_id)): Path<(SafeId, SafeId)>,
+    Json(payload): Json<ExtractTasksPayload>,
+) -> Result<Json<ExtractTasksResponse>, AppError> {
+    let feedback = match payload.feedback.filter(|f| !f.trim().is_empty()) {
+        Some(fb) => fb,
+        None => {
+            let row = crate::db::query(
+                "SELECT feedback FROM opentask.pr_reviews WHERE id = $1 LIMIT 1;",
+            )
+            .bind(review_id.0)
+            .fetch_optional(&state.pool)
+            .await?;
+
+            row.and_then(|r| r.try_get::<Option<String>, _>("feedback").ok().flatten())
+                .unwrap_or_default()
+        }
+    };
+
+    if feedback.trim().is_empty() {
+        return Ok(Json(ExtractTasksResponse { tasks: vec![] }));
+    }
+
+    let mut tasks = Vec::new();
+
+    // 1. Try Gemini extraction if API key is configured
+    let gemini_key = resolve_gemini_key(
+        &state.pool,
+        Some(project_id.0),
+        None,
+        Some(&state.config.gemini_api_key),
+    )
+    .await;
+
+    if let Some(key) = gemini_key {
+        let prompt = format!(
+            "You are an expert technical lead and agile product manager.\n\
+             Extract all actionable issues, bug fixes, refactoring suggestions, and improvements from this code review into discrete tasks.\n\n\
+             Code Review:\n\
+             \"\"\"\n\
+             {feedback}\n\
+             \"\"\"\n\n\
+             Output a JSON object ONLY with no markdown wrapping in this format:\n\
+             {{\n\
+               \"tasks\": [\n\
+                 {{\n\
+                   \"title\": \"Concise action-oriented title\",\n\
+                   \"description\": \"Clear context, specific file paths, and lines if mentioned in the review\",\n\
+                   \"type\": \"BUG\" or \"IMPROVEMENT\" or \"CODE\" or \"SECURITY\",\n\
+                   \"weight\": 1, 2, 3, 5, or 8\n\
+                 }}\n\
+               ]\n\
+             }}"
+        );
+
+        if let Ok(raw_json) = generate_content(&key, DEFAULT_TEXT_MODEL, None, &prompt).await {
+            let clean = raw_json
+                .trim()
+                .trim_start_matches("```json")
+                .trim_start_matches("```")
+                .trim_end_matches("```")
+                .trim();
+
+            if let Ok(parsed) = serde_json::from_str::<Value>(clean) {
+                if let Some(arr) = parsed["tasks"].as_array() {
+                    for item in arr {
+                        if let Some(title) = item["title"].as_str().filter(|s| !s.trim().is_empty()) {
+                            let desc = item["description"].as_str().map(|s| s.trim().to_string());
+                            let ttype = item["type"].as_str().unwrap_or("IMPROVEMENT").to_string();
+                            let weight = item["weight"].as_i64().unwrap_or(3) as i32;
+
+                            tasks.push(ExtractedTaskItem {
+                                title: title.trim().to_string(),
+                                description: desc,
+                                task_type: Some(ttype),
+                                weight: Some(weight),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Deterministic heuristic fallback if Gemini returned 0 tasks
+    if tasks.is_empty() {
+        tasks = extract_tasks_heuristic_fallback(&feedback);
+    }
+
+    Ok(Json(ExtractTasksResponse { tasks }))
+}
+
+fn extract_tasks_heuristic_fallback(feedback: &str) -> Vec<ExtractedTaskItem> {
+    let mut tasks = Vec::new();
+    let mut current_title: Option<String> = None;
+    let mut current_desc = Vec::new();
+    let mut in_actionable_section = false;
+
+    for line in feedback.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') {
+            let lower = trimmed.to_lowercase();
+            in_actionable_section = lower.contains("issue")
+                || lower.contains("improvement")
+                || lower.contains("recommend")
+                || lower.contains("action")
+                || lower.contains("fix")
+                || lower.contains("todo");
+            continue;
+        }
+
+        let is_numbered = trimmed
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+            && (trimmed.contains(". ") || trimmed.contains(") "));
+
+        let is_bullet = trimmed.starts_with("- ") || trimmed.starts_with("* ");
+
+        if (is_numbered || (is_bullet && in_actionable_section)) && !trimmed.starts_with("- [") {
+            if let Some(t) = current_title.take() {
+                if !t.trim().is_empty() {
+                    let desc = if current_desc.is_empty() {
+                        None
+                    } else {
+                        Some(current_desc.join("\n").trim().to_string())
+                    };
+                    let ttype = classify_task_type(&t, desc.as_deref().unwrap_or(""));
+                    tasks.push(ExtractedTaskItem {
+                        title: t,
+                        description: desc,
+                        task_type: Some(ttype),
+                        weight: Some(3),
+                    });
+                    current_desc.clear();
+                }
+            }
+
+            let raw_item = if is_numbered {
+                if let Some((_, rest)) = trimmed.split_once(". ") {
+                    rest
+                } else if let Some((_, rest)) = trimmed.split_once(") ") {
+                    rest
+                } else {
+                    trimmed
+                }
+            } else {
+                trimmed.trim_start_matches("- ").trim_start_matches("* ")
+            };
+
+            let clean_title = raw_item
+                .trim_start_matches("**")
+                .trim_end_matches("**")
+                .trim_end_matches(':')
+                .replace("**", "")
+                .replace('`', "")
+                .trim()
+                .to_string();
+
+            if clean_title.len() > 3 {
+                current_title = Some(clean_title);
+            }
+        } else if current_title.is_some() && !trimmed.is_empty() {
+            current_desc.push(trimmed.to_string());
+        }
+    }
+
+    if let Some(t) = current_title.take() {
+        if !t.trim().is_empty() {
+            let desc = if current_desc.is_empty() {
+                None
+            } else {
+                Some(current_desc.join("\n").trim().to_string())
+            };
+            let ttype = classify_task_type(&t, desc.as_deref().unwrap_or(""));
+            tasks.push(ExtractedTaskItem {
+                title: t,
+                description: desc,
+                task_type: Some(ttype),
+                weight: Some(3),
+            });
+        }
+    }
+
+    tasks
+}
+
+fn classify_task_type(title: &str, desc: &str) -> String {
+    let combined = format!("{title} {desc}").to_lowercase();
+    if combined.contains("security")
+        || combined.contains("token")
+        || combined.contains("leak")
+        || combined.contains("auth")
+    {
+        "SECURITY".to_string()
+    } else if combined.contains("critical")
+        || combined.contains("bug")
+        || combined.contains("fix")
+        || combined.contains("error")
+    {
+        "BUG".to_string()
+    } else if combined.contains("refactor")
+        || combined.contains("clean")
+        || combined.contains("style")
+    {
+        "CODE".to_string()
+    } else {
+        "IMPROVEMENT".to_string()
+    }
 }

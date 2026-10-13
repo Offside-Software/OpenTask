@@ -606,7 +606,7 @@ async def handle_pr_closed(payload: dict):
         return
 
     is_merged = pr.get("merged", False)
-    target_state = 'COMPLETED' if is_merged else 'ONGOING'
+    target_state = 'COMPLETED'
 
     project_data = find_project_bucket_by_state(repo_url, target_state)
     if not project_data: return
@@ -730,7 +730,6 @@ async def handle_pr_opened(payload: dict):
                 ))
             except Exception as e:
                 logger.error(f"[FORGOTTEN TASK] Failed to log activity: {e}")
-            return  # Don't auto-move
 
     # Normal flow: task is ONGOING, move to ON_REVIEW
     if not target_bucket_id:

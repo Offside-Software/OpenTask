@@ -173,6 +173,34 @@ pub async fn evaluate_pull_request(
     .await
     .map_err(|e| AppError::Internal(format!("Failed to save PR review: {e}")))?;
 
+    // If a task was matched, ensure it is moved to ON_REVIEW bucket
+    if let (Some(pid), Some(tid)) = (project_id, matched_id) {
+        if let Ok(Some(row)) = crate::db::query(
+            r#"
+            SELECT id FROM opentask.buckets
+            WHERE project_id = $1
+            ORDER BY (upper(state) = 'ON_REVIEW') DESC,
+                     (CASE WHEN upper(name) LIKE '%REVIEW%' THEN 1 ELSE 0 END) DESC,
+                     order_idx ASC
+            LIMIT 1;
+            "#
+        )
+        .bind(pid)
+        .fetch_optional(pool)
+        .await
+        {
+            if let Ok(review_bucket_id) = row.try_get::<i64, _>("id") {
+                let _ = crate::db::query(
+                    "UPDATE opentask.tasks SET bucket_id = $1, updated_at = NOW(), last_activity_at = NOW() WHERE id = $2 AND bucket_id != $1;"
+                )
+                .bind(review_bucket_id)
+                .bind(tid)
+                .execute(pool)
+                .await;
+            }
+        }
+    }
+
     // 9. Post comment to GitHub PR
     let comment_url = format!("https://api.github.com/repos/{repo_full_name}/issues/{pr_number}/comments");
     let comment_body = format!(
