@@ -124,6 +124,7 @@ pub async fn create_task(
     .fetch_one(&state.pool)
     .await?;
 
+    state.realtime.publish(project_id.0, "task", "created", Some(task_id));
     let _ = crate::routes::activities::record_project_event(
         &state.pool,
         project_id.0,
@@ -281,17 +282,18 @@ pub async fn update_task(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Task {task_id} not found")))?;
 
-    if let Some(pid) = row.project_id {
-        let action = if payload.bucket_id.is_some() {
-            "moved"
-        } else {
-            "updated"
-        };
+        if let Some(pid) = row.project_id {
+            let action = if payload.bucket_id.is_some() {
+                "moved"
+            } else {
+                "updated"
+            };
         let event_type = if payload.bucket_id.is_some() {
             "TASK_MOVED"
         } else {
             "TASK_UPDATED"
         };
+        state.realtime.publish(pid.0, "task", action, Some(task_id.0));
         let _ = crate::routes::activities::record_project_event(
             &state.pool,
             pid.0,
@@ -389,6 +391,7 @@ pub async fn delete_task(
             t.try_get::<i64, _>("project_id"),
             t.try_get::<String, _>("title"),
         ) {
+            state.realtime.publish(pid, "task", "deleted", Some(task_id.0));
             let _ = crate::routes::activities::record_project_event(
                 &state.pool,
                 pid,
@@ -505,6 +508,7 @@ pub async fn reorder_tasks(
         project_id,
         target_bucket_id
     );
+    state.realtime.publish(project_id.0, "task", "reordered", None);
 
     Ok(Json(json!({
         "status": "success",
@@ -662,4 +666,3 @@ pub async fn get_bucket_tasks(
         has_more,
     }))
 }
-

@@ -16,6 +16,7 @@ use crate::extractors::auth::CurrentUser;
 use crate::models::safe_id::SafeId;
 use crate::models::user::{AuthMeResponse, DatabaseUser, GitHubUserResponse};
 use crate::services::id_generator::next_id;
+use crate::services::realtime::RealtimeHub;
 
 #[derive(Debug, Deserialize)]
 pub struct CallbackQuery {
@@ -43,6 +44,7 @@ pub fn router() -> Router<AppState> {
 pub struct AppState {
     pub pool: PgPool,
     pub config: Config,
+    pub realtime: RealtimeHub,
 }
 
 pub async fn get_or_create_user(

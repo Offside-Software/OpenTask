@@ -25,6 +25,7 @@ import { useToast } from '../design-system/Toast';
 import { useAuth } from '../auth/useAuth';
 import { useCurrentUserRole } from '../controllers/useCurrentUserRole';
 import { useProjectMembers } from '../controllers/useProjectMembers';
+import { useProjectRealtime, type ProjectEvent } from '../controllers/useProjectRealtime';
 import { projectService } from '../services/projectService';
 import { prReviewService } from '../services/prReviewService';
 import { taskService } from '../services/taskService';
@@ -166,6 +167,23 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     });
   }, [setTasksOptimistically]);
   const { refreshDashboard } = useDashboard(projectId);
+
+  const handleProjectEvent = useCallback((event: ProjectEvent) => {
+    if (event.entity === 'task' || event.entity === 'bucket') {
+      void refreshBoard(true);
+      void refreshDashboard(true);
+    } else if (event.entity === 'member') {
+      void refreshMembers();
+      void refreshDashboard(true);
+    } else if (event.entity === 'project') {
+      projectService.getProjectById(projectId)
+        .then(setProject)
+        .catch(error => console.error('Failed to refresh project after realtime event:', error));
+    }
+  }, [projectId, refreshBoard, refreshDashboard, refreshMembers]);
+
+  useProjectRealtime(projectId, { onEvent: handleProjectEvent });
+
   // Mutation hooks
   const { createBucket, updateBucket, deleteBucket } = useBuckets(projectId);
   const { createTask, updateTask, deleteTask } = useTasks(projectId);

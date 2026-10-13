@@ -9,6 +9,7 @@ pub mod meetings;
 pub mod notifications;
 pub mod pr_reviews;
 pub mod projects;
+pub mod realtime;
 pub mod tasks;
 pub mod telegram;
 pub mod users;
@@ -22,6 +23,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(auth::router())
         .merge(users::router())
         .merge(projects::router())
+        .merge(realtime::router())
         .merge(buckets::router())
         .merge(tasks::router())
         .merge(alerts::router())

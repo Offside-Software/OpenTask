@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
 import type { Task, Bucket, ProjectMember, PrReview } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
@@ -39,6 +39,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [isAddingType, setIsAddingType] = useState(false);
     const [customTypeInput, setCustomTypeInput] = useState('');
     const { showToast } = useToast();
+    const previousTaskId = useRef<string | number | undefined>(task.id);
 
     const handleToggleType = (t: string) => {
         setSelectedTypes(prev => {
@@ -95,19 +96,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     };
 
     useEffect(() => {
-        setTitle(task.title);
-        setDescription(task.description || '');
-        const parsed = parseTaskTypes(task.type);
-        setSelectedTypes(parsed.length > 0 ? parsed : ['CODE']);
-        setWeight(task.weight);
-        setBucketId(task.bucket_id ? String(task.bucket_id) : undefined);
-        setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
-        setBranchName(task.branch_name || '');
-        setRepoUrl(task.repo_url || '');
-        setAvailableTypes(getAllTaskTypes([task.type]));
-    }, [task]);
-
-    useEffect(() => {
         if (task.id) {
             setLoadingReviews(true);
             prReviewService.getTaskReviews(task.id)
@@ -158,6 +146,26 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         leadAssigneeId !== (task.lead_assignee_id ? String(task.lead_assignee_id) : undefined) ||
         JSON.stringify([...selectedTypes].sort()) !== JSON.stringify([...parseTaskTypes(task.type)].sort())
     );
+
+    useEffect(() => {
+        const taskChanged = String(previousTaskId.current) !== String(task.id);
+        previousTaskId.current = task.id;
+
+        // Realtime board updates replace the task object while this modal is
+        // open. Never overwrite a draft unless the user switched tasks.
+        if (!taskChanged && isDirty) return;
+
+        setTitle(task.title);
+        setDescription(task.description || '');
+        const parsed = parseTaskTypes(task.type);
+        setSelectedTypes(parsed.length > 0 ? parsed : ['CODE']);
+        setWeight(task.weight);
+        setBucketId(task.bucket_id ? String(task.bucket_id) : undefined);
+        setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
+        setBranchName(task.branch_name || '');
+        setRepoUrl(task.repo_url || '');
+        setAvailableTypes(getAllTaskTypes([task.type]));
+    }, [task, isDirty]);
 
     useEffect(() => {
         if (!isDirty) return;

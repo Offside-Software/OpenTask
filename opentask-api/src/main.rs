@@ -68,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
     let app_state = AppState {
         pool: pool.clone(),
         config: config.clone(),
+        realtime: services::realtime::RealtimeHub::new(),
     };
 
     let trace_layer = tower_http::trace::TraceLayer::new_for_http()
