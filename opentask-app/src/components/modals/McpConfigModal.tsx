@@ -78,7 +78,7 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
     {
       mcpServers: {
         opentask: {
-          url: mcpSseUrl,
+          serverUrl: mcpSseUrl,
           headers: {
             Authorization: `Bearer ${safeApiKey}`,
           },

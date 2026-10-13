@@ -38,8 +38,13 @@ pub struct JsonRpcRequest {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/mcp", post(handle_mcp).get(handle_mcp_sse))
+        .route("/mcp/sse", post(handle_mcp).get(handle_mcp_sse))
         .route(
             "/projects/{project_id}/mcp",
+            post(handle_project_mcp).get(handle_project_mcp_sse),
+        )
+        .route(
+            "/projects/{project_id}/mcp/sse",
             post(handle_project_mcp).get(handle_project_mcp_sse),
         )
 }
