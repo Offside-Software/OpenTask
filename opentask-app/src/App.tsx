@@ -66,6 +66,7 @@ function ProjectDetailsPageWrapper() {
 }
 
 import { ToastProvider } from './design-system/Toast';
+import { UpdateProvider } from './components/updater/UpdateChecker';
 
 export default function App() {
   return (
@@ -73,7 +74,9 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <ToastProvider>
-            <AppShell />
+            <UpdateProvider>
+              <AppShell />
+            </UpdateProvider>
           </ToastProvider>
         </AuthProvider>
       </ThemeProvider>

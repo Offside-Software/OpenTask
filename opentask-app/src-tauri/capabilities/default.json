@@ -1,0 +1,29 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables default permissions for OpenTask desktop",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "notification:default",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-write-file",
+    "fs:allow-mkdir",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://env-opentask.user.cloudjkt02.com/*" },
+        { "url": "https://*.vercel.app/*" },
+        { "url": "https://*.supabase.co/*" },
+        { "url": "https://api.github.com/*" },
+        { "url": "https://github.com/*" },
+        { "url": "http://localhost:*/*" },
+        { "url": "http://127.0.0.1:*/*" }
+      ]
+    }
+  ]
+}

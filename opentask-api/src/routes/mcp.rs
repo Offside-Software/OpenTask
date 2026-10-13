@@ -8,7 +8,7 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use futures_util::stream;
+use futures_util::{stream, StreamExt};
 use regex::Regex;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -206,13 +206,13 @@ pub async fn handle_project_mcp_sse(
     let endpoint_url = format!("/api/projects/{}/mcp", project_id);
     let initial_event = Event::default().event("endpoint").data(endpoint_url);
 
-    let stream = stream::once(async move { Ok(initial_event) });
+    let stream = stream::once(async move { Ok(initial_event) }).chain(stream::pending());
     Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
 }
 
 pub async fn handle_mcp_sse() -> Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>> {
     let initial_event = Event::default().event("endpoint").data("/api/mcp");
-    let stream = stream::once(async move { Ok(initial_event) });
+    let stream = stream::once(async move { Ok(initial_event) }).chain(stream::pending());
     Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
 }
 
