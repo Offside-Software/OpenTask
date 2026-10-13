@@ -114,11 +114,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
   const { user } = useAuth();
   const dbUserId = user?.db_user?.id;
-
   const { role, loading: roleLoading } = useCurrentUserRole(projectId, dbUserId);
-
   const isManager = role?.toUpperCase() === 'MANAGER' || role?.toUpperCase() === 'OWNER';
   const { members } = useProjectMembers(projectId);
+
   // useBoard: single request for both buckets and tasks (strict data contract) + optimistic helpers
   const {
     buckets,
@@ -531,9 +530,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     queueBucketReorder(reorderedBuckets.map(b => b.id!));
   };
 
-  const tabs = isManager
-    ? ['Overview', 'Tasks', 'MoM & Meetings', 'Settings']
-    : ['Overview', 'Tasks', 'MoM & Meetings'];
+  const tabs = ['Overview', 'Tasks', 'MoM & Meetings', 'Settings'];
 
   if (projectNotFound) {
     return (
