@@ -43,7 +43,7 @@ pub async fn get_app_info(State(state): State<AppState>) -> Json<Value> {
 }
 
 pub async fn get_install_url(State(_state): State<AppState>) -> Json<Value> {
-    let url = format!("https://github.com/apps/opentask/installations/new");
+    let url = format!("https://github.com/apps/opentask-app/installations/new");
     Json(json!({ "install_url": url }))
 }
 

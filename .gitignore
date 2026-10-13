@@ -37,3 +37,4 @@ __pycache__
 lunaris
 *.pem
 .vercel
+.env*

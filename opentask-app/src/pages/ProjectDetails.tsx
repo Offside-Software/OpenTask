@@ -114,11 +114,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
   const { user } = useAuth();
   const dbUserId = user?.db_user?.id;
-
   const { role, loading: roleLoading } = useCurrentUserRole(projectId, dbUserId);
-
   const isManager = role?.toUpperCase() === 'MANAGER' || role?.toUpperCase() === 'OWNER';
-  const { members } = useProjectMembers(projectId);
+  const { members, refreshMembers } = useProjectMembers(projectId);
+
   // useBoard: single request for both buckets and tasks (strict data contract) + optimistic helpers
   const {
     buckets,
@@ -136,6 +135,36 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     addTaskLocally,
     removeTaskLocally,
   } = useBoard(projectId);
+
+  const handleMemberRemoved = useCallback((userId: string | number) => {
+    setTasksOptimistically(prevTasks =>
+      prevTasks.map(task => ({
+        ...task,
+        lead_assignee_id:
+          String(task.lead_assignee_id) === String(userId)
+            ? null
+            : task.lead_assignee_id,
+        suggested_assignee_id:
+          String(task.suggested_assignee_id) === String(userId)
+            ? null
+            : task.suggested_assignee_id,
+      })),
+    );
+    setSelectedTaskForEdit(currentTask => {
+      if (!currentTask) return currentTask;
+      return {
+        ...currentTask,
+        lead_assignee_id:
+          String(currentTask.lead_assignee_id) === String(userId)
+            ? null
+            : currentTask.lead_assignee_id,
+        suggested_assignee_id:
+          String(currentTask.suggested_assignee_id) === String(userId)
+            ? null
+            : currentTask.suggested_assignee_id,
+      };
+    });
+  }, [setTasksOptimistically]);
   const { refreshDashboard } = useDashboard(projectId);
   // Mutation hooks
   const { createBucket, updateBucket, deleteBucket } = useBuckets(projectId);
@@ -531,9 +560,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     queueBucketReorder(reorderedBuckets.map(b => b.id!));
   };
 
-  const tabs = isManager
-    ? ['Overview', 'Tasks', 'MoM & Meetings', 'Settings']
-    : ['Overview', 'Tasks', 'MoM & Meetings'];
+  const tabs = ['Overview', 'Tasks', 'MoM & Meetings', 'Settings'];
 
   if (projectNotFound) {
     return (
@@ -944,6 +971,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
           <ProjectSettingsTab
             projectId={projectId}
             onProjectUpdated={(updated) => setProject(updated)}
+            onMembersChanged={refreshMembers}
+            onMemberRemoved={handleMemberRemoved}
           />
         )}
       </div>

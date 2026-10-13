@@ -14,16 +14,25 @@ import { RepositoryPickerModal } from '../modals/RepositoryPickerModal';
 import { useNavigate } from 'react-router-dom';
 import { getCached, setCached } from '../../utils/cache';
 import type { Project, ProjectMember } from '../../models';
+import { useCurrentUserRole } from '../../controllers/useCurrentUserRole';
+import { useAuth } from '../../auth/useAuth';
 
 interface ProjectSettingsTabProps {
     projectId: string | number;
     onProjectUpdated?: (project: Project) => void;
+    onMembersChanged?: () => Promise<unknown>;
+    onMemberRemoved?: (userId: string | number) => void;
 }
 
 // Hard-coded list of roles (no longer stored in the DB projects table).
 const DEFAULT_ROLES = ['Owner', 'Manager', 'Programmer', 'Designer', 'QA'];
 
-export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectId, onProjectUpdated }) => {
+export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
+    projectId,
+    onProjectUpdated,
+    onMembersChanged,
+    onMemberRemoved,
+}) => {
     const navigate = useNavigate();
     const [project, setProject] = useState<Project | null>(null);
     const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -64,6 +73,13 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     const [isSearching, setIsSearching] = useState(false);
     const [selectedUser, setSelectedUser] = useState<{ id?: number | string; gh_username: string } | null>(null);
     const [selectedRole, setSelectedRole] = useState('');
+    const [editingMemberId, setEditingMemberId] = useState<string | number | null>(null);
+    const [editingRole, setEditingRole] = useState('');
+
+    const { user } = useAuth();
+    const dbUserId = user?.db_user?.id;
+    const { role } = useCurrentUserRole(projectId, dbUserId);
+    const isManager = role?.toUpperCase() === 'MANAGER' || role?.toUpperCase() === 'OWNER';
 
     const loadData = async () => {
         setLoading(true);
@@ -95,13 +111,13 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                         masked_key: customKeyData.masked_key || (p?.custom_ai_api_key ? 'AIzaSy••••••••••••' : null),
                     }
                     : hasCustom
-                    ? {
-                        project_id: String(projectId),
-                        has_custom_key: true,
-                        has_key: true,
-                        masked_key: 'AIzaSy••••••••••••',
-                    }
-                    : null
+                        ? {
+                            project_id: String(projectId),
+                            has_custom_key: true,
+                            has_key: true,
+                            masked_key: 'AIzaSy••••••••••••',
+                        }
+                        : null
             );
         } catch (e) {
             console.error(e);
@@ -298,7 +314,75 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
         await handleReposUpdated(newUrls);
     };
 
+    const handleAddMember = async () => {
+        if (!selectedUser || !selectedRole)
+            return;
 
+        try {
+            await projectMemberService.createMember(projectId, {
+                user_id: selectedUser.id ? (selectedUser.id as any) : undefined,
+                gh_username: selectedUser.gh_username,
+                role: selectedRole,
+                max_capacity: 100,
+                current_load: 0,
+                kpi_score: 0,
+            });
+            await loadData();
+            await onMembersChanged?.();
+            setSelectedUser(null);
+            setSearchQuery('');
+            setSelectedRole('');
+            showToast('Member added successfully', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to add member', 'error');
+        }
+    };
+
+    const handleRemoveMember = async (member_id: string | number) => {
+        if (member_id === null || member_id === undefined)
+            return;
+
+        try {
+            const removedMember = members.find(member => String(member.id) === String(member_id));
+            await projectMemberService.removeMember(projectId, member_id);
+            setMembers(current => current.filter(member => String(member.id) !== String(member_id)));
+            if (removedMember?.user_id !== undefined) {
+                onMemberRemoved?.(removedMember.user_id);
+            }
+            await onMembersChanged?.();
+            showToast('Member removed successfully', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to remove member', 'error');
+        }
+    };
+
+    const handleEditMember = (member: ProjectMember) => {
+        if (member.id === undefined) return;
+        setEditingMemberId(member.id);
+        setEditingRole(member.role);
+    };
+
+    const handleSaveMember = async (member: ProjectMember) => {
+        if (member.id === undefined || !editingRole) return;
+
+        try {
+            const updated = await projectMemberService.updateMember(projectId, member.id, {
+                role: editingRole,
+            });
+            setMembers(current => current.map(item => (
+                String(item.id) === String(updated.id) ? updated : item
+            )));
+            await onMembersChanged?.();
+            setEditingMemberId(null);
+            setEditingRole('');
+            showToast('Member updated successfully', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to update member', 'error');
+        }
+    };
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
@@ -362,28 +446,6 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
 
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery, members]);
-
-    const handleAddMember = async () => {
-        if (!selectedUser || !selectedRole) return;
-        try {
-            await projectMemberService.createMember(projectId, {
-                user_id: selectedUser.id ? (selectedUser.id as any) : undefined,
-                gh_username: selectedUser.gh_username,
-                role: selectedRole,
-                max_capacity: 100,
-                current_load: 0,
-                kpi_score: 0,
-            });
-            await loadData();
-            setSelectedUser(null);
-            setSearchQuery('');
-            setSelectedRole('');
-            showToast('Member added successfully', 'success');
-        } catch (e) {
-            console.error(e);
-            showToast('Failed to add member', 'error');
-        }
-    };
 
     if (loading) {
         return (
@@ -529,28 +591,30 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsReplacingKey(true);
-                                        setCustomAiInput('');
-                                        setAiKeyTestResult(null);
-                                    }}
-                                    className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    <RefreshCw size={12} strokeWidth={2.5} />
-                                    <span>REPLACE KEY</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
-                                    className="px-3.5 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    <Trash2 size={12} />
-                                    <span>REMOVE</span>
-                                </button>
-                            </div>
+                            {isManager && (
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsReplacingKey(true);
+                                            setCustomAiInput('');
+                                            setAiKeyTestResult(null);
+                                        }}
+                                        className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <RefreshCw size={12} strokeWidth={2.5} />
+                                        <span>REPLACE KEY</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
+                                        className="px-3.5 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <Trash2 size={12} />
+                                        <span>REMOVE</span>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -630,11 +694,10 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                             {/* Test Feedback banner */}
                             {aiKeyTestResult && (
                                 <div
-                                    className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${
-                                        aiKeyTestResult.valid
+                                    className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${aiKeyTestResult.valid
                                             ? "bg-[#00FF66] text-black font-bold"
                                             : "bg-[#FF3333] text-white font-bold"
-                                    }`}
+                                        }`}
                                 >
                                     {aiKeyTestResult.valid ? (
                                         <>
@@ -655,10 +718,10 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
             </SurfaceCard>
 
             {/* AI Native Agent Access Card */}
-            <SurfaceCard 
-                title="AI Agent Access" 
-                subtitle="PROGRAMMATIC API FOR CODE AGENTS (CURSOR, ANTIGRAVITY, CLAUDE, AIDER)" 
-                icon={Bot} 
+            <SurfaceCard
+                title="AI Agent Access"
+                subtitle="PROGRAMMATIC API FOR CODE AGENTS (CURSOR, ANTIGRAVITY, CLAUDE, AIDER)"
+                icon={Bot}
                 rightElement={
                     apiKey && (
                         <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#00FF66] text-black border-2 border-black font-mono text-[10px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000]">
@@ -707,27 +770,28 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                                     </button>
                                 </div>
                             </div>
-
-                            <div className="flex items-center gap-3 pt-1 flex-wrap">
-                                <button
-                                    type="button"
-                                    onClick={handleGenerateApiKey}
-                                    disabled={apiKeyLoading}
-                                    className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    <Key size={13} />
-                                    <span>{apiKeyLoading ? "REGENERATING..." : "REGENERATE KEY"}</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsRevokeModalOpen(true)}
-                                    disabled={apiKeyLoading}
-                                    className="px-4 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    <Trash2 size={13} />
-                                    <span>REVOKE KEY</span>
-                                </button>
-                            </div>
+                            {isManager && (
+                                <div className="flex items-center gap-3 pt-1 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={handleGenerateApiKey}
+                                        disabled={apiKeyLoading}
+                                        className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <Key size={13} />
+                                        <span>{apiKeyLoading ? "REGENERATING..." : "REGENERATE KEY"}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsRevokeModalOpen(true)}
+                                        disabled={apiKeyLoading}
+                                        className="px-4 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <Trash2 size={13} />
+                                        <span>REVOKE KEY</span>
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Agent Integration Quick Reference */}
                             <div className="p-4 bg-[#0B0E14] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] font-mono text-[11px] space-y-2.5">
@@ -799,8 +863,48 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                                     <div key={m.id} className="flex items-center justify-between p-3 rounded-none border-2 border-black bg-[#121417] shadow-[2px_2px_0px_0px_#000000]">
                                         <div>
                                             <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.display_name || m.gh_username || `User #${m.user_id}`}</div>
-                                            <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
+                                            {editingMemberId === m.id ? (
+                                                <select
+                                                    value={editingRole}
+                                                    onChange={(e) => setEditingRole(e.target.value)}
+                                                    className="mt-1 bg-[#0B0E14] border-2 border-black rounded-none px-2 py-1 text-[11px] font-mono text-white focus:border-[#FFE600] focus:outline-none"
+                                                >
+                                                    {DEFAULT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                                </select>
+                                            ) : (
+                                                <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
+                                            )}
                                         </div>
+
+                                        {isManager && (
+                                            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                                {editingMemberId === m.id ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveMember(m)}
+                                                        className="px-4 py-2 bg-[#00FF66] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleEditMember(m)}
+                                                        className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                )}
+
+                                                {(m.role.toUpperCase() !== "MANAGER" && m.role.toUpperCase() !== "OWNER" &&
+                                                    <button
+                                                        onClick={() => m.id !== undefined && handleRemoveMember(m.id) }
+                                                        className={`p-1 rounded-none bg-black border-2 border-neutral-700 text-neutral-400 hover:text-black hover:bg-[#FF0000] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer`}>
+                                                        <X size={18} strokeWidth={3}/>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             {members.length > 0 && members.filter(m => (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())).length === 0 && (
@@ -811,121 +915,125 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                         </div>
                     </div>
 
-                    <div className="pt-4 border-t-2 border-neutral-800">
-                        <h4 className="text-[13px] font-black uppercase tracking-wider text-white mb-4">// ADD NEW MEMBER</h4>
-
-                        {!selectedUser ? (
-                            <div className="space-y-2 relative">
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                        <Search size={14} className="text-neutral-400" />
+                    {isManager && (
+                        <div className="pt-4 border-t-2 border-neutral-800">
+                            <h4 className="text-[13px] font-black uppercase tracking-wider text-white mb-4">// ADD NEW MEMBER</h4>
+                            {!selectedUser ? (
+                                <div className="space-y-2 relative">
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                            <Search size={14} className="text-neutral-400" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="SEARCH USERNAME (LOCAL OR GITHUB)..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                        />
+                                        {isSearching && (
+                                            <div className="absolute inset-y-0 right-3 flex items-center">
+                                                <div className="w-4 h-4 rounded-none border-2 border-black border-t-[#FFE600] animate-spin"></div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <input
-                                        type="text"
-                                        placeholder="SEARCH USERNAME (LOCAL OR GITHUB)..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
-                                    />
-                                    {isSearching && (
-                                        <div className="absolute inset-y-0 right-3 flex items-center">
-                                            <div className="w-4 h-4 rounded-none border-2 border-black border-t-[#FFE600] animate-spin"></div>
+
+                                    {searchQuery.length >= 2 && searchResults.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none overflow-hidden z-10 shadow-[4px_4px_0px_0px_#000000] max-h-60 overflow-y-auto">
+                                            {searchResults.map(u => (
+                                                <button
+                                                    key={u.id || u.gh_username}
+                                                    onClick={() => setSelectedUser(u)}
+                                                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#FFE600] hover:text-black transition-colors text-left font-mono text-[12px] font-bold uppercase text-white cursor-pointer border-b border-neutral-800 last:border-0"
+                                                >
+                                                    <span>{u.gh_username}</span>
+                                                    {u.display_name && (
+                                                        <span className="text-[10px] text-neutral-400 opacity-80 normal-case">{u.display_name}</span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none p-3 text-[12px] font-mono text-neutral-400 text-center z-10 shadow-[4px_4px_0px_0px_#000000]">
+                                            NO USERS MATCHING QUERY
                                         </div>
                                     )}
                                 </div>
-
-                                {searchQuery.length >= 2 && searchResults.length > 0 && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none overflow-hidden z-10 shadow-[4px_4px_0px_0px_#000000] max-h-60 overflow-y-auto">
-                                        {searchResults.map(u => (
-                                            <button
-                                                key={u.id || u.gh_username}
-                                                onClick={() => setSelectedUser(u)}
-                                                className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#FFE600] hover:text-black transition-colors text-left font-mono text-[12px] font-bold uppercase text-white cursor-pointer border-b border-neutral-800 last:border-0"
-                                            >
-                                                <span>{u.gh_username}</span>
-                                                {u.display_name && (
-                                                    <span className="text-[10px] text-neutral-400 opacity-80 normal-case">{u.display_name}</span>
-                                                )}
-                                            </button>
-                                        ))}
+                            ) : (
+                                <div className="bg-[#121417] border-2 border-black rounded-none p-4 space-y-4 shadow-[3px_3px_0px_0px_#000000]">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[13px] font-bold text-white uppercase">// TARGET: {selectedUser.gh_username}</span>
+                                        <button onClick={() => setSelectedUser(null)} className="text-neutral-400 hover:text-white transition-colors cursor-pointer">
+                                            <X size={16} strokeWidth={3} />
+                                        </button>
                                     </div>
-                                )}
 
-                                {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none p-3 text-[12px] font-mono text-neutral-400 text-center z-10 shadow-[4px_4px_0px_0px_#000000]">
-                                        NO USERS MATCHING QUERY
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5">// ASSIGN ROLE</label>
+                                        <select
+                                            value={selectedRole}
+                                            onChange={(e) => setSelectedRole(e.target.value)}
+                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                        >
+                                            <option value="" disabled>SELECT A ROLE...</option>
+                                            {DEFAULT_ROLES.map(r => (
+                                                <option key={r} value={r}>{r}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="bg-[#121417] border-2 border-black rounded-none p-4 space-y-4 shadow-[3px_3px_0px_0px_#000000]">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[13px] font-bold text-white uppercase">// TARGET: {selectedUser.gh_username}</span>
-                                    <button onClick={() => setSelectedUser(null)} className="text-neutral-400 hover:text-white transition-colors cursor-pointer">
-                                        <X size={16} strokeWidth={3} />
-                                    </button>
-                                </div>
 
-                                <div>
-                                    <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5">// ASSIGN ROLE</label>
-                                    <select
-                                        value={selectedRole}
-                                        onChange={(e) => setSelectedRole(e.target.value)}
-                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
-                                    >
-                                        <option value="" disabled>SELECT A ROLE...</option>
-                                        {DEFAULT_ROLES.map(r => (
-                                            <option key={r} value={r}>{r}</option>
-                                        ))}
-                                    </select>
+                                    <div className="flex justify-end pt-2">
+                                        <button
+                                            onClick={handleAddMember}
+                                            disabled={!selectedRole}
+                                            className="flex items-center gap-2 px-5 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
+                                        >
+                                            <Plus size={14} strokeWidth={3} /> Add to Project
+                                        </button>
+                                    </div>
                                 </div>
-
-                                <div className="flex justify-end pt-2">
-                                    <button
-                                        onClick={handleAddMember}
-                                        disabled={!selectedRole}
-                                        className="flex items-center gap-2 px-5 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
-                                    >
-                                        <Plus size={14} strokeWidth={3} /> Add to Project
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </SurfaceCard>
 
             {/* GitHub-style Danger Zone */}
-            <div className="border-2 border-[#EF4444] bg-[#121417] rounded-none p-6 shadow-[4px_4px_0px_0px_#EF4444]">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 bg-[#EF4444] text-white border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
-                        <AlertTriangle size={18} strokeWidth={2.5} />
+            {isManager && (
+                <div className="border-2 border-[#EF4444] bg-[#121417] rounded-none p-6 shadow-[4px_4px_0px_0px_#EF4444]">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 bg-[#EF4444] text-white border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
+                            <AlertTriangle size={18} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                            <h3 className="text-white font-mono font-black text-[15px] uppercase tracking-wider">
+                                // DANGER ZONE
+                            </h3>
+                            <p className="text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+                                IRREVERSIBLE ACTIONS
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-white font-mono font-black text-[15px] uppercase tracking-wider">
-                            // DANGER ZONE
-                        </h3>
-                        <p className="text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
-                            IRREVERSIBLE ACTIONS
-                        </p>
-                    </div>
-                </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t-2 border-neutral-800">
-                    <div>
-                        <h4 className="text-white text-[13px] font-bold uppercase tracking-wider">Delete this project</h4>
-                        <p className="text-neutral-400 text-[11px] max-w-xl mt-1 leading-relaxed">
-                            Once you delete a project, there is no going back. All tasks, buckets, meetings, and data associated with this project will be permanently erased.
-                        </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t-2 border-neutral-800">
+                        <div>
+                            <h4 className="text-white text-[13px] font-bold uppercase tracking-wider">Delete this project</h4>
+                            <p className="text-neutral-400 text-[11px] max-w-xl mt-1 leading-relaxed">
+                                Once you delete a project, there is no going back. All tasks, buckets, meetings, and data associated with this project will be permanently erased.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setIsDeleteModalOpen(true)}
+                            className="px-5 py-2.5 bg-[#EF4444] hover:bg-[#DC2626] text-white border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap self-start sm:self-center"
+                        >
+                            Delete Project
+                        </button>
                     </div>
-                    <button
-                        onClick={() => setIsDeleteModalOpen(true)}
-                        className="px-5 py-2.5 bg-[#EF4444] hover:bg-[#DC2626] text-white border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap self-start sm:self-center"
-                    >
-                        Delete Project
-                    </button>
                 </div>
-            </div>
+            )}
+
 
             {/* Repository Picker Modal */}
             {isRepoPicker && (
