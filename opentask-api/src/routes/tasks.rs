@@ -234,6 +234,24 @@ pub async fn update_task(
     Path(task_id): Path<SafeId>,
     Json(payload): Json<TaskUpdatePayload>,
 ) -> Result<Json<DatabaseTask>, AppError> {
+    // 1. Fetch current task to know old assignee before updating
+    let prev_task = crate::db::query(
+        "SELECT title, project_id, lead_assignee_id, assignee_ids FROM opentask.tasks WHERE id = $1 LIMIT 1;"
+    )
+    .bind(task_id.0)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let prev_task = match prev_task {
+        Some(t) => t,
+        None => return Err(AppError::NotFound(format!("Task {task_id} not found"))),
+    };
+
+    let prev_lead_id: Option<i64> = prev_task.try_get("lead_assignee_id").ok().flatten();
+    let prev_assignee_ids: Vec<i64> = prev_task
+        .try_get::<Vec<i64>, _>("assignee_ids")
+        .unwrap_or_default();
+
     let mut builder = sqlx::QueryBuilder::new(
         "UPDATE opentask.tasks SET updated_at = NOW(), last_activity_at = NOW()",
     );
@@ -261,6 +279,14 @@ pub async fn update_task(
     if let Some(ref lead) = payload.lead_assignee_id {
         builder.push(", lead_assignee_id = ");
         builder.push_bind(lead.as_ref().map(|l| l.0));
+        if payload.assignee_ids.is_none() {
+            builder.push(", assignee_ids = ");
+            if let Some(l) = lead {
+                builder.push_bind(vec![l.0]);
+            } else {
+                builder.push_bind(Vec::<i64>::new());
+            }
+        }
     }
     if let Some(ref assignee_ids) = payload.assignee_ids {
         let raw_ids: Vec<i64> = assignee_ids.iter().map(|id| id.0).collect();
@@ -332,20 +358,78 @@ pub async fn update_task(
         .await;
     }
 
-    // Trigger notification if assignee was updated to a specific user
-    if let Some(Some(assignee)) = payload.lead_assignee_id {
+    // Determine newly assigned and unassigned users
+    let new_lead_id: Option<i64> = row.lead_assignee_id.as_ref().map(|l| l.0);
+    let new_assignee_ids: Vec<i64> = row
+        .assignee_ids
+        .as_ref()
+        .map(|v| v.iter().map(|id| id.0).collect())
+        .unwrap_or_default();
+
+    let mut newly_assigned: Vec<i64> = Vec::new();
+    if let Some(nl) = new_lead_id {
+        if prev_lead_id != Some(nl) {
+            newly_assigned.push(nl);
+        }
+    }
+    for uid in &new_assignee_ids {
+        if !prev_assignee_ids.contains(uid) && !newly_assigned.contains(uid) {
+            newly_assigned.push(*uid);
+        }
+    }
+
+    let mut unassigned: Vec<i64> = Vec::new();
+    if let Some(pl) = prev_lead_id {
+        if new_lead_id != Some(pl) {
+            unassigned.push(pl);
+        }
+    }
+    for uid in &prev_assignee_ids {
+        if !new_assignee_ids.contains(uid) && new_lead_id != Some(*uid) && !unassigned.contains(uid) {
+            unassigned.push(*uid);
+        }
+    }
+
+    tracing::info!(
+        "[TASK_ASSIGNMENT_CHECK] task_id={} prev_lead={:?} new_lead={:?} unassigned={:?} newly_assigned={:?}",
+        task_id.0, prev_lead_id, new_lead_id, unassigned, newly_assigned
+    );
+
+    // Trigger notification for newly assigned users
+    for aid in newly_assigned {
         let pool = state.pool.clone();
         let config = state.config.clone();
         let task_title = row.title.clone();
         let pid = row.project_id.map(|p| p.0).unwrap_or(0);
         let tid = task_id.0;
-        let aid = assignee.0;
         tokio::spawn(async move {
             crate::services::notifications::notify_task_assigned(
                 &pool,
                 &config,
                 &task_title,
                 aid,
+                pid,
+                None,
+                Some(tid),
+                None,
+            )
+            .await;
+        });
+    }
+
+    // Trigger notification for unassigned users
+    for uid in unassigned {
+        let pool = state.pool.clone();
+        let config = state.config.clone();
+        let task_title = row.title.clone();
+        let pid = row.project_id.map(|p| p.0).unwrap_or(0);
+        let tid = task_id.0;
+        tokio::spawn(async move {
+            crate::services::notifications::notify_task_unassigned(
+                &pool,
+                &config,
+                &task_title,
+                uid,
                 pid,
                 None,
                 Some(tid),

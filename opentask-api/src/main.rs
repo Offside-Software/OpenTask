@@ -57,7 +57,14 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // 5. Setup CORS
+    // 5. Telegram 24/7 Polling Worker
+    let telegram_pool = pool.clone();
+    let telegram_config = config.clone();
+    tokio::spawn(async move {
+        services::telegram::run_telegram_polling(telegram_pool, telegram_config).await;
+    });
+
+    // 6. Setup CORS
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::AllowOrigin::mirror_request())
         .allow_credentials(true)

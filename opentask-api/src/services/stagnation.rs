@@ -3,7 +3,6 @@ use sqlx::{PgPool, Row};
 
 use crate::config::Config;
 use crate::services::id_generator::next_id;
-use crate::services::telegram::send_telegram_message;
 
 pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), sqlx::Error> {
     tracing::info!("Running Stagnation Radar check...");
@@ -68,12 +67,23 @@ pub async fn run_stagnation_radar(pool: &PgPool, config: &Config) -> Result<(), 
             if let Some(u) = user {
                 if let Ok(Some(chat_id)) = u.try_get::<Option<String>, _>("telegram_chat_id") {
                     let msg = format!(
-                        "*STAGNATION RADAR ALERT*\n\n\
+                        "⚠️ *STAGNATION RADAR ALERT*\n\n\
                          Task: *{task_title}*\n\
                          No activity detected in the last 48 hours.\n\n\
-                         Please update the GitHub branch or the task will be proposed for reallocation."
+                         Please update the GitHub branch or confirm task status below:"
                     );
-                    let _ = send_telegram_message(bot_token, &chat_id, &msg).await;
+                    let keyboard = serde_json::json!({
+                        "inline_keyboard": [
+                            [
+                                { "text": "🔗 Buka di OpenTask", "url": format!("https://open-task-five.vercel.app/projects/{}?taskId={}", pid, task_id) }
+                            ],
+                            [
+                                { "text": "⏳ Masih Dikerjakan", "callback_data": format!("act_touch_{}", task_id) },
+                                { "text": "✅ Tandai Selesai", "callback_data": format!("act_done_{}", task_id) }
+                            ]
+                        ]
+                    });
+                    let _ = crate::services::telegram::send_telegram_message_with_keyboard(bot_token, &chat_id, &msg, Some(keyboard)).await;
                 }
             }
         }

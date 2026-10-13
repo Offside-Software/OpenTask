@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       strictPort: true,
-      allowedHosts: ["monasterial-luella-rigid.ngrok-free.dev"],
+      allowedHosts: true,
       proxy: {
         "/api": {
           target: apiBaseUrl || "http://127.0.0.1:8000",
