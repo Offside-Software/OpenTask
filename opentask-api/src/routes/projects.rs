@@ -24,7 +24,7 @@ pub struct BoardQuery {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CreateMemberPayload {
+pub struct MemberPayload {
     pub user_id: Option<SafeId>,
     pub gh_username: Option<String>,
     pub role: Option<String>,
@@ -35,11 +35,14 @@ pub struct CreateMemberPayload {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/projects", post(create_project).get(list_projects))
+        .route("/projects", post(create_project)
+            .get(list_projects))
         .route("/projects/mine", get(list_my_projects))
         .route(
             "/projects/{project_id}",
-            get(get_project).put(update_project).delete(delete_project),
+            get(get_project)
+            .put(update_project)
+            .delete(delete_project),
         )
         .route("/projects/{project_id}/board", get(get_project_board))
         .route(
@@ -58,7 +61,9 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/projects/{project_id}/members/{member_id}",
-            get(get_project_member_by_id),
+            get(get_project_member_by_id)
+                .put(update_project_member)
+                .delete(remove_project_member),
         )
         .route("/users/me/project_members", get(list_my_project_members))
 }
@@ -530,7 +535,7 @@ pub async fn delete_project_api_key(
 pub async fn add_project_member(
     State(state): State<AppState>,
     Path(project_id): Path<SafeId>,
-    Json(payload): Json<CreateMemberPayload>,
+    Json(payload): Json<MemberPayload>,
 ) -> Result<Json<ProjectMember>, AppError> {
     let member_id = next_id();
     let role = payload.role.unwrap_or_else(|| "PROGRAMMER".to_string());
@@ -603,6 +608,92 @@ pub async fn add_project_member(
     .await?;
 
     Ok(Json(row))
+}
+
+pub async fn update_project_member(
+    State(state): State<AppState>,
+    Path((project_id, member_id)): Path<(SafeId, SafeId)>,
+    Json(payload): Json<MemberPayload>,
+) -> Result<Json<ProjectMember>, AppError> {
+    let row = crate::db::query_as::<_, ProjectMember>(
+        r#"
+        UPDATE opentask.project_member
+        SET role = COALESCE($1, role),
+            kpi_score = COALESCE($2, kpi_score),
+            max_capacity = COALESCE($3, max_capacity),
+            current_load = COALESCE($4, current_load)
+        WHERE id = $5 AND project_id = $6
+        RETURNING id, project_id, user_id, role, kpi_score, max_capacity, current_load, gh_username,
+                  (SELECT display_name FROM opentask.users WHERE id = opentask.project_member.user_id) as display_name,
+                  CASE
+                      WHEN gh_username IS NOT NULL
+                      THEN 'https://github.com/' || gh_username || '.png?size=64'
+                      ELSE NULL
+                  END as avatar_url;
+        "#,
+    )
+    .bind(payload.role)
+    .bind(payload.kpi_score)
+    .bind(payload.max_capacity)
+    .bind(payload.current_load)
+    .bind(member_id.0)
+    .bind(project_id.0)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("member: {member_id} not found in project {project_id}")))?;
+
+    Ok(Json(row))
+}
+
+pub async fn remove_project_member(
+    State(state): State<AppState>,
+    Path((project_id, member_id)): Path<(SafeId, SafeId)>,
+) -> Result<StatusCode, AppError> {
+    let mut tx = state.pool.begin().await?;
+
+    // Task assignee columns reference users.id, while the route receives
+    // project_member.id. Resolve the member's user_id before clearing tasks.
+    crate::db::query(
+        r#"
+        UPDATE opentask.tasks t
+        SET lead_assignee_id = CASE
+                WHEN t.lead_assignee_id = pm.user_id THEN NULL
+                ELSE t.lead_assignee_id
+            END,
+            suggested_assignee_id = CASE
+                WHEN t.suggested_assignee_id = pm.user_id THEN NULL
+                ELSE t.suggested_assignee_id
+            END
+        FROM opentask.project_member pm
+        WHERE pm.id = $1
+          AND pm.project_id = $2
+          AND t.project_id = $2
+          AND (t.lead_assignee_id = pm.user_id OR t.suggested_assignee_id = pm.user_id);
+        "#
+    )
+    .bind(member_id.0)
+    .bind(project_id.0)
+    .execute(&mut *tx)
+    .await?;
+
+    let res = crate::db::query(
+        r#"
+        DELETE FROM opentask.project_member WHERE id = $1 AND project_id = $2;
+        "#
+    )
+    .bind(member_id.0)
+    .bind(project_id.0)
+    .execute(&mut *tx)
+    .await?;
+
+    if res.rows_affected() == 0 {
+        tx.rollback().await?;
+        return Err(AppError::NotFound(format!("member: {member_id} not found in project {project_id}")));
+    }
+
+    tx.commit().await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn list_project_members(

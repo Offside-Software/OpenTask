@@ -20,12 +20,19 @@ import { useAuth } from '../../auth/useAuth';
 interface ProjectSettingsTabProps {
     projectId: string | number;
     onProjectUpdated?: (project: Project) => void;
+    onMembersChanged?: () => Promise<unknown>;
+    onMemberRemoved?: (userId: string | number) => void;
 }
 
 // Hard-coded list of roles (no longer stored in the DB projects table).
 const DEFAULT_ROLES = ['Owner', 'Manager', 'Programmer', 'Designer', 'QA'];
 
-export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectId, onProjectUpdated }) => {
+export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
+    projectId,
+    onProjectUpdated,
+    onMembersChanged,
+    onMemberRemoved,
+}) => {
     const navigate = useNavigate();
     const [project, setProject] = useState<Project | null>(null);
     const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -66,10 +73,12 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
     const [isSearching, setIsSearching] = useState(false);
     const [selectedUser, setSelectedUser] = useState<{ id?: number | string; gh_username: string } | null>(null);
     const [selectedRole, setSelectedRole] = useState('');
+    const [editingMemberId, setEditingMemberId] = useState<string | number | null>(null);
+    const [editingRole, setEditingRole] = useState('');
 
     const { user } = useAuth();
     const dbUserId = user?.db_user?.id;
-    const { role, loading: roleLoading } = useCurrentUserRole(projectId, dbUserId);
+    const { role } = useCurrentUserRole(projectId, dbUserId);
     const isManager = role?.toUpperCase() === 'MANAGER' || role?.toUpperCase() === 'OWNER';
 
     const loadData = async () => {
@@ -305,7 +314,75 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
         await handleReposUpdated(newUrls);
     };
 
+    const handleAddMember = async () => {
+        if (!selectedUser || !selectedRole)
+            return;
 
+        try {
+            await projectMemberService.createMember(projectId, {
+                user_id: selectedUser.id ? (selectedUser.id as any) : undefined,
+                gh_username: selectedUser.gh_username,
+                role: selectedRole,
+                max_capacity: 100,
+                current_load: 0,
+                kpi_score: 0,
+            });
+            await loadData();
+            await onMembersChanged?.();
+            setSelectedUser(null);
+            setSearchQuery('');
+            setSelectedRole('');
+            showToast('Member added successfully', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to add member', 'error');
+        }
+    };
+
+    const handleRemoveMember = async (member_id: string | number) => {
+        if (member_id === null || member_id === undefined)
+            return;
+
+        try {
+            const removedMember = members.find(member => String(member.id) === String(member_id));
+            await projectMemberService.removeMember(projectId, member_id);
+            setMembers(current => current.filter(member => String(member.id) !== String(member_id)));
+            if (removedMember?.user_id !== undefined) {
+                onMemberRemoved?.(removedMember.user_id);
+            }
+            await onMembersChanged?.();
+            showToast('Member removed successfully', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to remove member', 'error');
+        }
+    };
+
+    const handleEditMember = (member: ProjectMember) => {
+        if (member.id === undefined) return;
+        setEditingMemberId(member.id);
+        setEditingRole(member.role);
+    };
+
+    const handleSaveMember = async (member: ProjectMember) => {
+        if (member.id === undefined || !editingRole) return;
+
+        try {
+            const updated = await projectMemberService.updateMember(projectId, member.id, {
+                role: editingRole,
+            });
+            setMembers(current => current.map(item => (
+                String(item.id) === String(updated.id) ? updated : item
+            )));
+            await onMembersChanged?.();
+            setEditingMemberId(null);
+            setEditingRole('');
+            showToast('Member updated successfully', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to update member', 'error');
+        }
+    };
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
@@ -369,28 +446,6 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
 
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery, members]);
-
-    const handleAddMember = async () => {
-        if (!selectedUser || !selectedRole) return;
-        try {
-            await projectMemberService.createMember(projectId, {
-                user_id: selectedUser.id ? (selectedUser.id as any) : undefined,
-                gh_username: selectedUser.gh_username,
-                role: selectedRole,
-                max_capacity: 100,
-                current_load: 0,
-                kpi_score: 0,
-            });
-            await loadData();
-            setSelectedUser(null);
-            setSearchQuery('');
-            setSelectedRole('');
-            showToast('Member added successfully', 'success');
-        } catch (e) {
-            console.error(e);
-            showToast('Failed to add member', 'error');
-        }
-    };
 
     if (loading) {
         return (
@@ -808,8 +863,48 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                                     <div key={m.id} className="flex items-center justify-between p-3 rounded-none border-2 border-black bg-[#121417] shadow-[2px_2px_0px_0px_#000000]">
                                         <div>
                                             <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.display_name || m.gh_username || `User #${m.user_id}`}</div>
-                                            <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
+                                            {editingMemberId === m.id ? (
+                                                <select
+                                                    value={editingRole}
+                                                    onChange={(e) => setEditingRole(e.target.value)}
+                                                    className="mt-1 bg-[#0B0E14] border-2 border-black rounded-none px-2 py-1 text-[11px] font-mono text-white focus:border-[#FFE600] focus:outline-none"
+                                                >
+                                                    {DEFAULT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                                </select>
+                                            ) : (
+                                                <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
+                                            )}
                                         </div>
+
+                                        {isManager && (
+                                            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                                {editingMemberId === m.id ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveMember(m)}
+                                                        className="px-4 py-2 bg-[#00FF66] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleEditMember(m)}
+                                                        className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                )}
+
+                                                {(m.role.toUpperCase() !== "MANAGER" && m.role.toUpperCase() !== "OWNER" &&
+                                                    <button
+                                                        onClick={() => m.id !== undefined && handleRemoveMember(m.id) }
+                                                        className={`p-1 rounded-none bg-black border-2 border-neutral-700 text-neutral-400 hover:text-black hover:bg-[#FF0000] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer`}>
+                                                        <X size={18} strokeWidth={3}/>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             {members.length > 0 && members.filter(m => (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())).length === 0 && (
@@ -823,7 +918,6 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({ projectI
                     {isManager && (
                         <div className="pt-4 border-t-2 border-neutral-800">
                             <h4 className="text-[13px] font-black uppercase tracking-wider text-white mb-4">// ADD NEW MEMBER</h4>
-
                             {!selectedUser ? (
                                 <div className="space-y-2 relative">
                                     <div className="relative">

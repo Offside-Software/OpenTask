@@ -20,6 +20,26 @@ export const projectMemberService = {
     });
     return res;
   },
+
+  updateMember: async (
+    projectId: number | string,
+    memberId: number | string,
+    data: Partial<ProjectMember>,
+  ): Promise<ProjectMember> => {
+    return await apiFetch<ProjectMember>(`/projects/${projectId}/members/${memberId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  removeMember: async (
+    projectId: number | string,
+    memberId: number | string,
+  ) : Promise<void> => {
+    await apiFetch(`/projects/${projectId}/members/${memberId}`, {
+      method: "DELETE",
+    });
+  }
 };
 
 export default projectMemberService;
