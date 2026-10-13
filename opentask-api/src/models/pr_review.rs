@@ -26,3 +26,22 @@ pub struct TriggerPrReviewPayload {
     pub task_id: Option<SafeId>,
     pub installation_id: Option<i64>,
 }
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ExtractTasksPayload {
+    pub feedback: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractedTaskItem {
+    pub title: String,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub task_type: Option<String>,
+    pub weight: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExtractTasksResponse {
+    pub tasks: Vec<ExtractedTaskItem>,
+}

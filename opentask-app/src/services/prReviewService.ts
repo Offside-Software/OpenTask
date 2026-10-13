@@ -42,4 +42,19 @@ export const prReviewService = {
     getProjectPulls: async (projectId: number | string): Promise<{ pull_requests: GitHubPullRequest[] }> => {
         return await apiFetch<{ pull_requests: GitHubPullRequest[] }>(`/projects/${projectId}/pulls`);
     },
+
+    extractTasks: async (
+        projectId: number | string,
+        reviewId: number | string,
+        feedback?: string
+    ): Promise<import('../models').ExtractedTask[]> => {
+        const res = await apiFetch<{ tasks: import('../models').ExtractedTask[] }>(
+            `/projects/${projectId}/pr-reviews/${reviewId}/extract-tasks`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ feedback }),
+            }
+        );
+        return res.tasks || [];
+    },
 };

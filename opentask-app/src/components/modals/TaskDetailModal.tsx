@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw } from 'lucide-react';
-import type { Task, Bucket, ProjectMember, PrReview } from '../../models';
+import type { Task, Bucket, ProjectMember, PrReview, ExtractedTask } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
 import { useToast } from '../../design-system/Toast';
@@ -8,6 +8,7 @@ import { Badge } from '../../design-system/Badge';
 import { MarkdownRenderer } from '../../design-system/MarkdownRenderer';
 import { prReviewService } from '../../services/prReviewService';
 import { ConfirmModal } from './ConfirmModal';
+import { ReviewTaskExtractionModal } from './ReviewTaskExtractionModal';
 
 interface TaskDetailModalProps {
     task: Task;
@@ -31,6 +32,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [loadingReviews, setLoadingReviews] = useState(false);
     const [reviewsError, setReviewsError] = useState<string | null>(null);
     const [expandedReviewId, setExpandedReviewId] = useState<string | number | null>(null);
+    const [extractingReviewId, setExtractingReviewId] = useState<string | number | null>(null);
+    const [showExtractionModal, setShowExtractionModal] = useState(false);
+    const [extractionData, setExtractionData] = useState<{
+        review: PrReview;
+        tasks: ExtractedTask[];
+    } | null>(null);
     const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
         const parsed = parseTaskTypes(task.type);
         return parsed.length > 0 ? parsed : ['CODE'];
@@ -167,6 +174,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             showToast("Failed to run AI Code Review", "error");
         } finally {
             setTriggeringReview(false);
+        }
+    };
+
+    const handleExtractTasks = async (rev: PrReview) => {
+        const pId = task.project_id;
+        if (!pId || !rev.id) return;
+        setExtractingReviewId(rev.id);
+        try {
+            const extracted = await prReviewService.extractTasks(pId, rev.id, rev.feedback);
+            if (!extracted || extracted.length === 0) {
+                showToast("No actionable issues or suggestions detected in this review", "info");
+                return;
+            }
+            setExtractionData({
+                review: rev,
+                tasks: extracted,
+            });
+            setShowExtractionModal(true);
+        } catch (err: any) {
+            console.error("Failed to extract tasks from review", err);
+            showToast(err?.message || "Failed to extract tasks from review", "error");
+        } finally {
+            setExtractingReviewId(null);
         }
     };
 
@@ -544,6 +574,30 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                                     {/* Expanded Feedback in Markdown */}
                                                     {isExpanded && rev.feedback && (
                                                         <div className="mt-3 pt-3 border-t border-neutral-800 bg-[#0B0E14] dark:bg-[#0B0E14] light:bg-[#F9F9F6] p-3 border border-neutral-800 dark:border-neutral-800 light:border-neutral-300">
+                                                            <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-neutral-800 dark:border-neutral-800 light:border-neutral-300 flex-wrap gap-2">
+                                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 dark:text-neutral-400 light:text-neutral-600">
+                                                                    // AI REVIEW FEEDBACK
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleExtractTasks(rev)}
+                                                                    disabled={extractingReviewId === rev.id}
+                                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black font-mono uppercase bg-[#FFE600] text-black border-2 border-black hover:bg-yellow-300 transition-all shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer disabled:opacity-50"
+                                                                    title="Extract actionable suggestions and issues into new project tasks"
+                                                                >
+                                                                    {extractingReviewId === rev.id ? (
+                                                                        <>
+                                                                            <Loader2 size={11} className="animate-spin" />
+                                                                            <span>EXTRACTING...</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Sparkles size={11} />
+                                                                            <span>EXTRACT TASKS FROM REVIEW</span>
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            </div>
                                                             <MarkdownRenderer content={rev.feedback} />
                                                         </div>
                                                     )}
@@ -727,6 +781,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         onClose();
                     }}
                     onCancel={() => setShowDiscardConfirm(false)}
+                />
+            )}
+
+            {/* Review Task Extraction Modal */}
+            {showExtractionModal && extractionData && (
+                <ReviewTaskExtractionModal
+                    isOpen={showExtractionModal}
+                    onClose={() => {
+                        setShowExtractionModal(false);
+                        setExtractionData(null);
+                    }}
+                    projectId={task.project_id!}
+                    defaultBucketId={bucketId || task.bucket_id}
+                    defaultAssigneeId={leadAssigneeId || task.lead_assignee_id}
+                    reviewTitle={`PR #${extractionData.review.pr_number}${extractionData.review.pr_title ? `: ${extractionData.review.pr_title}` : ''}`}
+                    extractedTasks={extractionData.tasks}
+                    buckets={buckets}
+                    members={members}
+                    onSuccess={() => {
+                        if (task.id) {
+                            onUpdate(task.id, {});
+                        }
+                    }}
                 />
             )}
         </div>
