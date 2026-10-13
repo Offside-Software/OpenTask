@@ -25,6 +25,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description || '');
     const [repoUrl, setRepoUrl] = useState(task.repo_url || '');
+    const [prUrl, setPrUrl] = useState(task.prUrl || '');
     const [reviews, setReviews] = useState<PrReview[]>([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
     const [expandedReviewId, setExpandedReviewId] = useState<string | number | null>(null);
@@ -111,18 +112,34 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const handleTriggerReview = async () => {
         const pId = task.project_id;
         if (!pId || !task.id) return;
+        const selectedRepo = repoUrl
+            .trim()
+            .replace(/^https?:\/\/github\.com\//i, '')
+            .replace(/\/+$/, '')
+            .replace(/\.git$/i, '');
         setTriggeringReview(true);
         setTriggerError(null);
         try {
             const review = await prReviewService.triggerReview(pId, {
                 task_id: task.id,
-                repo_full_name: repoUrl ? repoUrl.replace('https://github.com/', '') : undefined,
+                repo_full_name: selectedRepo || undefined,
+                pr_url: prUrl.trim() || undefined,
             });
-            showToast(`AI Code Review Completed: ${review.verdict}!`, review.verdict === 'PASS' ? 'success' : 'error');
+            const queuedRepo = review.repo_full_name.toLowerCase();
+            const queuedPr = Number(review.pr_number);
             const updated = await prReviewService.getTaskReviews(task.id);
-            setReviews(updated || []);
-            if (review.id) {
-                setExpandedReviewId(review.id);
+            setReviews(updated);
+            const completedReview = updated.find(r =>
+                r.repo_full_name.toLowerCase() === queuedRepo && Number(r.pr_number) === queuedPr,
+            );
+            if (completedReview) {
+                setExpandedReviewId(completedReview.id);
+                showToast(
+                    `AI Code Review completed for ${review.repo_full_name}#${review.pr_number}: ${completedReview.verdict}`,
+                    completedReview.verdict === 'PASS' ? 'success' : 'error',
+                );
+            } else {
+                showToast(`AI Code Review finished for ${review.repo_full_name}#${review.pr_number}`, 'info');
             }
         } catch (err: any) {
             console.error("Failed to trigger review", err);
@@ -140,6 +157,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         title !== task.title ||
         description !== (task.description || '') ||
         repoUrl !== (task.repo_url || '') ||
+        prUrl !== (task.prUrl || '') ||
         branchName !== (task.branch_name || '') ||
         weight !== task.weight ||
         bucketId !== (task.bucket_id ? String(task.bucket_id) : undefined) ||
@@ -164,6 +182,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
         setBranchName(task.branch_name || '');
         setRepoUrl(task.repo_url || '');
+        setPrUrl(task.prUrl || '');
         setAvailableTypes(getAllTaskTypes([task.type]));
     }, [task, isDirty]);
 
@@ -340,10 +359,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                         className="w-full bg-[#121417] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] transition-all"
                                     />
                                 </div>
-                                {task.prUrl && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">PULL REQUEST URL</label>
+                                    <input
+                                        value={prUrl}
+                                        onChange={(e) => setPrUrl(e.target.value)}
+                                        placeholder="https://github.com/OWNER/REPO/pull/123"
+                                        className="w-full bg-[#121417] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] transition-all"
+                                    />
+                                </div>
+                                {prUrl && (
                                     <div className="text-[11px] font-mono">
                                         <span className="text-neutral-400 uppercase">PULL REQUEST: </span>
-                                        <a href={task.prUrl} target="_blank" rel="noopener noreferrer" className="text-[#FFE600] hover:underline font-bold">{task.prUrl}</a>
+                                        <a href={prUrl} target="_blank" rel="noopener noreferrer" className="text-[#FFE600] hover:underline font-bold">{prUrl}</a>
                                     </div>
                                 )}
                             </div>

@@ -15,6 +15,7 @@ use crate::error::AppError;
 use crate::extractors::auth::CurrentUser;
 use crate::models::safe_id::SafeId;
 use crate::models::user::{AuthMeResponse, DatabaseUser, GitHubUserResponse};
+use crate::services::github::generate_app_jwt;
 use crate::services::id_generator::next_id;
 use crate::services::realtime::RealtimeHub;
 
@@ -287,6 +288,11 @@ pub async fn auth_callback(
         })
         .unwrap_or_else(|| get_frontend_url(&state.config, &headers));
 
+    if let Some(installation_id) = query.installation_id.filter(|id| *id > 0) {
+        persist_github_installation(&state, installation_id).await?;
+        return Ok(Redirect::temporary(&frontend_url).into_response());
+    }
+
     let code = match query.code {
         Some(c) => c,
         None => return Ok(Redirect::temporary(&frontend_url).into_response()),
@@ -310,6 +316,64 @@ pub async fn auth_callback(
 
     if !token_resp.status().is_success() {
         return Err(AppError::Unauthorized("Failed to exchange OAuth code".to_string()));
+    }
+
+    async fn persist_github_installation(
+        state: &AppState,
+        installation_id: i64,
+    ) -> Result<(), AppError> {
+        let jwt = generate_app_jwt(state.config.gh_app_id, &state.config.gh_app_private_key)?;
+        let response = Client::new()
+            .get(format!(
+                "https://api.github.com/app/installations/{installation_id}"
+            ))
+            .header("Authorization", format!("Bearer {jwt}"))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "OpenTask-App")
+            .send()
+            .await
+            .map_err(|error| AppError::Internal(format!("Failed to fetch GitHub installation: {error}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::BadRequest(format!(
+                "GitHub installation lookup failed ({status}): {body}"
+            )));
+        }
+
+        let data: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|error| AppError::Internal(format!("Failed to parse GitHub installation: {error}")))?;
+        let account_login = data["account"]["login"]
+            .as_str()
+            .unwrap_or("GitHub")
+            .to_string();
+        let account_type = data["account"]["type"]
+            .as_str()
+            .unwrap_or("User")
+            .to_string();
+
+        crate::db::query(
+            r#"
+            INSERT INTO opentask.github_installations
+                (id, installation_id, account_login, account_type, project_id)
+            VALUES ($1, $2, $3, $4, NULL)
+            ON CONFLICT (installation_id, project_id) DO UPDATE
+            SET account_login = EXCLUDED.account_login,
+                account_type = EXCLUDED.account_type;
+            "#,
+        )
+        .bind(next_id())
+        .bind(installation_id)
+        .bind(account_login)
+        .bind(account_type)
+        .execute(&state.pool)
+        .await?;
+
+        tracing::info!("Persisted GitHub App installation {installation_id}");
+        Ok(())
     }
 
     let token_data: serde_json::Value = token_resp

@@ -110,15 +110,17 @@ export async function apiFetch<T>(
             }
 
             let errorData: Record<string, unknown> = {};
+            let errorText = "";
             try {
-              const text = await response.text();
-              errorData = text ? JSONBig({ storeAsString: true }).parse(text) : {};
+              errorText = await response.text();
+              errorData = errorText ? JSONBig({ storeAsString: true }).parse(errorText) : {};
             } catch {
-              // ignore parsing error for error bodies
+              // Non-JSON error body (e.g. plain text from the Rust API); use it verbatim below
             }
 
             throw new Error(
               (errorData.detail as string) ||
+              (errorText && !errorText.trim().startsWith("{") ? errorText.trim() : "") ||
               `API Error: ${response.status} ${response.statusText}`,
             );
           }

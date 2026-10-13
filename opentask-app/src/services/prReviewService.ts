@@ -24,9 +24,9 @@ export const prReviewService = {
 
     triggerReview: async (
         projectId: number | string,
-        params: { repo_full_name?: string; pr_number?: number; task_id?: number | string }
-    ): Promise<PrReview> => {
-        return await apiFetch<PrReview>(`/projects/${projectId}/pr-reviews/trigger`, {
+        params: { repo_full_name?: string; pr_number?: number; pr_url?: string; task_id?: number | string }
+    ): Promise<{ status: 'completed'; task_id?: string; repo_full_name: string; pr_number: number }> => {
+        return await apiFetch(`/projects/${projectId}/pr-reviews/trigger`, {
             method: 'POST',
             body: JSON.stringify(params),
         });

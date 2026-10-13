@@ -1,4 +1,4 @@
-﻿use reqwest::Client;
+use reqwest::Client;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 
@@ -14,6 +14,7 @@ pub async fn evaluate_pull_request(
     repo_full_name: &str,
     pr_number: i64,
     installation_id: u64,
+    task_id: Option<i64>,
 ) -> Result<(), AppError> {
     tracing::info!("Starting PR evaluation for {repo_full_name}#{pr_number}");
 
@@ -65,14 +66,32 @@ pub async fn evaluate_pull_request(
 
     // 4. Find matching project
     let project_row = crate::db::query(
-        "SELECT id, name FROM opentask.projects WHERE $1 = ANY(gh_repo_url) LIMIT 1;"
+        r#"
+        SELECT id, name
+        FROM opentask.projects
+        WHERE EXISTS (
+            SELECT 1
+            FROM unnest(gh_repo_url) AS configured_repo
+            WHERE lower(trim(both '/' from regexp_replace(configured_repo, '^https?://github.com/', '', 'i'))) = lower($1)
+        )
+        LIMIT 1;
+        "#
     )
     .bind(repo_full_name)
     .fetch_optional(pool)
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let project_id: Option<i64> = project_row.as_ref().and_then(|r| r.try_get("id").ok());
+    let mut project_id: Option<i64> = project_row.as_ref().and_then(|r| r.try_get("id").ok());
+    if project_id.is_none() {
+        if let Some(tid) = task_id {
+            project_id = crate::db::query_scalar::<_, i64>("SELECT project_id FROM opentask.tasks WHERE id = $1 LIMIT 1;")
+                .bind(tid)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+        }
+    }
 
     // 5. Resolve Gemini API key
     let gemini_key = resolve_gemini_key(pool, project_id, None, Some(&config.gemini_api_key))
@@ -116,7 +135,7 @@ pub async fn evaluate_pull_request(
          }}"
     );
 
-    let raw_review = generate_content(&gemini_key, "gemini-2.5-flash", None, &prompt).await?;
+    let raw_review = generate_content(&gemini_key, crate::services::gemini::DEFAULT_TEXT_MODEL, None, &prompt).await?;
 
     // Parse JSON from response
     let clean_json = raw_review.trim().trim_start_matches("```json").trim_end_matches("```").trim();
@@ -129,11 +148,11 @@ pub async fn evaluate_pull_request(
     let verdict = parsed["verdict"].as_str().unwrap_or("PASS");
     let feedback = parsed["feedback"].as_str().unwrap_or(&raw_review);
     let completeness = parsed["completeness_score"].as_i64().unwrap_or(80) as i32;
-    let matched_id = parsed["matched_task_id"].as_str().and_then(|s| s.parse::<i64>().ok());
+    let matched_id = task_id.or_else(|| parsed["matched_task_id"].as_str().and_then(|s| s.parse::<i64>().ok()));
 
     // 8. Save review to DB
     let review_id = next_id();
-    let _ = crate::db::query(
+    crate::db::query(
         r#"
         INSERT INTO opentask.pr_reviews
             (id, project_id, task_id, repo_full_name, pr_number, pr_title, pr_url, verdict, feedback, completeness_score, reviewed_at)
@@ -151,7 +170,8 @@ pub async fn evaluate_pull_request(
     .bind(feedback)
     .bind(completeness)
     .execute(pool)
-    .await;
+    .await
+    .map_err(|e| AppError::Internal(format!("Failed to save PR review: {e}")))?;
 
     // 9. Post comment to GitHub PR
     let comment_url = format!("https://api.github.com/repos/{repo_full_name}/issues/{pr_number}/comments");

@@ -2,7 +2,7 @@
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use serde::Deserialize;
 use sqlx::Row;
@@ -33,6 +33,13 @@ pub struct MemberPayload {
     pub current_load: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ProjectInstallationPayload {
+    pub installation_id: i64,
+    pub account_login: String,
+    pub account_type: String,
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/projects", post(create_project)
@@ -45,6 +52,14 @@ pub fn router() -> Router<AppState> {
             .delete(delete_project),
         )
         .route("/projects/{project_id}/board", get(get_project_board))
+        .route(
+            "/projects/{project_id}/installations",
+            post(link_project_installation),
+        )
+        .route(
+            "/projects/{project_id}/installations/{installation_id}",
+            delete(unlink_project_installation),
+        )
         .route(
             "/projects/{project_id}/dashboard",
             get(get_project_dashboard),
@@ -759,6 +774,66 @@ pub async fn list_my_project_members(
     .await?;
 
     Ok(Json(rows))
+}
+
+pub async fn link_project_installation(
+    State(state): State<AppState>,
+    Path(project_id): Path<SafeId>,
+    Json(payload): Json<ProjectInstallationPayload>,
+) -> Result<StatusCode, AppError> {
+    if payload.installation_id <= 0
+        || payload.account_login.trim().is_empty()
+        || payload.account_type.trim().is_empty()
+    {
+        return Err(AppError::BadRequest(
+            "A valid installation ID and GitHub account are required".to_string(),
+        ));
+    }
+
+    let project_exists = crate::db::query_scalar::<_, bool>(
+        "SELECT EXISTS (SELECT 1 FROM opentask.projects WHERE id = $1);",
+    )
+    .bind(project_id.0)
+    .fetch_one(&state.pool)
+    .await?;
+    if !project_exists {
+        return Err(AppError::NotFound(format!("Project {project_id} not found")));
+    }
+
+    crate::db::query(
+        r#"
+        INSERT INTO opentask.github_installations
+            (id, installation_id, account_login, account_type, project_id)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (installation_id, project_id) DO UPDATE
+        SET account_login = EXCLUDED.account_login,
+            account_type = EXCLUDED.account_type;
+        "#,
+    )
+    .bind(next_id())
+    .bind(payload.installation_id)
+    .bind(payload.account_login.trim())
+    .bind(payload.account_type.trim())
+    .bind(project_id.0)
+    .execute(&state.pool)
+    .await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn unlink_project_installation(
+    State(state): State<AppState>,
+    Path((project_id, installation_id)): Path<(SafeId, i64)>,
+) -> Result<StatusCode, AppError> {
+    crate::db::query(
+        "DELETE FROM opentask.github_installations WHERE project_id = $1 AND installation_id = $2;",
+    )
+    .bind(project_id.0)
+    .bind(installation_id)
+    .execute(&state.pool)
+    .await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn get_project_member_by_id(

@@ -1,4 +1,4 @@
-﻿use axum::{
+use axum::{
     extract::{Path, State},
     routing::{get, post},
     Json, Router,
@@ -106,7 +106,7 @@ pub async fn analyze_meeting(
         payload.transcript
     );
 
-    let raw = generate_content(&key, "gemini-2.5-flash", None, &prompt).await?;
+    let raw = generate_content(&key, crate::services::gemini::DEFAULT_TEXT_MODEL, None, &prompt).await?;
     let clean = raw.trim().trim_start_matches("```json").trim_end_matches("```").trim();
     let parsed: Value = serde_json::from_str(clean).unwrap_or(json!({
         "mom_summary": raw,

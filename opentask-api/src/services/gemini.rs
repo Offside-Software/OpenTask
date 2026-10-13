@@ -1,4 +1,4 @@
-﻿use reqwest::Client;
+use reqwest::Client;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 
@@ -123,12 +123,49 @@ pub async fn resolve_gemini_key(
     None
 }
 
+/// Default text model used for reviews and summaries.
+pub const DEFAULT_TEXT_MODEL: &str = "gemini-flash-latest";
+
+/// Models tried (in order) when the requested model is retired (404), overloaded (503) or rate limited (429).
+const FALLBACK_TEXT_MODELS: [&str; 3] = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"];
+
+/// Generates content with `model`, transparently falling back to newer models
+/// when the requested one is retired, overloaded or rate limited.
 pub async fn generate_content(
     api_key: &str,
     model: &str,
     system_prompt: Option<&str>,
     user_prompt: &str,
 ) -> Result<String, AppError> {
+    let mut candidates = vec![model];
+    candidates.extend(FALLBACK_TEXT_MODELS.iter().copied().filter(|m| *m != model));
+
+    let mut last_error = None;
+    for candidate in candidates {
+        match generate_content_with_model(api_key, candidate, system_prompt, user_prompt).await {
+            Ok(text) => return Ok(text),
+            Err(GeminiCallError::ModelUnavailable(message)) => {
+                tracing::warn!("Gemini model {candidate} unavailable, trying fallback");
+                last_error = Some(AppError::Internal(format!("Gemini API error: {message}")));
+            }
+            Err(GeminiCallError::Other(error)) => return Err(error),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| AppError::Internal("No Gemini model available".to_string())))
+}
+
+enum GeminiCallError {
+    ModelUnavailable(String),
+    Other(AppError),
+}
+
+async fn generate_content_with_model(
+    api_key: &str,
+    model: &str,
+    system_prompt: Option<&str>,
+    user_prompt: &str,
+) -> Result<String, GeminiCallError> {
     let client = Client::new();
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
@@ -151,17 +188,26 @@ pub async fn generate_content(
         .json(&body)
         .send()
         .await
-        .map_err(|e| AppError::Internal(format!("Gemini API request failed: {e}")))?;
+        .map_err(|e| GeminiCallError::Other(AppError::Internal(format!("Gemini API request failed: {e}"))))?;
 
     if !resp.status().is_success() {
+        let status = resp.status();
         let err_text = resp.text().await.unwrap_or_default();
-        return Err(AppError::Internal(format!("Gemini API error: {err_text}")));
+        if matches!(
+            status,
+            reqwest::StatusCode::NOT_FOUND
+                | reqwest::StatusCode::SERVICE_UNAVAILABLE
+                | reqwest::StatusCode::TOO_MANY_REQUESTS
+        ) {
+            return Err(GeminiCallError::ModelUnavailable(err_text));
+        }
+        return Err(GeminiCallError::Other(AppError::Internal(format!("Gemini API error: {err_text}"))));
     }
 
     let json_resp: Value = resp
         .json()
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to parse Gemini response: {e}")))?;
+        .map_err(|e| GeminiCallError::Other(AppError::Internal(format!("Failed to parse Gemini response: {e}"))))?;
 
     let text = json_resp["candidates"][0]["content"]["parts"][0]["text"]
         .as_str()
