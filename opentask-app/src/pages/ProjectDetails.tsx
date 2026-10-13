@@ -6,7 +6,7 @@ import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
 import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
-import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw, Sparkles, Search, X } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw, Sparkles, Search, X, Cpu, Filter } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
 import { MeetingAccordion } from '../components/dashboard/MeetingAccordion';
@@ -17,6 +17,7 @@ import { TaskContextMenu, type ContextMenuState } from '../components/kanban/Tas
 import { TaskDetailModal } from '../components/modals/TaskDetailModal';
 import { ConfirmModal } from '../components/modals/ConfirmModal';
 import { BucketSettingsModal } from '../components/modals/BucketSettingsModal';
+import { McpConfigModal } from '../components/modals/McpConfigModal';
 import { SurfaceCard } from '../design-system/SurfaceCard';
 import { TaskFormModal } from '../components/modals/TaskFormModal';
 import { MeetingFormModal } from '../components/modals/MeetingFormModal';
@@ -57,6 +58,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const [selectedBucketTarget, setSelectedBucketTarget] = useState<number | string | undefined>(undefined);
   const [bucketToDelete, setBucketToDelete] = useState<number | string | null>(null);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [isMcpModalOpen, setIsMcpModalOpen] = useState(false);
+  const [selectedAssigneeFilter, setSelectedAssigneeFilter] = useState<string>('ALL');
   const [project, setProject] = useState<Project | null>(null);
   const [selectedBucketForEdit, setSelectedBucketForEdit] = useState<Bucket | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -168,8 +171,27 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   }, [setTasksOptimistically]);
   const { refreshDashboard } = useDashboard(projectId);
 
+  const notifyActivityUpdated = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('opentask:activity-updated', { detail: { projectId } }));
+  }, [projectId]);
+
+  // Seamless asynchronous reorder queue (debounced + silent retries, zero-latency UI)
+  const { queueTaskReorder, queueBucketReorder, cancelTaskFromQueue, hasPendingReorders } = useAsyncReorderQueue({
+    projectId,
+    onTasksSynced: () => {
+      refreshDashboard(true);
+      notifyActivityUpdated();
+    },
+    onBucketsSynced: () => refreshDashboard(true),
+    debounceMs: 50,
+  });
+
   const handleProjectEvent = useCallback((event: ProjectEvent) => {
     if (event.entity === 'task' || event.entity === 'bucket') {
+      if (hasPendingReorders()) {
+        // Skip board reload while optimistic moves or network syncs are pending/in flight
+        return;
+      }
       void refreshBoard(true);
       void refreshDashboard(true);
     } else if (event.entity === 'member') {
@@ -180,7 +202,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         .then(setProject)
         .catch(error => console.error('Failed to refresh project after realtime event:', error));
     }
-  }, [projectId, refreshBoard, refreshDashboard, refreshMembers]);
+  }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders]);
 
   useProjectRealtime(projectId, { onEvent: handleProjectEvent });
 
@@ -188,21 +210,6 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const { createBucket, updateBucket, deleteBucket } = useBuckets(projectId);
   const { createTask, updateTask, deleteTask } = useTasks(projectId);
   const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting } = useMeetings(projectId);
-
-  const notifyActivityUpdated = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('opentask:activity-updated', { detail: { projectId } }));
-  }, [projectId]);
-
-  // Seamless asynchronous reorder queue (debounced + silent retries, zero-latency UI)
-  const { queueTaskReorder, queueBucketReorder, cancelTaskFromQueue } = useAsyncReorderQueue({
-    projectId,
-    onTasksSynced: () => {
-      refreshDashboard(true);
-      notifyActivityUpdated();
-    },
-    onBucketsSynced: () => refreshDashboard(true),
-    debounceMs: 250,
-  });
 
   // Auto-scrolling during drag operations (vertical on <main>, horizontal on board)
   const boardScrollRef = React.useRef<HTMLDivElement>(null);
@@ -270,12 +277,25 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const matchingTasks = useMemo(() => {
+    let result = tasks;
+
+    // Filter by selected assignee dropdown
+    if (selectedAssigneeFilter === 'UNASSIGNED') {
+      result = result.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id);
+    } else if (selectedAssigneeFilter !== 'ALL') {
+      result = result.filter(t => {
+        const inAssigneeIds = t.assignee_ids && t.assignee_ids.map(String).includes(selectedAssigneeFilter);
+        const inLead = t.lead_assignee_id && String(t.lead_assignee_id) === selectedAssigneeFilter;
+        return Boolean(inAssigneeIds || inLead);
+      });
+    }
+
     const q = taskSearchQuery.trim().toLowerCase();
-    if (!q) return tasks;
+    if (!q) return result;
 
     const rawDigits = q.replace(/^#/, '');
 
-    return tasks.filter(t => {
+    return result.filter(t => {
       // 1. Match task ID (Snowflake ID substring)
       if (rawDigits && String(t.id).includes(rawDigits)) {
         return true;
@@ -296,15 +316,20 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       if (t.branch_name && t.branch_name.toLowerCase().includes(q)) {
         return true;
       }
-      // 6. Match assignee name or GitHub username
-      const assignedMember = t.lead_assignee_id ? members.find(m => String(m.user_id) === String(t.lead_assignee_id)) : undefined;
-      if (assignedMember) {
-        if (assignedMember.gh_username && assignedMember.gh_username.toLowerCase().includes(q)) return true;
-        if (assignedMember.display_name && assignedMember.display_name.toLowerCase().includes(q)) return true;
+      // 6. Match all assigned members' names or GitHub usernames
+      const allAssigneeIds = (t.assignee_ids && t.assignee_ids.length > 0)
+        ? t.assignee_ids.map(String)
+        : (t.lead_assignee_id ? [String(t.lead_assignee_id)] : []);
+      for (const uid of allAssigneeIds) {
+        const assignedMember = members.find(m => String(m.user_id) === uid);
+        if (assignedMember) {
+          if (assignedMember.gh_username && assignedMember.gh_username.toLowerCase().includes(q)) return true;
+          if (assignedMember.display_name && assignedMember.display_name.toLowerCase().includes(q)) return true;
+        }
       }
       return false;
     });
-  }, [tasks, taskSearchQuery, members]);
+  }, [tasks, selectedAssigneeFilter, taskSearchQuery, members]);
 
   // Debounced backend backlog search for tasks not yet in local DOM
   useEffect(() => {
@@ -483,6 +508,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     const draggedTask = tasks.find(t => String(t.id) === String(taskId));
     if (!draggedTask) return;
 
+    const sourceBucketId = draggedTask.bucket_id;
+    const isCrossBucket = sourceBucketId && String(sourceBucketId) !== String(newBucketId);
+
     // Filter out the dragged task to avoid self-collision
     const filteredTasks = bucketTasks.filter(t => String(t.id) !== String(taskId));
 
@@ -503,9 +531,23 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     const taskIds = filteredTasks.map(t => t.id!);
 
     // OPTIMISTIC UPDATE: Update UI instantaneously (0ms)
-    const otherTasks = tasks.filter(t => String(t.bucket_id) !== String(newBucketId) && String(t.id) !== String(taskId));
+    let reorderedSourceTasks: Task[] = [];
+    if (isCrossBucket) {
+      const remainingSourceTasks = tasks
+        .filter(t => String(t.bucket_id) === String(sourceBucketId) && String(t.id) !== String(taskId))
+        .sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
+      reorderedSourceTasks = remainingSourceTasks.map((t, idx) => ({ ...t, order_idx: idx }));
+      const sourceTaskIds = reorderedSourceTasks.map(t => t.id!);
+      queueTaskReorder(sourceBucketId, sourceTaskIds);
+    }
+
+    const otherTasks = tasks.filter(
+      t => String(t.bucket_id) !== String(newBucketId) &&
+           (!isCrossBucket || String(t.bucket_id) !== String(sourceBucketId)) &&
+           String(t.id) !== String(taskId)
+    );
     const reorderedBucketTasks = filteredTasks.map((t, idx) => ({ ...t, order_idx: idx, bucket_id: newBucketId }));
-    const nextTasks = [...otherTasks, ...reorderedBucketTasks];
+    const nextTasks = [...otherTasks, ...reorderedSourceTasks, ...reorderedBucketTasks];
     setTasksOptimistically(nextTasks);
 
     // Asynchronous debounced background sync to database with silent retries
@@ -686,6 +728,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
+                  onClick={() => setIsMcpModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                  title="Configure IDE Model Context Protocol (MCP) server endpoints"
+                >
+                  <Cpu size={13} strokeWidth={2.5} />
+                  <span>AI MCP</span>
+                </button>
+                <button
                   onClick={handleSyncAndReviewPrs}
                   disabled={isSyncingPrs}
                   className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
@@ -706,34 +756,64 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
               </div>
             </div>
 
-            {/* Task Search Bar */}
+            {/* Task Search Bar & Assignee Filter */}
             <div className="mb-4 flex items-center justify-between gap-3 flex-wrap bg-[#141619] p-3 border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-              <div className="relative flex-1 min-w-[260px] max-w-xl">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-500">
-                  <Search size={14} />
+              <div className="flex items-center gap-3 flex-1 min-w-[260px] flex-wrap">
+                <div className="relative flex-1 min-w-[220px] max-w-xl">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-500">
+                    <Search size={14} />
+                  </div>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={taskSearchQuery}
+                    onChange={(e) => setTaskSearchQuery(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="SEARCH TASKS (TITLE, #ID, TAG, ASSIGNEE)... [/]"
+                    className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-8 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                  />
+                  {taskSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setTaskSearchQuery('')}
+                      className="absolute inset-y-0 right-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
+                      title="Clear Search (Esc)"
+                    >
+                      <X size={14} strokeWidth={2.5} />
+                    </button>
+                  )}
                 </div>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={taskSearchQuery}
-                  onChange={(e) => setTaskSearchQuery(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="SEARCH TASKS (TITLE, #ID, TAG, ASSIGNEE)... [/]"
-                  className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-8 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
-                />
-                {taskSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setTaskSearchQuery('')}
-                    className="absolute inset-y-0 right-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
-                    title="Clear Search (Esc)"
+
+                {/* Assignee Filter Dropdown */}
+                <div className="flex items-center gap-1.5 bg-[#0B0E14] border-2 border-black px-2.5 py-1.5 shadow-[2px_2px_0px_0px_#000000]">
+                  <Filter size={13} className="text-[#FFE600] shrink-0" />
+                  <span className="font-mono text-[10px] font-black uppercase text-neutral-400 shrink-0">ASSIGNEE:</span>
+                  <select
+                    value={selectedAssigneeFilter}
+                    onChange={(e) => setSelectedAssigneeFilter(e.target.value)}
+                    className="bg-transparent font-mono text-[11px] font-bold text-white uppercase focus:outline-none cursor-pointer"
                   >
-                    <X size={14} strokeWidth={2.5} />
-                  </button>
-                )}
+                    <option value="ALL" className="bg-[#141619] text-white">ALL ASSIGNEES ({tasks.length})</option>
+                    <option value="UNASSIGNED" className="bg-[#141619] text-white">
+                      UNASSIGNED ({tasks.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id).length})
+                    </option>
+                    {members.map(m => {
+                      const uid = String(m.user_id);
+                      const count = tasks.filter(t =>
+                        (t.assignee_ids && t.assignee_ids.map(String).includes(uid)) ||
+                        (t.lead_assignee_id && String(t.lead_assignee_id) === uid)
+                      ).length;
+                      return (
+                        <option key={uid} value={uid} className="bg-[#141619] text-white">
+                          @{m.gh_username || m.display_name || `Member #${uid}`} ({count})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
 
-              {taskSearchQuery.trim() && (
+              {(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL') && (
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 bg-[#1E2227] text-neutral-300 border border-neutral-700 font-mono text-[11px] font-bold uppercase tracking-wider">
                     <span className="text-[#FFE600] font-black mr-1">{matchingTasks.length}</span>
@@ -747,7 +827,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                   )}
                   <button
                     type="button"
-                    onClick={() => setTaskSearchQuery('')}
+                    onClick={() => {
+                      setTaskSearchQuery('');
+                      setSelectedAssigneeFilter('ALL');
+                    }}
                     className="px-2 py-1 bg-[#1E2227] hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-700 font-mono text-[10px] uppercase font-bold cursor-pointer"
                   >
                     RESET
@@ -809,6 +892,17 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                         }
 
                         const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
+                        const rawAssigneeIds = (task.assignee_ids && task.assignee_ids.length > 0)
+                          ? task.assignee_ids.map(String)
+                          : (task.lead_assignee_id ? [String(task.lead_assignee_id)] : []);
+                        const cardAssignees = rawAssigneeIds.map(uid => {
+                          const m = members.find(mem => String(mem.user_id) === uid);
+                          return {
+                            userId: uid,
+                            name: m?.gh_username || m?.display_name || `Member #${uid}`,
+                            avatarUrl: m?.avatar_url || (m?.gh_username ? `https://github.com/${m.gh_username}.png?size=64` : undefined),
+                          };
+                        });
                         const assignedMember = task.lead_assignee_id ? members.find(m => String(m.user_id) === String(task.lead_assignee_id)) : undefined;
                         const assigneeName = assignedMember?.gh_username || assignedMember?.display_name || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
                         const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
@@ -822,6 +916,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                             weight={task.weight}
                             assignee={assigneeName}
                             assigneeAvatar={assigneeAvatar}
+                            assignees={cardAssignees}
                             pr={!!task.prUrl}
                             repoUrl={task.repo_url}
                             description={task.description}
@@ -1054,6 +1149,13 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
           variant="danger"
         />
       )}
+
+      <McpConfigModal
+        isOpen={isMcpModalOpen}
+        onClose={() => setIsMcpModalOpen(false)}
+        projectId={projectId}
+        projectName={project?.name}
+      />
 
       <TaskContextMenu
         contextMenu={contextMenu}

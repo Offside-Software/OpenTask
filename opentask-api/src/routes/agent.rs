@@ -1,4 +1,4 @@
-﻿use axum::{
+use axum::{
     extract::{Path, State},
     routing::post,
     Json, Router,
@@ -93,6 +93,7 @@ pub async fn get_agent_task(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
+               COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE id = $1 AND project_id = $2
@@ -116,6 +117,7 @@ pub async fn list_agent_tasks(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
+               COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1
@@ -165,6 +167,7 @@ pub async fn create_agent_task(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW(), NOW())
         RETURNING id, project_id, bucket_id, meeting_id,
                   parent_task_id, lead_assignee_id, suggested_assignee_id,
+                  COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                   title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;
         "#
     )
@@ -217,6 +220,7 @@ pub async fn complete_agent_task(
         WHERE id = $2 AND project_id = $3
         RETURNING id, project_id, bucket_id, meeting_id,
                   parent_task_id, lead_assignee_id, suggested_assignee_id,
+                  COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                   title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;
         "#
     )
@@ -267,6 +271,7 @@ pub async fn move_agent_task(
         WHERE id = $2 AND project_id = $3
         RETURNING id, project_id, bucket_id, meeting_id,
                   parent_task_id, lead_assignee_id, suggested_assignee_id,
+                  COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                   title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;
         "#
     )
@@ -302,6 +307,7 @@ pub async fn update_agent_task(
         WHERE id = $7 AND project_id = $8
         RETURNING id, project_id, bucket_id, meeting_id,
                   parent_task_id, lead_assignee_id, suggested_assignee_id,
+                  COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                   title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;
         "#
     )
@@ -331,6 +337,7 @@ pub async fn lookup_agent_task(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
+               COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1 AND (title ILIKE $2 OR description ILIKE $2)

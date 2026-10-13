@@ -5,6 +5,7 @@ pub mod alerts;
 pub mod auth;
 pub mod buckets;
 pub mod github;
+pub mod mcp;
 pub mod meetings;
 pub mod notifications;
 pub mod pr_reviews;
@@ -34,6 +35,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(telegram::router())
         .merge(notifications::router())
         .merge(pr_reviews::router())
+        .merge(mcp::router())
         .nest("/agent", agent::router());
 
     // Support both direct routes (e.g. /tasks, /auth) and prefixed routes (e.g. /api/tasks, /api/auth)

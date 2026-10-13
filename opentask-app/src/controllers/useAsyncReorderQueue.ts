@@ -20,7 +20,7 @@ export const useAsyncReorderQueue = ({
   projectId,
   onTasksSynced,
   onBucketsSynced,
-  debounceMs = 250,
+  debounceMs = 60,
 }: UseAsyncReorderQueueOptions) => {
   const { showToast } = useToast();
 
@@ -32,26 +32,34 @@ export const useAsyncReorderQueue = ({
   const pendingBuckets = useRef<(string | number)[] | null>(null);
   const bucketTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Counter of active HTTP reorder calls currently in-flight
+  const activeSyncCount = useRef<number>(0);
+
   // Helper for retrying an async action up to maxRetries with backoff
   const executeWithRetry = async (
     action: () => Promise<unknown>,
     retries = 2,
     delayMs = 400,
   ): Promise<boolean> => {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        await action();
-        return true;
-      } catch (err) {
-        if (attempt < retries) {
-          await new Promise((res) => setTimeout(res, delayMs * (attempt + 1)));
-        } else {
-          console.error("[ReorderQueue] Sync failed after retries:", err);
-          return false;
+    activeSyncCount.current++;
+    try {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          await action();
+          return true;
+        } catch (err) {
+          if (attempt < retries) {
+            await new Promise((res) => setTimeout(res, delayMs * (attempt + 1)));
+          } else {
+            console.error("[ReorderQueue] Sync failed after retries:", err);
+            return false;
+          }
         }
       }
+      return false;
+    } finally {
+      activeSyncCount.current = Math.max(0, activeSyncCount.current - 1);
     }
-    return false;
   };
 
   /**
@@ -145,9 +153,20 @@ export const useAsyncReorderQueue = ({
     };
   }, []);
 
+  const hasPendingReorders = useCallback(() => {
+    return (
+      pendingTasks.current.size > 0 ||
+      taskTimers.current.size > 0 ||
+      activeSyncCount.current > 0 ||
+      pendingBuckets.current !== null ||
+      bucketTimer.current !== null
+    );
+  }, []);
+
   return {
     queueTaskReorder,
     queueBucketReorder,
     cancelTaskFromQueue,
+    hasPendingReorders,
   };
 };

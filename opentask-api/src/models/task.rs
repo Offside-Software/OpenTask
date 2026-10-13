@@ -11,6 +11,8 @@ pub struct DatabaseTask {
     pub parent_task_id: Option<SafeId>,
     pub lead_assignee_id: Option<SafeId>,
     pub suggested_assignee_id: Option<SafeId>,
+    #[serde(default)]
+    pub assignee_ids: Option<Vec<SafeId>>,
     pub title: String,
     pub description: Option<String>,
     #[serde(rename = "type")]
@@ -61,6 +63,7 @@ pub struct TaskUpdatePayload {
     pub lead_assignee_id: Option<Option<SafeId>>,
     #[serde(default, deserialize_with = "deserialize_optional_nullable_safe_id")]
     pub suggested_assignee_id: Option<Option<SafeId>>,
+    pub assignee_ids: Option<Vec<SafeId>>,
     pub branch_name: Option<String>,
     pub repo_url: Option<String>,
     pub order_idx: Option<i32>,

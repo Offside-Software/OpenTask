@@ -75,6 +75,18 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
         .execute(pool)
         .await;
 
+    // Ensure tasks assignee_ids column
+    let _ = sqlx::raw_sql(
+        r#"
+        ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS assignee_ids BIGINT[] DEFAULT '{}';
+        UPDATE opentask.tasks
+        SET assignee_ids = ARRAY[lead_assignee_id]
+        WHERE lead_assignee_id IS NOT NULL AND (assignee_ids IS NULL OR assignee_ids = '{}');
+        "#,
+    )
+    .execute(pool)
+    .await;
+
     // Ensure project history table
     let _ = sqlx::raw_sql(
         r#"

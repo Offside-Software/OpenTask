@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw } from 'lucide-react';
+import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw, Users } from 'lucide-react';
 import type { Task, Bucket, ProjectMember, PrReview, ExtractedTask } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
@@ -44,12 +44,36 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     });
     const [weight, setWeight] = useState<number>(task.weight);
     const [bucketId, setBucketId] = useState<string | undefined>(task.bucket_id ? String(task.bucket_id) : undefined);
+    const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
+        if (task.assignee_ids && task.assignee_ids.length > 0) {
+            return task.assignee_ids.map(String);
+        }
+        return task.lead_assignee_id ? [String(task.lead_assignee_id)] : [];
+    });
     const [leadAssigneeId, setLeadAssigneeId] = useState<string | undefined>(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
     const [availableTypes, setAvailableTypes] = useState<string[]>(() => getAllTaskTypes([task.type]));
     const [isAddingType, setIsAddingType] = useState(false);
     const [customTypeInput, setCustomTypeInput] = useState('');
     const { showToast } = useToast();
     const previousTaskId = useRef<string | number | undefined>(task.id);
+
+    const handleToggleAssignee = (userId: string) => {
+        setAssigneeIds(prev => {
+            const next = prev.includes(userId)
+                ? prev.filter(id => id !== userId)
+                : [...prev, userId];
+            setLeadAssigneeId(next.length > 0 ? next[0] : undefined);
+            return next;
+        });
+    };
+
+    const handleRemoveAssignee = (userId: string) => {
+        setAssigneeIds(prev => {
+            const next = prev.filter(id => id !== userId);
+            setLeadAssigneeId(next.length > 0 ? next[0] : undefined);
+            return next;
+        });
+    };
 
     const handleToggleType = (t: string) => {
         setSelectedTypes(prev => {
@@ -202,6 +226,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
+    const initialAssigneeIds = (task.assignee_ids && task.assignee_ids.length > 0)
+        ? task.assignee_ids.map(String)
+        : (task.lead_assignee_id ? [String(task.lead_assignee_id)] : []);
+
     const isDirty = Boolean(
         title !== task.title ||
         description !== (task.description || '') ||
@@ -211,6 +239,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         weight !== task.weight ||
         bucketId !== (task.bucket_id ? String(task.bucket_id) : undefined) ||
         leadAssigneeId !== (task.lead_assignee_id ? String(task.lead_assignee_id) : undefined) ||
+        JSON.stringify([...assigneeIds].sort()) !== JSON.stringify([...initialAssigneeIds].sort()) ||
         JSON.stringify([...selectedTypes].sort()) !== JSON.stringify([...parseTaskTypes(task.type)].sort())
     );
 
@@ -228,7 +257,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         setSelectedTypes(parsed.length > 0 ? parsed : ['CODE']);
         setWeight(task.weight);
         setBucketId(task.bucket_id ? String(task.bucket_id) : undefined);
-        setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : undefined);
+        const currentTaskAssigneeIds = (task.assignee_ids && task.assignee_ids.length > 0)
+            ? task.assignee_ids.map(String)
+            : (task.lead_assignee_id ? [String(task.lead_assignee_id)] : []);
+        setAssigneeIds(currentTaskAssigneeIds);
+        setLeadAssigneeId(task.lead_assignee_id ? String(task.lead_assignee_id) : (currentTaskAssigneeIds[0] || undefined));
         setBranchName(task.branch_name || '');
         setRepoUrl(task.repo_url || '');
         setPrUrl(task.prUrl || '');
@@ -265,7 +298,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             type: finalType,
             weight: Number(weight),
             bucket_id: bucketId || undefined,
-            lead_assignee_id: leadAssigneeId ? leadAssigneeId : null,
+            assignee_ids: assigneeIds,
+            lead_assignee_id: assigneeIds.length > 0 ? assigneeIds[0] : null,
             branch_name: branchName.trim() || undefined,
             repo_url: repoUrl.trim() || undefined,
         };
@@ -368,7 +402,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="ENTER TECHNICAL SPECIFICATIONS OR REQUIREMENTS..."
-                                className="w-full h-32 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-3 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-all resize-y"
+                                className="w-full h-64 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-3 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-all resize-y"
                             />
                         </div>
 
@@ -729,18 +763,77 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             </select>
                         </div>
 
-                        {/* Lead Assignee */}
+                        {/* Assignees */}
                         <div>
-                            <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-wider mb-1.5">LEAD ASSIGNEE</label>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Users size={13} /> ASSIGNEES ({assigneeIds.length})
+                                </label>
+                            </div>
+
+                            {/* Selected Assignees Badges */}
+                            <div className="flex flex-wrap gap-1.5 min-h-[32px] mb-2 p-1.5 bg-[#0B0E14] border-2 border-black">
+                                {assigneeIds.length === 0 ? (
+                                    <span className="text-[11px] font-mono text-neutral-500 uppercase px-1 py-0.5">
+                                        [NO ASSIGNEES SELECTED]
+                                    </span>
+                                ) : (
+                                    assigneeIds.map((uid, index) => {
+                                        const member = members.find(m => String(m.user_id) === uid);
+                                        const username = member?.gh_username || member?.display_name || `Member #${uid}`;
+                                        const avatar = member?.avatar_url || (member?.gh_username ? `https://github.com/${member.gh_username}.png?size=64` : undefined);
+                                        return (
+                                            <div
+                                                key={uid}
+                                                className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#16191D] border border-black font-mono text-[11px] text-white shadow-[1px_1px_0px_0px_#000000]"
+                                            >
+                                                {avatar ? (
+                                                    <img
+                                                        src={avatar}
+                                                        alt={username}
+                                                        className="w-3.5 h-3.5 rounded-none border border-black object-cover shrink-0"
+                                                    />
+                                                ) : null}
+                                                <span className="font-bold truncate max-w-[110px]">{username}</span>
+                                                {index === 0 && (
+                                                    <span className="text-[9px] bg-[#FFE600] text-black font-black px-1 uppercase">
+                                                        LEAD
+                                                    </span>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveAssignee(uid)}
+                                                    className="hover:text-[#FF3333] cursor-pointer text-neutral-400 font-bold ml-0.5"
+                                                    title="Remove assignee"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Add / Toggle Assignee Dropdown */}
                             <select
-                                value={leadAssigneeId || ''}
-                                onChange={(e) => setLeadAssigneeId(e.target.value || undefined)}
+                                value=""
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        handleToggleAssignee(e.target.value);
+                                    }
+                                }}
                                 className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
                             >
-                                <option value="">UNASSIGNED</option>
-                                {members.map(m => (
-                                    <option key={String(m.user_id)} value={String(m.user_id)}>{m.gh_username || `Member #${m.user_id}`}</option>
-                                ))}
+                                <option value="">+ ASSIGN / TOGGLE MEMBER...</option>
+                                {members.map(m => {
+                                    const uid = String(m.user_id);
+                                    const isAssigned = assigneeIds.includes(uid);
+                                    return (
+                                        <option key={uid} value={uid}>
+                                            {isAssigned ? `✓ ${m.gh_username || `Member #${uid}`}` : `+ ${m.gh_username || `Member #${uid}`}`}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
 

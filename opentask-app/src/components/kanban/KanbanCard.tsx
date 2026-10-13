@@ -6,6 +6,12 @@ import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
 import { TrashButton } from '../../design-system/TrashButton';
 import { useToast } from '../../design-system/Toast';
 
+export interface CardAssignee {
+  userId?: string | number;
+  name: string;
+  avatarUrl?: string;
+}
+
 interface KanbanCardProps {
   id: string | number;
   title: string;
@@ -13,6 +19,7 @@ interface KanbanCardProps {
   weight: number;
   assignee?: string;
   assigneeAvatar?: string;
+  assignees?: CardAssignee[];
   status?: string;
   warnStagnant?: boolean;
   isSuggested?: boolean;
@@ -44,6 +51,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   weight,
   assignee,
   assigneeAvatar,
+  assignees,
   warnStagnant,
   isSuggested,
   pr,
@@ -58,6 +66,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 }) => {
   const [isOver, setIsOver] = React.useState(false);
   const { showToast } = useToast();
+
+  const effectiveAssignees: CardAssignee[] = React.useMemo(() => {
+    if (assignees && assignees.length > 0) return assignees;
+    if (assignee) {
+      return [{ name: assignee, avatarUrl: assigneeAvatar }];
+    }
+    return [];
+  }, [assignees, assignee, assigneeAvatar]);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('taskId', id.toString());
@@ -212,29 +228,69 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 
       {/* Card Footer */}
       <div className="mt-2 pt-2 border-t-2 border-neutral-800 flex items-center justify-between">
-        {assignee ? (
-          <div className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[11px] font-black flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000000] max-w-[170px]">
-            {assigneeAvatar ? (
-              <img
-                src={assigneeAvatar}
-                alt={assignee}
-                className="w-3.5 h-3.5 rounded-none border border-black object-cover shrink-0"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.nextElementSibling;
-                  if (fallback) fallback.classList.remove('hidden');
-                }}
-              />
-            ) : null}
-            <span
-              className={`w-3.5 h-3.5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black ${
-                assigneeAvatar ? 'hidden' : ''
-              }`}
+        {effectiveAssignees.length > 0 ? (
+          effectiveAssignees.length === 1 ? (
+            <div
+              className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[11px] font-black flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000000] max-w-[170px]"
+              title={effectiveAssignees[0].name}
             >
-              {getInitials(assignee)}
-            </span>
-            <span className="truncate">{assignee.toUpperCase()}</span>
-          </div>
+              {effectiveAssignees[0].avatarUrl ? (
+                <img
+                  src={effectiveAssignees[0].avatarUrl}
+                  alt={effectiveAssignees[0].name}
+                  className="w-3.5 h-3.5 rounded-none border border-black object-cover shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling;
+                    if (fallback) fallback.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <span
+                className={`w-3.5 h-3.5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black ${
+                  effectiveAssignees[0].avatarUrl ? 'hidden' : ''
+                }`}
+              >
+                {getInitials(effectiveAssignees[0].name)}
+              </span>
+              <span className="truncate">{effectiveAssignees[0].name.toUpperCase()}</span>
+            </div>
+          ) : (
+            <div
+              className="flex items-center gap-1.5"
+              title={effectiveAssignees.map((a) => a.name).join(', ')}
+            >
+              <div className="flex items-center -space-x-1.5">
+                {effectiveAssignees.slice(0, 3).map((a, idx) => (
+                  <div key={idx} className="relative">
+                    {a.avatarUrl ? (
+                      <img
+                        src={a.avatarUrl}
+                        alt={a.name}
+                        className="w-4 h-4 rounded-none border border-black object-cover bg-neutral-900"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling;
+                          if (fallback) fallback.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className={`w-4 h-4 rounded-none bg-black text-[#00E5FF] font-mono text-[7px] font-black flex items-center justify-center border border-black ${
+                        a.avatarUrl ? 'hidden' : ''
+                      }`}
+                    >
+                      {getInitials(a.name)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <span className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[10px] font-black shadow-[1px_1px_0px_0px_#000000]">
+                {effectiveAssignees[0].name.slice(0, 7)}
+                {effectiveAssignees.length > 1 ? ` +${effectiveAssignees.length - 1}` : ''}
+              </span>
+            </div>
+          )
         ) : (
           <div className="font-mono text-[11px] text-neutral-500 font-semibold uppercase">
             [UNASSIGNED]

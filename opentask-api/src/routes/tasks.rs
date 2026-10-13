@@ -96,14 +96,24 @@ pub async fn create_task(
 
     let order_idx = payload.order_idx.unwrap_or(max_idx + 1);
 
+    let raw_assignee_ids: Vec<i64> = if let Some(ref a_ids) = payload.assignee_ids {
+        a_ids.iter().map(|id| id.0).collect()
+    } else if let Some(lead) = payload.lead_assignee_id {
+        vec![lead.0]
+    } else {
+        vec![]
+    };
+    let lead_id = payload.lead_assignee_id.map(|l| l.0).or_else(|| raw_assignee_ids.first().copied());
+
     let row = crate::db::query_as::<_, DatabaseTask>(
         r#"
         INSERT INTO opentask.tasks
-            (id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id,
+            (id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, assignee_ids,
              title, description, type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), $15, NOW(), NOW())
         RETURNING id, project_id, bucket_id, meeting_id,
                   parent_task_id, lead_assignee_id, suggested_assignee_id,
+                  COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                   title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;
         "#
     )
@@ -112,8 +122,9 @@ pub async fn create_task(
     .bind(b_id)
     .bind(payload.meeting_id.map(|m| m.0))
     .bind(payload.parent_task_id.map(|p| p.0))
-    .bind(payload.lead_assignee_id.map(|l| l.0))
+    .bind(lead_id)
     .bind(payload.suggested_assignee_id.map(|s| s.0))
+    .bind(&raw_assignee_ids)
     .bind(payload.title)
     .bind(payload.description)
     .bind(payload.task_type.unwrap_or_else(|| "CODE".to_string()))
@@ -179,6 +190,7 @@ pub async fn list_tasks(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
+               COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE ($1::BIGINT IS NULL OR project_id = $1)
@@ -202,6 +214,7 @@ pub async fn get_task(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
+               COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE id = $1
@@ -249,6 +262,15 @@ pub async fn update_task(
         builder.push(", lead_assignee_id = ");
         builder.push_bind(lead.as_ref().map(|l| l.0));
     }
+    if let Some(ref assignee_ids) = payload.assignee_ids {
+        let raw_ids: Vec<i64> = assignee_ids.iter().map(|id| id.0).collect();
+        builder.push(", assignee_ids = ");
+        builder.push_bind(raw_ids);
+        if payload.lead_assignee_id.is_none() {
+            builder.push(", lead_assignee_id = ");
+            builder.push_bind(assignee_ids.first().map(|l| l.0));
+        }
+    }
     if let Some(ref suggested) = payload.suggested_assignee_id {
         builder.push(", suggested_assignee_id = ");
         builder.push_bind(suggested.as_ref().map(|s| s.0));
@@ -271,6 +293,7 @@ pub async fn update_task(
     builder.push(
         " RETURNING id, project_id, bucket_id, meeting_id, \
                    parent_task_id, lead_assignee_id, suggested_assignee_id, \
+                   COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids, \
                    title, description, type as task_type, weight, branch_name, repo_url, \
                    last_activity_at, order_idx, created_at, updated_at;",
     );
@@ -442,6 +465,7 @@ pub async fn search_tasks(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
+               COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1
@@ -632,6 +656,7 @@ pub async fn get_bucket_tasks(
         r#"
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
+               COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks

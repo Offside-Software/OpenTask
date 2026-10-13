@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
 import { Badge } from '../../design-system/Badge';
-import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal, Sparkles, CheckCircle2, RefreshCw, Cpu } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
 import { userService } from '../../services/userService';
@@ -11,6 +11,7 @@ import { useToast } from '../../design-system/Toast';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { RepositoryPickerModal } from '../modals/RepositoryPickerModal';
+import { McpConfigModal } from '../modals/McpConfigModal';
 import { useNavigate } from 'react-router-dom';
 import { getCached, setCached } from '../../utils/cache';
 import type { Project, ProjectMember } from '../../models';
@@ -47,6 +48,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
     const [showApiKey, setShowApiKey] = useState(false);
     const [copiedKey, setCopiedKey] = useState(false);
     const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
+    const [isMcpModalOpen, setIsMcpModalOpen] = useState(false);
 
     // Custom Integrated AI (Gemini Key) State
     const [customAiKeyInfo, setCustomAiKeyInfo] = useState<ProjectAiKeyResponse | null>(null);
@@ -808,6 +810,27 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                     <div><span className="text-[#00FF66] font-bold">GET</span> <code className="text-white">/api/agent/summary</code> <span className="text-neutral-500">// Fetch live project markdown & metrics</span></div>
                                 </div>
                             </div>
+
+                            {/* MCP IDE Integration Box */}
+                            <div className="p-4 bg-[#141619] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div>
+                                    <div className="flex items-center gap-2 text-white font-mono text-[12px] font-black uppercase tracking-wider">
+                                        <Cpu size={14} className="text-[#FFE600]" />
+                                        <span>// MODEL CONTEXT PROTOCOL (MCP) INTEGRATION</span>
+                                    </div>
+                                    <p className="text-[11px] font-mono text-neutral-400 mt-1">
+                                        Expose project tasks directly to Antigravity, Cursor, VS Code (Cline/Copilot), Zed, and Claude Desktop.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMcpModalOpen(true)}
+                                    className="px-4 py-2 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0 active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                                >
+                                    <Cpu size={13} strokeWidth={2.5} />
+                                    <span>VIEW MCP CONFIGS</span>
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="p-5 bg-[#121417] border-2 border-dashed border-neutral-700 rounded-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1083,6 +1106,14 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                     onCancel={() => setIsDeleteModalOpen(false)}
                 />
             )}
+
+            <McpConfigModal
+                isOpen={isMcpModalOpen}
+                onClose={() => setIsMcpModalOpen(false)}
+                projectId={projectId}
+                projectName={project?.name}
+                initialApiKey={apiKey}
+            />
         </div>
     );
 };

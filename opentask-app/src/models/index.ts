@@ -166,6 +166,7 @@ export interface Task {
   parent_task_id?: number | string;
   lead_assignee_id?: number | string | null; // VISIBLE TIER
   suggested_assignee_id?: number | string | null;
+  assignee_ids?: (number | string)[];
   title: string;
   description?: string; // LAZY LOAD TIER
   status?: BucketState; // Derived from bucket for UI
