@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 :root {
   /* Brutalist Industrial Dark Palette (Default) */
   --cmd-app-bg: #0C0D0E;
