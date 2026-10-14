@@ -255,7 +255,15 @@ pub async fn send_telegram_alert(
             &text,
             Some(reply_markup),
         ).await;
-        if let Err(e) = res {
+        if res.is_ok() {
+            if let Some(tid) = task_id {
+                let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE, updated_at = NOW() WHERE context_id = $1 AND user_id = $2;")
+                    .bind(tid)
+                    .bind(user_id)
+                    .execute(pool)
+                    .await;
+            }
+        } else if let Err(e) = res {
             tracing::error!("[TELEGRAM_ALERT] Delivery failed to chat_id={}: {e}", chat_id);
         }
     }
