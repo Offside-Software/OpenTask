@@ -78,8 +78,8 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
                   to={`/${id}`}
                   title={fullLabel}
                   className={`h-11 rounded-none border-2 transition-all duration-75 relative flex items-center overflow-hidden ${isActive
-                      ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
-                      : 'bg-[#141619] text-neutral-400 border-neutral-800 hover:border-white hover:text-white hover:shadow-[2px_2px_0px_0px_#000000]'
+                    ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
+                    : 'bg-[#141619] text-neutral-400 border-neutral-800 hover:border-white hover:text-white hover:shadow-[2px_2px_0px_0px_#000000]'
                     }`}
                 >
                   <div className="w-10 h-full flex items-center justify-center shrink-0 relative">
@@ -106,7 +106,7 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
             <button
               onClick={toggleTheme}
               title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
+              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
             >
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 {theme === 'dark' ? (
@@ -126,7 +126,7 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
             <button
               onClick={onOpenFeedback}
               title="User Feedback & Bug Report (Alpha Release)"
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-[#FFE600] hover:border-[#FFE600] transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
+              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-[#FFE600] hover:border-[#FFE600] transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
             >
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 <MessageSquarePlus size={18} strokeWidth={2.5} className="group-hover:text-[#FFE600] text-[#FFE600]" />
@@ -149,7 +149,7 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
               target="_blank"
               rel="noopener noreferrer"
               title="OpenTask Source Code on GitHub (Open Source)"
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
+              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
             >
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 <Github size={18} strokeWidth={2.2} />
@@ -167,7 +167,7 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
             <button
               onClick={onOpenSettings}
               title="System Settings"
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
+              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
             >
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 <Settings size={18} strokeWidth={2.5} />
@@ -182,7 +182,7 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
             <button
               onClick={() => setIsSignOutModalOpen(true)}
               title={`Sign out (${displayName})`}
-              className="h-11 w-full rounded-none bg-[#1E2227] border-2 border-black text-white hover:bg-[#FF3333] hover:text-white transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
+              className="h-11 w-full rounded-none bg-[#1E2227] border-2 border-black text-white hover:bg-[#FF3333] hover:text-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
             >
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 <div className="w-6 h-6 rounded-none bg-black/40 border border-neutral-700 flex items-center justify-center font-mono text-[10px] font-black shrink-0">

@@ -22,6 +22,7 @@ import { CloseButton } from '../../design-system/CloseButton';
 import { Button } from '../../design-system/Button';
 import { Badge } from '../../design-system/Badge';
 import { ConfirmModal } from './ConfirmModal';
+import { TrashButton } from '../../design-system/TrashButton';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -613,11 +614,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                                     <CheckCircle2 size={11} strokeWidth={3} /> RESOLVE
                                   </button>
                                 )}
-
                                 <button
                                   disabled={isBusy}
                                   onClick={() => setFeedbackToDelete(item.id)}
-                                  className="p-1 text-neutral-500 hover:text-[#FF3333] hover:bg-[#FF3333]/10 border border-transparent hover:border-[#FF3333] transition-colors cursor-pointer"
+                                  className="p-1 text-neutral-500 hover:text-[#FF3333] hover:bg-[#FF3333] border border-transparent hover:border-[#FF3333] transition-colors cursor-pointer"
                                   title="Delete Feedback (Dev / Localhost only)"
                                 >
                                   <Trash2 size={13} />
