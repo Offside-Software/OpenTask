@@ -22,7 +22,6 @@ import { CloseButton } from '../../design-system/CloseButton';
 import { Button } from '../../design-system/Button';
 import { Badge } from '../../design-system/Badge';
 import { ConfirmModal } from './ConfirmModal';
-import { TrashButton } from '../../design-system/TrashButton';
 
 interface FeedbackModalProps {
   isOpen: boolean;
