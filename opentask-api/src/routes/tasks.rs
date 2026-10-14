@@ -246,7 +246,6 @@ pub async fn update_task(
     .bind(task_id.0)
     .fetch_optional(&state.pool)
     .await?;
-
     let mut builder = sqlx::QueryBuilder::new(
         "UPDATE opentask.tasks SET updated_at = NOW(), last_activity_at = NOW()",
     );
@@ -274,6 +273,14 @@ pub async fn update_task(
     if let Some(ref lead) = payload.lead_assignee_id {
         builder.push(", lead_assignee_id = ");
         builder.push_bind(lead.as_ref().map(|l| l.0));
+        if payload.assignee_ids.is_none() {
+            builder.push(", assignee_ids = ");
+            if let Some(l) = lead {
+                builder.push_bind(vec![l.0]);
+            } else {
+                builder.push_bind(Vec::<i64>::new());
+            }
+        }
     }
     if let Some(ref assignee_ids) = payload.assignee_ids {
         let raw_ids: Vec<i64> = assignee_ids.iter().map(|id| id.0).collect();

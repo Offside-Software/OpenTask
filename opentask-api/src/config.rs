@@ -127,7 +127,7 @@ impl Config {
             .unwrap_or_else(|| "http://localhost:5173/api/auth/callback".to_string());
 
         let frontend_url = get_clean_env("FRONTEND_URL")
-            .unwrap_or_else(|| "http://localhost:5173".to_string());
+            .unwrap_or_else(|| "https://open-task-five.vercel.app".to_string());
 
         if gh_app_id == 0 || get_clean_env("GH_APP_PRIVATE_KEY").is_none() {
             tracing::warn!(

@@ -19,6 +19,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     const [chatId, setChatId] = useState(user?.db_user?.telegram_chat_id || '');
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [isWaitingForLink, setIsWaitingForLink] = useState(false);
+
+    // Sync chatId when user updates
+    useEffect(() => {
+        if (user?.db_user?.telegram_chat_id) {
+            setChatId(user.db_user.telegram_chat_id);
+            if (isWaitingForLink) {
+                setIsWaitingForLink(false);
+                setMessage({ type: 'success', text: 'Telegram account successfully linked!' });
+                setTimeout(() => setMessage(null), 4000);
+            }
+        }
+    }, [user?.db_user?.telegram_chat_id]);
+
+    // Polling effect while waiting for bot link
+    useEffect(() => {
+        if (!isOpen || !isWaitingForLink) return;
+
+        const interval = setInterval(async () => {
+            try {
+                await refreshUser();
+            } catch {
+                // ignore
+            }
+        }, 2000);
+
+        const timeout = setTimeout(() => {
+            setIsWaitingForLink(false);
+        }, 60000);
+
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timeout);
+        };
+    }, [isOpen, isWaitingForLink, refreshUser]);
 
     // Personal AI Key State
     const [userAiKeyInfo, setUserAiKeyInfo] = useState<UserAiKeyResponse | null>(null);
@@ -101,6 +136,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         }
     };
 
+    const handleUnlink = async () => {
+        if (!user?.db_user?.id) return;
+        setIsSaving(true);
+        try {
+            await updateTelegramChatId(user.db_user.id, '');
+            setChatId('');
+            await refreshUser();
+            setMessage({ type: 'success', text: 'Telegram unlinked successfully.' });
+            setTimeout(() => setMessage(null), 3000);
+        } catch {
+            setMessage({ type: 'error', text: 'Failed to unlink Telegram.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-100">
             <div
@@ -174,16 +225,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
                     {/* Telegram Section */}
                     <section>
-                        <h4 className="text-white text-[13px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Bell size={12} />
-                            <span className="text-[#FFE600] mr-1.5">//</span>TELEGRAM DISPATCH PIPELINE
-                        </h4>
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-white text-[13px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <Bell size={12} />
+                                <span className="text-[#FFE600] mr-1.5">//</span>TELEGRAM DISPATCH PIPELINE
+                            </h4>
+                            {user?.db_user?.telegram_chat_id ? (
+                                <span className="px-2 py-0.5 bg-[#00FF66] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000] flex items-center gap-1">
+                                    <CheckCircle2 size={10} /> CONNECTED
+                                </span>
+                            ) : (
+                                <span className="px-2 py-0.5 bg-[#FFE600] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000]">
+                                    NOT CONNECTED
+                                </span>
+                            )}
+                        </div>
 
                         <div className="space-y-4">
+                            {/* Auto-Link Button */}
+                            <a
+                                href={user?.db_user?.id ? `https://t.me/OffsideOpenTaskBot?start=link_${user.db_user.id}` : (user?.login ? `https://t.me/OffsideOpenTaskBot?start=link_${user.login}` : 'https://t.me/OffsideOpenTaskBot')}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => setIsWaitingForLink(true)}
+                                className={`flex items-center justify-between p-4 border-2 border-black rounded-none group transition-all cursor-pointer shadow-[3px_3px_0px_0px_#000000] ${
+                                    user?.db_user?.telegram_chat_id 
+                                        ? 'bg-[#141619] hover:bg-[#1E2227]' 
+                                        : 'bg-[#FFE600] text-black hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_0px_#000000]'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-none border border-black flex items-center justify-center ${
+                                        user?.db_user?.telegram_chat_id ? 'bg-black text-[#00FF66]' : 'bg-black text-[#FFE600]'
+                                    }`}>
+                                        <Send size={14} />
+                                    </div>
+                                    <div>
+                                        <span className={`text-[12px] font-black uppercase block ${
+                                            user?.db_user?.telegram_chat_id ? 'text-white' : 'text-black'
+                                        }`}>
+                                            {user?.db_user?.telegram_chat_id ? 'OPEN BOT CHAT' : '⚡ AUTO-LINK VIA TELEGRAM'}
+                                        </span>
+                                        <span className={`text-[10px] ${
+                                            user?.db_user?.telegram_chat_id ? 'text-neutral-400' : 'text-neutral-800 font-bold'
+                                        }`}>
+                                            {user?.db_user?.telegram_chat_id ? '@OffsideOpenTaskBot (Active)' : 'Tap to open bot & auto-connect with 1 click'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <ExternalLink size={14} className={user?.db_user?.telegram_chat_id ? 'text-neutral-400 group-hover:text-white' : 'text-black'} />
+                            </a>
+
+                            {/* Waiting indicator */}
+                            {isWaitingForLink && !user?.db_user?.telegram_chat_id && (
+                                <div className="p-3 bg-[#1A1F26] border-2 border-[#FFE600] flex items-center gap-3 animate-pulse">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#FFE600] animate-ping" />
+                                    <p className="text-[#FFE600] text-[11px] font-mono leading-tight">
+                                        Menunggu konfirmasi bot... Silakan tap <span className="font-bold underline">START</span> di Telegram kamu.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Manual ID Input & Unlink */}
                             <div>
-                                <label className="text-neutral-300 text-[11px] font-bold uppercase mb-1.5 block">
-                                    CHAT ID
-                                </label>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="text-neutral-300 text-[11px] font-bold uppercase">
+                                        CHAT ID (MANUAL EDIT)
+                                    </label>
+                                    {user?.db_user?.telegram_chat_id && (
+                                        <button
+                                            type="button"
+                                            onClick={handleUnlink}
+                                            className="text-red-400 hover:text-red-300 text-[10px] font-bold uppercase underline cursor-pointer"
+                                        >
+                                            UNLINK ACCOUNT
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="relative group">
                                     <input
                                         type="text"
@@ -196,28 +314,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                         <Send size={15} />
                                     </div>
                                 </div>
-                                <p className="text-neutral-400 text-[10px] mt-1.5 uppercase leading-relaxed">
-                                    SEND <code className="text-[#FFE600] font-black">/start</code> TO BOT TO RETRIEVE ID.
-                                </p>
                             </div>
-
-                            <a
-                                href="https://t.me/OffsideOpenTaskBot"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between p-4 bg-[#141619] border-2 border-black rounded-none group hover:bg-[#FFE600] transition-all cursor-pointer shadow-[3px_3px_0px_0px_#000000]"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-none bg-black border border-black flex items-center justify-center text-[#FFE600] group-hover:text-black group-hover:bg-white">
-                                        <Send size={14} />
-                                    </div>
-                                    <div>
-                                        <span className="text-white group-hover:text-black text-[12px] font-black uppercase block">OPEN TELEGRAM BOT</span>
-                                        <span className="text-neutral-400 group-hover:text-black text-[10px]">@OffsideOpenTaskBot</span>
-                                    </div>
-                                </div>
-                                <ExternalLink size={14} className="text-neutral-400 group-hover:text-black transition-colors" />
-                            </a>
                         </div>
                     </section>
 

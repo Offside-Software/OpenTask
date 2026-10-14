@@ -42,14 +42,13 @@ where
 
 pub fn get_pool_options() -> PgPoolOptions {
     PgPoolOptions::new()
-        // Supabase Session Pooler has a global per-project session limit (15
-        // by default). The API runs as a single long-lived container, so a
-        // small pool is enough and stays well under that limit.
-        .max_connections(8)
+        // Supabase Session Pooler has a global per-project session limit (15 by default).
+        // Keep our API pool conservative so it never hits EMAXCONNSESSION.
+        .max_connections(3)
         .min_connections(0)
-        .acquire_timeout(Duration::from_secs(5))
-        .idle_timeout(Duration::from_secs(60))
-        .max_lifetime(Duration::from_secs(10 * 60))
+        .acquire_timeout(Duration::from_secs(10))
+        .idle_timeout(Duration::from_secs(10))
+        .max_lifetime(Duration::from_secs(5 * 60))
 }
 
 pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {

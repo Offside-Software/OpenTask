@@ -30,6 +30,10 @@ export const TelegramLinkPrompt: React.FC<TelegramLinkPromptProps> = ({ onOpenSe
     // Only show if user is logged in, has no telegram_chat_id, and hasn't dismissed before
     if (!user || user.db_user?.telegram_chat_id || dismissed) return null;
 
+    const botLink = user?.db_user?.id
+        ? `https://t.me/OffsideOpenTaskBot?start=link_${user.db_user.id}`
+        : (user?.login ? `https://t.me/OffsideOpenTaskBot?start=link_${user.login}` : 'https://t.me/OffsideOpenTaskBot');
+
     return (
         <div className="fixed bottom-6 right-6 z-[90] animate-in slide-in-from-right-10 fade-in duration-200 max-w-sm w-full select-none font-mono">
             <div className="bg-[#121417] border-3 border-black rounded-none shadow-[6px_6px_0px_0px_#000000] overflow-hidden p-5 relative">
@@ -65,7 +69,7 @@ export const TelegramLinkPrompt: React.FC<TelegramLinkPromptProps> = ({ onOpenSe
                                 LINK NOW <ArrowRight size={14} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
                             </button>
                             <a
-                                href="https://t.me/OffsideOpenTaskBot"
+                                href={botLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-2.5 rounded-none bg-[#1E2227] border-2 border-black text-neutral-300 hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer"
