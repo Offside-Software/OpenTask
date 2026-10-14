@@ -10,8 +10,8 @@ use crate::error::AppError;
 
 static TELEGRAM_CLIENT: LazyLock<Client> = LazyLock::new(|| {
     Client::builder()
-        .pool_idle_timeout(Duration::from_secs(90))
-        .tcp_keepalive(Duration::from_secs(60))
+        .pool_idle_timeout(Duration::from_secs(30))
+        .tcp_keepalive(Duration::from_secs(30))
         .timeout(Duration::from_secs(10))
         .build()
         .unwrap_or_else(|_| Client::new())
@@ -94,12 +94,22 @@ pub async fn send_telegram_message_with_keyboard(
         payload["reply_markup"] = markup.clone();
     }
 
-    let resp = TELEGRAM_CLIENT
-        .post(&url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to send Telegram message: {e}")))?;
+    let mut send_res = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
+
+    // Retry once if there was a stale pooled connection drop
+    if send_res.is_err() {
+        tracing::warn!("[Telegram] First send attempt failed, retrying once...");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        send_res = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
+    }
+
+    let resp = match send_res {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!("[Telegram] Failed to send message to {chat_id}: {e}");
+            return Err(AppError::Internal(format!("Failed to send Telegram message: {e}")));
+        }
+    };
 
     if !resp.status().is_success() {
         let err = resp.text().await.unwrap_or_default();
