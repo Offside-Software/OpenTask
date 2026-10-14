@@ -19,6 +19,26 @@ static TELEGRAM_CLIENT: LazyLock<Client> = LazyLock::new(|| {
 
 static RECENT_COMMANDS: Mutex<Option<HashMap<(String, String), Instant>>> = Mutex::new(None);
 static RECENT_CALLBACKS: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
+static RECENT_SENT_ALERTS: Mutex<Option<HashMap<i64, Instant>>> = Mutex::new(None);
+
+pub fn check_and_record_alert_sent(alert_id: i64) -> bool {
+    let mut guard = match RECENT_SENT_ALERTS.lock() {
+        Ok(g) => g,
+        Err(_) => return false,
+    };
+    let map = guard.get_or_insert_with(HashMap::new);
+
+    let now = Instant::now();
+    map.retain(|_, time| now.duration_since(*time) < Duration::from_secs(300));
+
+    if let Some(prev) = map.get(&alert_id) {
+        if now.duration_since(*prev) < Duration::from_secs(300) {
+            return true; // Already processed recently
+        }
+    }
+    map.insert(alert_id, now);
+    false
+}
 
 pub fn escape_markdown(text: &str) -> String {
     text.replace('_', "\\_")
@@ -1019,6 +1039,7 @@ pub async fn run_telegram_alert_dispatcher(pool: PgPool, config: Config) {
             WHERE (a.telegram_sent IS FALSE OR a.telegram_sent IS NULL)
               AND u.telegram_chat_id IS NOT NULL
               AND u.telegram_chat_id != ''
+              AND a.created_at <= NOW() - INTERVAL '10 seconds'
               AND a.created_at >= NOW() - INTERVAL '2 hours'
             ORDER BY a.created_at ASC
             LIMIT 10;
@@ -1031,6 +1052,22 @@ pub async fn run_telegram_alert_dispatcher(pool: PgPool, config: Config) {
 
         for r in rows {
             let alert_id: i64 = r.try_get("id").unwrap_or(0);
+
+            // In-memory deduplication check
+            if check_and_record_alert_sent(alert_id) {
+                let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE WHERE id = $1;")
+                    .bind(alert_id)
+                    .execute(&pool)
+                    .await;
+                continue;
+            }
+
+            // Immediately mark in DB so concurrent runs or queries don't grab it
+            let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE, updated_at = NOW() WHERE id = $1;")
+                .bind(alert_id)
+                .execute(&pool)
+                .await;
+
             let chat_id: String = r.try_get("telegram_chat_id").unwrap_or_default();
             let alert_title: String = r.try_get("title").unwrap_or_default();
             let alert_desc: String = r.try_get("description").unwrap_or_default();
@@ -1080,11 +1117,9 @@ pub async fn run_telegram_alert_dispatcher(pool: PgPool, config: Config) {
                 Some(reply_markup),
             ).await;
 
-            if send_res.is_ok() {
-                let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE, updated_at = NOW() WHERE id = $1;")
-                    .bind(alert_id)
-                    .execute(&pool)
-                    .await;
+            if let Err(e) = send_res {
+                tracing::warn!("[Telegram Dispatcher] Failed to deliver alert {} to {}: {}", alert_id, chat_id, e);
+            } else {
                 tracing::info!("[Telegram Dispatcher] Successfully delivered alert {} to chat_id={}", alert_id, chat_id);
             }
         }
