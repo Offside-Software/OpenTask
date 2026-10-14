@@ -20,6 +20,9 @@ pub struct DatabaseTask {
     pub weight: Option<i32>,
     pub branch_name: Option<String>,
     pub repo_url: Option<String>,
+    #[serde(default)]
+    #[sqlx(default)]
+    pub attachments: Option<serde_json::Value>,
     pub last_activity_at: Option<DateTime<Utc>>,
     pub order_idx: Option<i32>,
     pub created_at: Option<DateTime<Utc>>,
@@ -66,6 +69,7 @@ pub struct TaskUpdatePayload {
     pub assignee_ids: Option<Vec<SafeId>>,
     pub branch_name: Option<String>,
     pub repo_url: Option<String>,
+    pub attachments: Option<serde_json::Value>,
     pub order_idx: Option<i32>,
 }
 

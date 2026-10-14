@@ -4,38 +4,49 @@ use axum::{
         Path, Query, State,
     },
     response::Response,
-    routing::get,
-    Router,
+    routing::{get, post},
+    Json, Router,
 };
 use futures_util::{SinkExt, StreamExt};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     error::AppError,
-    extractors::auth::resolve_github_user,
+    extractors::auth::{resolve_github_user, CurrentUser},
     models::safe_id::SafeId,
     routes::auth::AppState,
 };
 
 #[derive(Debug, Deserialize)]
 pub struct WebSocketAuth {
-    pub token: String,
+    pub ticket: Option<String>,
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WsTicketResponse {
+    pub ticket: String,
+    pub expires_in: u64,
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route(
-        "/projects/{project_id}/events",
-        get(project_events),
-    )
+    Router::new()
+        .route("/projects/{project_id}/events", get(project_events))
+        .route(
+            "/projects/{project_id}/events/ticket",
+            post(create_project_realtime_ticket),
+        )
+        .route(
+            "/projects/{project_id}/realtime-ticket",
+            post(create_project_realtime_ticket),
+        )
 }
 
-async fn project_events(
+async fn create_project_realtime_ticket(
     State(state): State<AppState>,
+    CurrentUser(github_user, _): CurrentUser,
     Path(project_id): Path<SafeId>,
-    Query(auth): Query<WebSocketAuth>,
-    ws: WebSocketUpgrade,
-) -> Result<Response, AppError> {
-    let github_user = resolve_github_user(&auth.token).await?;
+) -> Result<Json<WsTicketResponse>, AppError> {
     let is_member = crate::db::query_scalar::<_, bool>(
         r#"
         SELECT EXISTS (
@@ -45,7 +56,7 @@ async fn project_events(
             WHERE pm.project_id = $1
               AND (u.gh_id = $2 OR u.gh_username = $3)
         );
-        "#,
+        "#
     )
     .bind(project_id.0)
     .bind(github_user.id.to_string())
@@ -56,6 +67,55 @@ async fn project_events(
     if !is_member {
         return Err(AppError::Forbidden(
             "You are not a member of this project".to_string(),
+        ));
+    }
+
+    let (ticket, expires_in) = state.realtime.create_ticket(project_id.0, Some(github_user.id), 60);
+
+    Ok(Json(WsTicketResponse {
+        ticket,
+        expires_in,
+    }))
+}
+
+async fn project_events(
+    State(state): State<AppState>,
+    Path(project_id): Path<SafeId>,
+    Query(auth): Query<WebSocketAuth>,
+    ws: WebSocketUpgrade,
+) -> Result<Response, AppError> {
+    if let Some(ticket) = auth.ticket.filter(|t| !t.trim().is_empty()) {
+        state
+            .realtime
+            .consume_ticket(ticket.trim(), project_id.0)
+            .map_err(|e| AppError::Unauthorized(format!("Invalid WebSocket ticket: {e}")))?;
+    } else if let Some(token) = auth.token.filter(|t| !t.trim().is_empty()) {
+        let github_user = resolve_github_user(token.trim()).await?;
+        let is_member = crate::db::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM opentask.project_member pm
+                JOIN opentask.users u ON u.id = pm.user_id
+                WHERE pm.project_id = $1
+                  AND (u.gh_id = $2 OR u.gh_username = $3)
+            );
+            "#
+        )
+        .bind(project_id.0)
+        .bind(github_user.id.to_string())
+        .bind(&github_user.login)
+        .fetch_one(&state.pool)
+        .await?;
+
+        if !is_member {
+            return Err(AppError::Forbidden(
+                "You are not a member of this project".to_string(),
+            ));
+        }
+    } else {
+        return Err(AppError::Unauthorized(
+            "Authentication required: provide a one-time 'ticket' or legacy 'token'".to_string(),
         ));
     }
 

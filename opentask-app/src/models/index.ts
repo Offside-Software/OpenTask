@@ -178,6 +178,17 @@ export interface Task {
   isSuggested?: boolean;
   prUrl?: string;
   repo_url?: string;
+  attachments?: TaskAttachment[];
+}
+
+export interface TaskAttachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  path: string;
+  url: string;
+  created_at: string;
 }
 
 export interface TaskAssignee {
