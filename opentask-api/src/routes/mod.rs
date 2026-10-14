@@ -4,6 +4,7 @@ pub mod ai_keys;
 pub mod alerts;
 pub mod auth;
 pub mod buckets;
+pub mod feedback;
 pub mod github;
 pub mod mcp;
 pub mod meetings;
@@ -35,6 +36,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(telegram::router())
         .merge(notifications::router())
         .merge(pr_reviews::router())
+        .merge(feedback::router())
         .merge(mcp::router())
         .nest("/agent", agent::router());
 

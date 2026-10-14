@@ -280,6 +280,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskBucketId, setCreatingTaskBucketId] = useState<string | number | undefined>(undefined);
   const [creatingTaskTitle, setCreatingTaskTitle] = useState('');
+  const [taskToDelete, setTaskToDelete] = useState<string | number | null>(null);
 
   // Open / Close task modal with URL query param synchronization
   const handleOpenTask = (task: Task) => {
@@ -616,8 +617,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
     const otherTasks = tasks.filter(
       t => String(t.bucket_id) !== String(newBucketId) &&
-           (!isCrossBucket || String(t.bucket_id) !== String(sourceBucketId)) &&
-           String(t.id) !== String(taskId)
+        (!isCrossBucket || String(t.bucket_id) !== String(sourceBucketId)) &&
+        String(t.id) !== String(taskId)
     );
     const reorderedBucketTasks = filteredTasks.map((t, idx) => ({ ...t, order_idx: idx, bucket_id: newBucketId }));
     const nextTasks = [...otherTasks, ...reorderedSourceTasks, ...reorderedBucketTasks];
@@ -756,11 +757,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none transition-all duration-75 flex items-center gap-2 cursor-pointer ${
-              activeTab === tab 
-                ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]' 
-                : 'bg-[#141619] text-neutral-400 border border-neutral-800 hover:border-white hover:text-white'
-            }`}
+            className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none transition-all duration-75 flex items-center gap-2 cursor-pointer ${activeTab === tab
+              ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]'
+              : 'bg-[#141619] text-neutral-400 border border-neutral-800 hover:border-white hover:text-white'
+              }`}
           >
             {tab === 'Overview' && <LayoutDashboard size={14} strokeWidth={2.5} />}
             {tab === 'Tasks' && <Briefcase size={14} strokeWidth={2.5} />}
@@ -1002,7 +1002,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                             onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
                             onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
                             onClick={() => handleOpenTask(task)}
-                            onDelete={() => handleDeleteTask(task.id!)}
+                            onDelete={() => setTaskToDelete(task.id!)}
                             onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
                           />
                         );
@@ -1240,8 +1240,25 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         onEdit={(t) => handleOpenTask(t)}
         onToggleComplete={(tId, completed) => handleToggleTaskComplete(tId, completed)}
         onMoveToBucket={handleMoveTaskToBucket}
-        onDelete={(tId) => handleDeleteTask(tId)}
+        onDelete={(tId) => setTaskToDelete(tId)}
       />
+
+      {taskToDelete && (
+        <ConfirmModal
+          title="DELETE TASK"
+          message="Are sure want to permanently delete this task? This record will be permanently purged from data base."
+          confirmLabel="DELETE TASK"
+          cancelLabel="CANCEL"
+          variant="danger"
+          onConfirm={() => {
+            if (taskToDelete) {
+              handleDeleteTask(taskToDelete);
+              setTaskToDelete(null);
+            }
+          }}
+          onCancel={() => setTaskToDelete(null)}
+        />
+      )}
     </div>
   );
 };

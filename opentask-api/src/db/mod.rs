@@ -164,6 +164,25 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
             created_at TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE(installation_id, project_id)
         );
+
+        CREATE TABLE IF NOT EXISTS opentask.feedbacks (
+            id BIGINT PRIMARY KEY,
+            user_id BIGINT,
+            user_name TEXT,
+            user_email TEXT,
+            feedback_type TEXT NOT NULL DEFAULT 'FEEDBACK',
+            category TEXT DEFAULT 'GENERAL',
+            rating INT,
+            title TEXT,
+            description TEXT NOT NULL,
+            device_info JSONB DEFAULT '{}'::jsonb,
+            status TEXT NOT NULL DEFAULT 'PENDING',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_feedbacks_created_at ON opentask.feedbacks(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_feedbacks_user_id ON opentask.feedbacks(user_id);
+        CREATE INDEX IF NOT EXISTS idx_feedbacks_status ON opentask.feedbacks(status);
         "#,
     )
     .execute(pool)
