@@ -12,34 +12,48 @@ use crate::config::Config;
 use crate::error::AppError;
 use crate::services::id_generator::next_id;
 
-static CHAT_ID_CACHE: LazyLock<RwLock<HashMap<i64, (Instant, Option<String>)>>> =
+static CHAT_ID_CACHE: LazyLock<RwLock<HashMap<i64, (Instant, String)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub async fn get_user_telegram_chat_id(pool: &PgPool, user_id: i64) -> Option<String> {
-    {
-        if let Ok(cache) = CHAT_ID_CACHE.read() {
-            if let Some((cached_at, chat_id)) = cache.get(&user_id) {
-                if cached_at.elapsed() < Duration::from_secs(300) {
-                    return chat_id.clone();
-                }
+    // 1. Check in-memory cache (TTL: 5 minutes, ONLY for valid Some values)
+    if let Ok(cache) = CHAT_ID_CACHE.read() {
+        if let Some((cached_at, chat_id)) = cache.get(&user_id) {
+            if cached_at.elapsed() < Duration::from_secs(300) {
+                return Some(chat_id.clone());
             }
         }
     }
 
-    let row = crate::db::query("SELECT telegram_chat_id FROM opentask.users WHERE id = $1 LIMIT 1;")
+    // 2. Query database
+    let query_result = crate::db::query("SELECT telegram_chat_id FROM opentask.users WHERE id = $1 LIMIT 1;")
         .bind(user_id)
         .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten();
+        .await;
 
-    let chat_id = row.and_then(|r| r.try_get::<Option<String>, _>("telegram_chat_id").ok().flatten());
-
-    if let Ok(mut cache) = CHAT_ID_CACHE.write() {
-        cache.insert(user_id, (Instant::now(), chat_id.clone()));
+    match query_result {
+        Ok(Some(row)) => {
+            if let Ok(Some(cid)) = row.try_get::<Option<String>, _>("telegram_chat_id") {
+                let trimmed = cid.trim().to_string();
+                if !trimmed.is_empty() {
+                    if let Ok(mut cache) = CHAT_ID_CACHE.write() {
+                        cache.insert(user_id, (Instant::now(), trimmed.clone()));
+                    }
+                    return Some(trimmed);
+                }
+            }
+            tracing::warn!("[TELEGRAM_ALERT] user_id={} found in DB but telegram_chat_id is empty/null", user_id);
+            None
+        }
+        Ok(None) => {
+            tracing::warn!("[TELEGRAM_ALERT] user_id={} not found in opentask.users", user_id);
+            None
+        }
+        Err(e) => {
+            tracing::error!("[TELEGRAM_ALERT] Failed to query telegram_chat_id for user_id={}: {e}", user_id);
+            None
+        }
     }
-
-    chat_id
 }
 
 pub fn decode_base64_url(s: &str) -> Result<Vec<u8>, AppError> {
@@ -235,12 +249,15 @@ pub async fn send_telegram_alert(
         });
 
         tracing::info!("[TELEGRAM_ALERT] Fast dispatch to chat_id={}: {}", chat_id, title);
-        let _ = crate::services::telegram::send_telegram_message_with_keyboard(
+        let res = crate::services::telegram::send_telegram_message_with_keyboard(
             bot_token,
             &chat_id,
             &text,
             Some(reply_markup),
         ).await;
+        if let Err(e) = res {
+            tracing::error!("[TELEGRAM_ALERT] Delivery failed to chat_id={}: {e}", chat_id);
+        }
     }
 }
 
@@ -276,32 +293,30 @@ pub async fn notify_task_assigned(
     };
     let tag = format!("task-assigned-{}", task_id.unwrap_or(project_id));
 
-    let db_fut = async {
-        let _ = crate::db::query(
-            r#"
-            INSERT INTO opentask.alerts (
-                id, user_id, context_id, project_id, title, description,
-                type, severity, suggested_actions, is_resolved, created_at, updated_at
-            ) VALUES (
-                $1, $2, $3, $4, $5, $6,
-                'TASK_ASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
-            );
-            "#
-        )
-        .bind(alert_id)
-        .bind(assignee_id)
-        .bind(context_id)
-        .bind(project_id)
-        .bind(&alert_title)
-        .bind(&alert_body)
-        .execute(pool)
-        .await;
-    };
+    let _ = crate::db::query(
+        r#"
+        INSERT INTO opentask.alerts (
+            id, user_id, context_id, project_id, title, description,
+            type, severity, suggested_actions, is_resolved, created_at, updated_at
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            'TASK_ASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
+        );
+        "#
+    )
+    .bind(alert_id)
+    .bind(assignee_id)
+    .bind(context_id)
+    .bind(project_id)
+    .bind(&alert_title)
+    .bind(&alert_body)
+    .execute(pool)
+    .await;
 
     let push_fut = send_push_notification(pool, config, assignee_id, title, &body, &url, &tag);
     let tg_fut = send_telegram_alert(pool, config, assignee_id, title, &body, &url, task_id, true);
 
-    let _ = tokio::join!(db_fut, push_fut, tg_fut);
+    let _ = tokio::join!(push_fut, tg_fut);
 }
 
 pub async fn notify_task_unassigned(
@@ -336,31 +351,29 @@ pub async fn notify_task_unassigned(
     };
     let tag = format!("task-unassigned-{}", task_id.unwrap_or(project_id));
 
-    let db_fut = async {
-        let _ = crate::db::query(
-            r#"
-            INSERT INTO opentask.alerts (
-                id, user_id, context_id, project_id, title, description,
-                type, severity, suggested_actions, is_resolved, created_at, updated_at
-            ) VALUES (
-                $1, $2, $3, $4, $5, $6,
-                'TASK_UNASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
-            );
-            "#
-        )
-        .bind(alert_id)
-        .bind(unassigned_user_id)
-        .bind(context_id)
-        .bind(project_id)
-        .bind(&alert_title)
-        .bind(&alert_body)
-        .execute(pool)
-        .await;
-    };
+    let _ = crate::db::query(
+        r#"
+        INSERT INTO opentask.alerts (
+            id, user_id, context_id, project_id, title, description,
+            type, severity, suggested_actions, is_resolved, created_at, updated_at
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            'TASK_UNASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
+        );
+        "#
+    )
+    .bind(alert_id)
+    .bind(unassigned_user_id)
+    .bind(context_id)
+    .bind(project_id)
+    .bind(&alert_title)
+    .bind(&alert_body)
+    .execute(pool)
+    .await;
 
     let push_fut = send_push_notification(pool, config, unassigned_user_id, title, &body, &url, &tag);
     let tg_fut = send_telegram_alert(pool, config, unassigned_user_id, title, &body, &url, task_id, false);
-    let _ = tokio::join!(db_fut, push_fut, tg_fut);
+    let _ = tokio::join!(push_fut, tg_fut);
 }
 
 pub async fn notify_task_completed(
