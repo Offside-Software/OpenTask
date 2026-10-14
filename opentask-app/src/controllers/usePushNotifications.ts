@@ -10,20 +10,39 @@ export const usePushNotifications = () => {
   const [isSupported, setIsSupported] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [loading, setLoading] = useState(false);
+  const isDesktop = pushNotificationService.isDesktop();
+
+  const refreshPermission = useCallback(async () => {
+    try {
+      const state = await pushNotificationService.getPermissionState();
+      setPermission(state);
+      return state;
+    } catch {
+      setPermission("denied");
+      return "denied";
+    }
+  }, []);
 
   useEffect(() => {
     const supported = pushNotificationService.isSupported();
     setIsSupported(supported);
     if (supported) {
-      setPermission(pushNotificationService.getPermissionState());
-      // Register service worker in background
-      void pushNotificationService.registerServiceWorker();
+      void refreshPermission();
+      if (!isDesktop) {
+        // Register service worker in background for web push
+        void pushNotificationService.registerServiceWorker();
+      }
     }
-  }, []);
+  }, [refreshPermission, isDesktop]);
 
   const subscribe = useCallback(async () => {
     if (!isSupported) {
-      showToast("Web Push is not supported on this device/browser", "error");
+      showToast(
+        isDesktop
+          ? "Desktop notifications are not supported on this platform"
+          : "Web Push is not supported on this device/browser",
+        "error"
+      );
       return false;
     }
 
@@ -32,20 +51,49 @@ export const usePushNotifications = () => {
       const dbUserId = user?.db_user?.id;
       const success = await pushNotificationService.subscribe(dbUserId);
       if (success) {
-        setPermission(pushNotificationService.getPermissionState());
-        showToast("Web Push Notifications enabled successfully", "success");
+        await refreshPermission();
+        showToast(
+          isDesktop
+            ? "Desktop notifications enabled successfully"
+            : "Web Push notifications enabled successfully",
+          "success"
+        );
         return true;
       }
       return false;
     } catch (err: any) {
       console.error("Push subscribe error:", err);
-      setPermission(pushNotificationService.getPermissionState());
-      showToast(err.message || "Failed to enable push notifications", "error");
+      await refreshPermission();
+      showToast(err.message || "Failed to enable notifications", "error");
       return false;
     } finally {
       setLoading(false);
     }
-  }, [isSupported, user, showToast]);
+  }, [isSupported, isDesktop, user, refreshPermission, showToast]);
+
+  const unsubscribe = useCallback(async () => {
+    setLoading(true);
+    try {
+      const success = await pushNotificationService.unsubscribe();
+      if (success) {
+        await refreshPermission();
+        showToast(
+          isDesktop
+            ? "Desktop notifications deactivated"
+            : "Web Push notifications deactivated",
+          "info"
+        );
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      console.error("Push unsubscribe error:", err);
+      showToast(err.message || "Failed to deactivate notifications", "error");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [isDesktop, refreshPermission, showToast]);
 
   const sendTestAlert = useCallback(async () => {
     setLoading(true);
@@ -69,9 +117,12 @@ export const usePushNotifications = () => {
 
   return {
     isSupported,
+    isDesktop,
     permission,
     loading,
     subscribe,
+    unsubscribe,
+    refreshPermission,
     sendTestAlert,
   };
 };

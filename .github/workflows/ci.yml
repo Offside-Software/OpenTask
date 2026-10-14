@@ -23,6 +23,7 @@ env:
 
 jobs:
   build-and-push:
+    name: Build & Push API Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,6 +64,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy-to-dewacloud:
+    name: Deploy API to DewaCloud Docker CE
     needs: build-and-push
     runs-on: ubuntu-latest
 
@@ -85,6 +87,7 @@ jobs:
 
   deploy-to-vercel:
     # Deploy the web app (and API rewrites) only after the Rust API is live.
+    name: Deploy Web to Vercel (event)
     needs: deploy-to-dewacloud
     runs-on: ubuntu-latest
 

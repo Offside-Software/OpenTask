@@ -248,7 +248,7 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                 // SERVER-SENT EVENTS (SSE) ENDPOINT
               </div>
               <div className="flex items-center justify-between gap-2">
-                <code className="font-mono text-[11px] text-[#00E5FF] truncate select-all">{mcpSseUrl}</code>
+                <code className="font-mono text-[11px] text-cyan-700 dark:text-[#00E5FF] truncate select-all">{mcpSseUrl}</code>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(mcpSseUrl, 'SSE URL')}
@@ -263,7 +263,7 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 
           {/* IDE Selection Tabs */}
           <div>
-            <div className="flex items-center gap-1 border-b-2 border-black overflow-x-auto pb-1">
+            <div className="flex items-center gap-1 border-b-2 border-black overflow-x-auto pb-3">
               {[
                 { id: 'antigravity', label: 'ANTIGRAVITY' },
                 { id: 'cursor', label: 'CURSOR' },
@@ -276,11 +276,10 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id as IdeTab)}
-                  className={`px-3.5 py-1.5 font-mono text-[11px] font-black uppercase tracking-wider border-2 border-black transition-all cursor-pointer ${
-                    activeTab === tab.id
-                      ? 'bg-[#FFE600] text-black shadow-[2px_2px_0px_0px_#000000] -translate-y-0.5'
-                      : 'bg-[#141619] text-neutral-400 hover:text-white hover:bg-neutral-800'
-                  }`}
+                  className={`px-3.5 py-1.5 font-mono text-[11px] font-black uppercase tracking-wider border-2 border-black transition-all cursor-pointer ${activeTab === tab.id
+                    ? 'bg-[#FFE600] text-black shadow-[2px_2px_0px_0px_#000000] py-1'
+                    : 'bg-[#141619] text-neutral-400 hover:text-white hover:bg-neutral-800'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -304,10 +303,10 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                   onClick={() => {
                     const text =
                       activeTab === 'antigravity' ? antigravityConfig :
-                      activeTab === 'cursor' ? cursorConfig :
-                      activeTab === 'vscode' ? vscodeClineConfig :
-                      activeTab === 'claude' ? claudeDesktopConfig :
-                      activeTab === 'zed' ? zedConfig : curlExample;
+                        activeTab === 'cursor' ? cursorConfig :
+                          activeTab === 'vscode' ? vscodeClineConfig :
+                            activeTab === 'claude' ? claudeDesktopConfig :
+                              activeTab === 'zed' ? zedConfig : curlExample;
                     copyToClipboard(text, activeTab.toUpperCase());
                   }}
                   className="px-3 py-1 bg-[#FFE600] text-black font-mono text-[10px] font-black uppercase border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
@@ -326,7 +325,7 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                 </button>
               </div>
 
-              <pre className="font-mono text-[12px] text-neutral-200 overflow-x-auto p-3 bg-black border border-neutral-800 leading-relaxed">
+              <pre className="font-mono text-[12px] text-neutral-200 overflow-x-auto p-3 bg-[#F0F0EB] dark:bg-black border border-neutral-800 leading-relaxed">
                 {activeTab === 'antigravity' && antigravityConfig}
                 {activeTab === 'cursor' && cursorConfig}
                 {activeTab === 'vscode' && vscodeClineConfig}
