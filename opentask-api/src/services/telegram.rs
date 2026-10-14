@@ -2,11 +2,20 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 use std::collections::{HashSet, HashMap};
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::error::AppError;
+
+static TELEGRAM_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    Client::builder()
+        .pool_idle_timeout(Duration::from_secs(90))
+        .tcp_keepalive(Duration::from_secs(60))
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap_or_else(|_| Client::new())
+});
 
 static RECENT_COMMANDS: Mutex<Option<HashMap<(String, String), Instant>>> = Mutex::new(None);
 static RECENT_CALLBACKS: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
@@ -73,7 +82,6 @@ pub async fn send_telegram_message_with_keyboard(
     text: &str,
     reply_markup: Option<Value>,
 ) -> Result<(), AppError> {
-    let client = Client::new();
     let url = format!("https://api.telegram.org/bot{bot_token}/sendMessage");
 
     let mut payload = json!({
@@ -86,7 +94,7 @@ pub async fn send_telegram_message_with_keyboard(
         payload["reply_markup"] = markup.clone();
     }
 
-    let resp = client
+    let resp = TELEGRAM_CLIENT
         .post(&url)
         .json(&payload)
         .send()
@@ -103,7 +111,7 @@ pub async fn send_telegram_message_with_keyboard(
         if let Some(markup) = reply_markup {
             fallback_payload["reply_markup"] = markup;
         }
-        let _ = client.post(&url).json(&fallback_payload).send().await;
+        let _ = TELEGRAM_CLIENT.post(&url).json(&fallback_payload).send().await;
     }
 
     Ok(())
@@ -114,14 +122,13 @@ pub async fn answer_callback_query(
     callback_query_id: &str,
     text: &str,
 ) {
-    let client = Client::new();
     let url = format!("https://api.telegram.org/bot{bot_token}/answerCallbackQuery");
     let payload = json!({
         "callback_query_id": callback_query_id,
         "text": text,
         "show_alert": false
     });
-    let _ = client.post(&url).json(&payload).send().await;
+    let _ = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
 }
 
 pub async fn edit_telegram_message_text(
@@ -131,7 +138,6 @@ pub async fn edit_telegram_message_text(
     new_text: &str,
     reply_markup: Option<Value>,
 ) {
-    let client = Client::new();
     let url = format!("https://api.telegram.org/bot{bot_token}/editMessageText");
     let mut payload = json!({
         "chat_id": chat_id,
@@ -142,7 +148,7 @@ pub async fn edit_telegram_message_text(
     if let Some(markup) = reply_markup {
         payload["reply_markup"] = markup;
     }
-    let _ = client.post(&url).json(&payload).send().await;
+    let _ = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
 }
 
 pub async fn handle_telegram_callback_query(

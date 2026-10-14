@@ -1,4 +1,6 @@
-﻿use std::time::Duration;
+﻿use std::collections::HashMap;
+use std::sync::{LazyLock, RwLock};
+use std::time::{Duration, Instant};
 use base64ct::{Base64UrlUnpadded, Encoding as _};
 use sqlx::{PgPool, Row};
 use serde_json::json;
@@ -9,6 +11,36 @@ use web_push_native::{
 use crate::config::Config;
 use crate::error::AppError;
 use crate::services::id_generator::next_id;
+
+static CHAT_ID_CACHE: LazyLock<RwLock<HashMap<i64, (Instant, Option<String>)>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub async fn get_user_telegram_chat_id(pool: &PgPool, user_id: i64) -> Option<String> {
+    {
+        if let Ok(cache) = CHAT_ID_CACHE.read() {
+            if let Some((cached_at, chat_id)) = cache.get(&user_id) {
+                if cached_at.elapsed() < Duration::from_secs(300) {
+                    return chat_id.clone();
+                }
+            }
+        }
+    }
+
+    let row = crate::db::query("SELECT telegram_chat_id FROM opentask.users WHERE id = $1 LIMIT 1;")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten();
+
+    let chat_id = row.and_then(|r| r.try_get::<Option<String>, _>("telegram_chat_id").ok().flatten());
+
+    if let Ok(mut cache) = CHAT_ID_CACHE.write() {
+        cache.insert(user_id, (Instant::now(), chat_id.clone()));
+    }
+
+    chat_id
+}
 
 pub fn decode_base64_url(s: &str) -> Result<Vec<u8>, AppError> {
     let trimmed = s.trim().trim_matches('"').trim_matches('\'').trim_end_matches('=');
@@ -163,67 +195,52 @@ pub async fn send_telegram_alert(
     allow_actions: bool,
 ) {
     if let Some(bot_token) = &config.telegram_bot_token {
-        let row = crate::db::query("SELECT telegram_chat_id FROM opentask.users WHERE id = $1 LIMIT 1;")
-            .bind(user_id)
-            .fetch_optional(pool)
-            .await;
-
-        match row {
-            Ok(Some(r)) => {
-                if let Ok(Some(chat_id)) = r.try_get::<Option<String>, _>("telegram_chat_id") {
-                    if !chat_id.trim().is_empty() {
-                        let base_url = if !config.frontend_url.trim().is_empty() && !config.frontend_url.contains("localhost") {
-                            config.frontend_url.trim_end_matches('/')
-                        } else {
-                            "https://open-task-five.vercel.app"
-                        };
-                        let full_url = if path_url.starts_with("http") {
-                            path_url.to_string()
-                        } else {
-                            format!("{}{}", base_url, path_url)
-                        };
-                        let text = format!("🔔 *{}*\n\n{}", title, body);
-
-                        let mut keyboard_rows = vec![
-                            vec![
-                                json!({ "text": "🔗 Buka di OpenTask", "url": full_url })
-                            ]
-                        ];
-
-                        if allow_actions {
-                            if let Some(tid) = task_id {
-                                keyboard_rows.push(vec![
-                                    json!({ "text": "▶️ Kerjakan (Ongoing)", "callback_data": format!("act_ongoing_{}", tid) }),
-                                    json!({ "text": "✅ Selesai (Done)", "callback_data": format!("act_done_{}", tid) }),
-                                ]);
-                            }
-                        }
-
-                        let reply_markup = json!({
-                            "inline_keyboard": keyboard_rows
-                        });
-
-                        tracing::info!("[TELEGRAM_ALERT] Sending to chat_id={}: {}", chat_id, title);
-                        let _ = crate::services::telegram::send_telegram_message_with_keyboard(
-                            bot_token,
-                            &chat_id,
-                            &text,
-                            Some(reply_markup),
-                        ).await;
-                    } else {
-                        tracing::warn!("[TELEGRAM_ALERT] user_id={} has empty telegram_chat_id", user_id);
-                    }
-                } else {
-                    tracing::warn!("[TELEGRAM_ALERT] user_id={} has null telegram_chat_id", user_id);
-                }
+        let chat_id = match get_user_telegram_chat_id(pool, user_id).await {
+            Some(cid) if !cid.trim().is_empty() => cid,
+            _ => {
+                tracing::debug!("[TELEGRAM_ALERT] user_id={} has no linked telegram_chat_id", user_id);
+                return;
             }
-            Ok(None) => {
-                tracing::warn!("[TELEGRAM_ALERT] user_id={} not found in database", user_id);
-            }
-            Err(e) => {
-                tracing::error!("[TELEGRAM_ALERT] Query failed for user_id={}: {e}", user_id);
+        };
+
+        let base_url = if !config.frontend_url.trim().is_empty() && !config.frontend_url.contains("localhost") {
+            config.frontend_url.trim_end_matches('/')
+        } else {
+            "https://open-task-five.vercel.app"
+        };
+        let full_url = if path_url.starts_with("http") {
+            path_url.to_string()
+        } else {
+            format!("{}{}", base_url, path_url)
+        };
+        let text = format!("🔔 *{}*\n\n{}", title, body);
+
+        let mut keyboard_rows = vec![
+            vec![
+                json!({ "text": "🔗 Buka di OpenTask", "url": full_url })
+            ]
+        ];
+
+        if allow_actions {
+            if let Some(tid) = task_id {
+                keyboard_rows.push(vec![
+                    json!({ "text": "▶️ Kerjakan (Ongoing)", "callback_data": format!("act_ongoing_{}", tid) }),
+                    json!({ "text": "✅ Selesai (Done)", "callback_data": format!("act_done_{}", tid) }),
+                ]);
             }
         }
+
+        let reply_markup = json!({
+            "inline_keyboard": keyboard_rows
+        });
+
+        tracing::info!("[TELEGRAM_ALERT] Fast dispatch to chat_id={}: {}", chat_id, title);
+        let _ = crate::services::telegram::send_telegram_message_with_keyboard(
+            bot_token,
+            &chat_id,
+            &text,
+            Some(reply_markup),
+        ).await;
     }
 }
 
@@ -251,26 +268,6 @@ pub async fn notify_task_assigned(
     let alert_id = next_id();
     let context_id = task_id.unwrap_or(project_id);
 
-    let _ = crate::db::query(
-        r#"
-        INSERT INTO opentask.alerts (
-            id, user_id, context_id, project_id, title, description,
-            type, severity, suggested_actions, is_resolved, created_at, updated_at
-        ) VALUES (
-            $1, $2, $3, $4, $5, $6,
-            'TASK_ASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
-        );
-        "#
-    )
-    .bind(alert_id)
-    .bind(assignee_id)
-    .bind(context_id)
-    .bind(project_id)
-    .bind(&alert_title)
-    .bind(&alert_body)
-    .execute(pool)
-    .await;
-
     let title = "Task Assigned";
     let body = format!("You were assigned to \"{}\"{}{}.", task_title, by_text, proj_text);
     let url = match task_id {
@@ -279,9 +276,32 @@ pub async fn notify_task_assigned(
     };
     let tag = format!("task-assigned-{}", task_id.unwrap_or(project_id));
 
+    let db_fut = async {
+        let _ = crate::db::query(
+            r#"
+            INSERT INTO opentask.alerts (
+                id, user_id, context_id, project_id, title, description,
+                type, severity, suggested_actions, is_resolved, created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                'TASK_ASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
+            );
+            "#
+        )
+        .bind(alert_id)
+        .bind(assignee_id)
+        .bind(context_id)
+        .bind(project_id)
+        .bind(&alert_title)
+        .bind(&alert_body)
+        .execute(pool)
+        .await;
+    };
+
     let push_fut = send_push_notification(pool, config, assignee_id, title, &body, &url, &tag);
     let tg_fut = send_telegram_alert(pool, config, assignee_id, title, &body, &url, task_id, true);
-    let _ = tokio::join!(push_fut, tg_fut);
+
+    let _ = tokio::join!(db_fut, push_fut, tg_fut);
 }
 
 pub async fn notify_task_unassigned(
@@ -308,26 +328,6 @@ pub async fn notify_task_unassigned(
     let alert_id = next_id();
     let context_id = task_id.unwrap_or(project_id);
 
-    let _ = crate::db::query(
-        r#"
-        INSERT INTO opentask.alerts (
-            id, user_id, context_id, project_id, title, description,
-            type, severity, suggested_actions, is_resolved, created_at, updated_at
-        ) VALUES (
-            $1, $2, $3, $4, $5, $6,
-            'TASK_UNASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
-        );
-        "#
-    )
-    .bind(alert_id)
-    .bind(unassigned_user_id)
-    .bind(context_id)
-    .bind(project_id)
-    .bind(&alert_title)
-    .bind(&alert_body)
-    .execute(pool)
-    .await;
-
     let title = "Task Unassigned";
     let body = format!("You were unassigned from \"{}\"{}{}.", task_title, by_text, proj_text);
     let url = match task_id {
@@ -336,9 +336,31 @@ pub async fn notify_task_unassigned(
     };
     let tag = format!("task-unassigned-{}", task_id.unwrap_or(project_id));
 
+    let db_fut = async {
+        let _ = crate::db::query(
+            r#"
+            INSERT INTO opentask.alerts (
+                id, user_id, context_id, project_id, title, description,
+                type, severity, suggested_actions, is_resolved, created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                'TASK_UNASSIGNED', 'info', ARRAY['View Task', 'Go to Project'], FALSE, NOW(), NOW()
+            );
+            "#
+        )
+        .bind(alert_id)
+        .bind(unassigned_user_id)
+        .bind(context_id)
+        .bind(project_id)
+        .bind(&alert_title)
+        .bind(&alert_body)
+        .execute(pool)
+        .await;
+    };
+
     let push_fut = send_push_notification(pool, config, unassigned_user_id, title, &body, &url, &tag);
     let tg_fut = send_telegram_alert(pool, config, unassigned_user_id, title, &body, &url, task_id, false);
-    let _ = tokio::join!(push_fut, tg_fut);
+    let _ = tokio::join!(db_fut, push_fut, tg_fut);
 }
 
 pub async fn notify_task_completed(
@@ -376,7 +398,7 @@ pub async fn notify_task_completed(
 
     for uid in targets {
         let alert_id = next_id();
-        let _ = crate::db::query(
+        let db_fut = crate::db::query(
             r#"
             INSERT INTO opentask.alerts (
                 id, user_id, context_id, project_id, title, description,
@@ -393,11 +415,11 @@ pub async fn notify_task_completed(
         .bind(project_id)
         .bind(&alert_title)
         .bind(&body)
-        .execute(pool)
-        .await;
+        .execute(pool);
 
-        let _ = send_push_notification(pool, config, uid, "Task Completed", &body, &url, &tag).await;
-        send_telegram_alert(pool, config, uid, "Task Completed", &body, &url, task_id, false).await;
+        let push_fut = send_push_notification(pool, config, uid, "Task Completed", &body, &url, &tag);
+        let tg_fut = send_telegram_alert(pool, config, uid, "Task Completed", &body, &url, task_id, false);
+        let _ = tokio::join!(db_fut, push_fut, tg_fut);
     }
 }
 
@@ -436,7 +458,7 @@ pub async fn notify_task_reopened(
 
     for uid in targets {
         let alert_id = next_id();
-        let _ = crate::db::query(
+        let db_fut = crate::db::query(
             r#"
             INSERT INTO opentask.alerts (
                 id, user_id, context_id, project_id, title, description,
@@ -453,11 +475,11 @@ pub async fn notify_task_reopened(
         .bind(project_id)
         .bind(&alert_title)
         .bind(&body)
-        .execute(pool)
-        .await;
+        .execute(pool);
 
-        let _ = send_push_notification(pool, config, uid, "Task Reopened", &body, &url, &tag).await;
-        send_telegram_alert(pool, config, uid, "Task Reopened", &body, &url, task_id, true).await;
+        let push_fut = send_push_notification(pool, config, uid, "Task Reopened", &body, &url, &tag);
+        let tg_fut = send_telegram_alert(pool, config, uid, "Task Reopened", &body, &url, task_id, true);
+        let _ = tokio::join!(db_fut, push_fut, tg_fut);
     }
 }
 
@@ -495,7 +517,7 @@ pub async fn notify_pr_reviewed(
 
     for uid in targets {
         let alert_id = next_id();
-        let _ = crate::db::query(
+        let db_fut = crate::db::query(
             r#"
             INSERT INTO opentask.alerts (
                 id, user_id, context_id, project_id, title, description,
@@ -514,10 +536,10 @@ pub async fn notify_pr_reviewed(
         .bind(&body)
         .bind(if is_pass { "info" } else { "warning" })
         .bind(pr_url)
-        .execute(pool)
-        .await;
+        .execute(pool);
 
-        let _ = send_push_notification(pool, config, uid, &alert_title, &body, &direct_url, &tag).await;
-        send_telegram_alert(pool, config, uid, &alert_title, &body, &direct_url, task_id, false).await;
+        let push_fut = send_push_notification(pool, config, uid, &alert_title, &body, &direct_url, &tag);
+        let tg_fut = send_telegram_alert(pool, config, uid, &alert_title, &body, &direct_url, task_id, false);
+        let _ = tokio::join!(db_fut, push_fut, tg_fut);
     }
 }
