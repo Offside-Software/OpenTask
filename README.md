@@ -14,6 +14,7 @@ Built with a high-performance **Rust (Axum + Tokio)** backend and a reactive **R
 - **Meeting Intelligence**: Upload audio/transcripts or invite meeting bots to automatically generate Minutes of Meeting (MoM) and extract actionable tasks.
 - **Stagnation Radar**: Automated background worker monitoring stale tasks and triggering alert notifications.
 - **Multi-Channel Alerts**: Browser Web Push notifications (VAPID) and Telegram bot integration.
+- **Model Context Protocol (MCP)**: Built-in JSON-RPC & SSE endpoints for AI coding assistants (Google Antigravity, Cursor, Claude Desktop, Cline, Zed) to read specs, manage tasks, and synchronize boards autonomously. See [`MCP_TOOLS.md`](file:///MCP_TOOLS.md).
 - **Safe 64-bit Snowflake IDs**: Twitter-style 64-bit BigInt primary keys with frontend precision-loss protection (`SafeId` serialization).
 
 ---
@@ -113,6 +114,22 @@ OpenTask uses a decoupled production deployment:
 ### 1. Backend Deployment (DewaCloud + GHCR)
 
 The Rust API is continuously built and deployed via GitHub Actions ([`.github/workflows/ci.yml`](file:///.github/workflows/ci.yml)).
+
+#### Initial VPS Host Setup (Prerequisites):
+Before CI/CD deployment runs (or if the folder was accidentally deleted), you must initialize the application directory and environment file on the DewaCloud / VPS host:
+
+1. **Create the OpenTask directory**:
+   ```bash
+   mkdir -p ~/OpenTask
+   ```
+2. **Create and populate `.env`**:
+   ```bash
+   nano ~/OpenTask/.env
+   ```
+   > [!IMPORTANT]
+   > The deployment step in GitHub Actions mounts this file directly using `--env-file ~/OpenTask/.env`. If `/root/OpenTask/.env` does not exist on the server, `docker run` will fail with `open /root/OpenTask/.env: no such file or directory`.
+
+   Refer to [`.env.example`](file:///.env.example) for all required keys (`POSTGRESQL_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_KEY`, `GH_APP_*`, `GEMINI_API_KEY`, `SECRET_KEY`, etc.).
 
 #### CI/CD Pipeline Steps:
 1. Triggers on push to `master` branch when files in `opentask-api/**` or `.github/workflows/ci.yml` change.
