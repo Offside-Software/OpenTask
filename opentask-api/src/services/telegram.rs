@@ -1,10 +1,72 @@
 use reqwest::Client;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
-use std::time::Duration;
+use std::collections::{HashSet, HashMap};
+use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::error::AppError;
+
+static TELEGRAM_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    Client::builder()
+        .pool_idle_timeout(Duration::from_secs(30))
+        .tcp_keepalive(Duration::from_secs(30))
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap_or_else(|_| Client::new())
+});
+
+static RECENT_COMMANDS: Mutex<Option<HashMap<(String, String), Instant>>> = Mutex::new(None);
+static RECENT_CALLBACKS: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
+
+pub fn escape_markdown(text: &str) -> String {
+    text.replace('_', "\\_")
+        .replace('*', "\\*")
+        .replace('`', "\\`")
+        .replace('[', "\\[")
+}
+
+fn check_and_record_command_cooldown(chat_id: &str, text: &str, cooldown_secs: u64) -> bool {
+    let mut guard = match RECENT_COMMANDS.lock() {
+        Ok(g) => g,
+        Err(_) => return false,
+    };
+    let map = guard.get_or_insert_with(HashMap::new);
+
+    let now = Instant::now();
+    // Prune entries older than 30s
+    map.retain(|_, time| now.duration_since(*time) < Duration::from_secs(30));
+
+    let key = (chat_id.to_string(), text.to_string());
+    if let Some(prev) = map.get(&key) {
+        if now.duration_since(*prev) < Duration::from_secs(cooldown_secs) {
+            return true; // Already processed recently (duplicate / double-click)
+        }
+    }
+    map.insert(key, now);
+    false
+}
+
+fn check_and_record_callback_cooldown(callback_id_or_key: &str, cooldown_secs: u64) -> bool {
+    let mut guard = match RECENT_CALLBACKS.lock() {
+        Ok(g) => g,
+        Err(_) => return false,
+    };
+    let map = guard.get_or_insert_with(HashMap::new);
+
+    let now = Instant::now();
+    map.retain(|_, time| now.duration_since(*time) < Duration::from_secs(30));
+
+    let key = callback_id_or_key.to_string();
+    if let Some(prev) = map.get(&key) {
+        if now.duration_since(*prev) < Duration::from_secs(cooldown_secs) {
+            return true;
+        }
+    }
+    map.insert(key, now);
+    false
+}
 
 pub async fn send_telegram_message(
     bot_token: &str,
@@ -20,7 +82,6 @@ pub async fn send_telegram_message_with_keyboard(
     text: &str,
     reply_markup: Option<Value>,
 ) -> Result<(), AppError> {
-    let client = Client::new();
     let url = format!("https://api.telegram.org/bot{bot_token}/sendMessage");
 
     let mut payload = json!({
@@ -33,12 +94,22 @@ pub async fn send_telegram_message_with_keyboard(
         payload["reply_markup"] = markup.clone();
     }
 
-    let resp = client
-        .post(&url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to send Telegram message: {e}")))?;
+    let mut send_res = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
+
+    // Retry once if there was a stale pooled connection drop
+    if send_res.is_err() {
+        tracing::warn!("[Telegram] First send attempt failed, retrying once...");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        send_res = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
+    }
+
+    let resp = match send_res {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!("[Telegram] Failed to send message to {chat_id}: {e}");
+            return Err(AppError::Internal(format!("Failed to send Telegram message: {e}")));
+        }
+    };
 
     if !resp.status().is_success() {
         let err = resp.text().await.unwrap_or_default();
@@ -50,7 +121,7 @@ pub async fn send_telegram_message_with_keyboard(
         if let Some(markup) = reply_markup {
             fallback_payload["reply_markup"] = markup;
         }
-        let _ = client.post(&url).json(&fallback_payload).send().await;
+        let _ = TELEGRAM_CLIENT.post(&url).json(&fallback_payload).send().await;
     }
 
     Ok(())
@@ -61,14 +132,13 @@ pub async fn answer_callback_query(
     callback_query_id: &str,
     text: &str,
 ) {
-    let client = Client::new();
     let url = format!("https://api.telegram.org/bot{bot_token}/answerCallbackQuery");
     let payload = json!({
         "callback_query_id": callback_query_id,
         "text": text,
         "show_alert": false
     });
-    let _ = client.post(&url).json(&payload).send().await;
+    let _ = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
 }
 
 pub async fn edit_telegram_message_text(
@@ -78,7 +148,6 @@ pub async fn edit_telegram_message_text(
     new_text: &str,
     reply_markup: Option<Value>,
 ) {
-    let client = Client::new();
     let url = format!("https://api.telegram.org/bot{bot_token}/editMessageText");
     let mut payload = json!({
         "chat_id": chat_id,
@@ -89,7 +158,7 @@ pub async fn edit_telegram_message_text(
     if let Some(markup) = reply_markup {
         payload["reply_markup"] = markup;
     }
-    let _ = client.post(&url).json(&payload).send().await;
+    let _ = TELEGRAM_CLIENT.post(&url).json(&payload).send().await;
 }
 
 pub async fn handle_telegram_callback_query(
@@ -101,6 +170,12 @@ pub async fn handle_telegram_callback_query(
     original_text: &str,
     data: &str,
 ) {
+    // Prevent duplicate button click processing within 1.5 seconds
+    let cb_key = format!("{}:{}:{}", chat_id, message_id.unwrap_or(0), data);
+    if check_and_record_callback_cooldown(&cb_key, 2) {
+        answer_callback_query(bot_token, callback_query_id, "Sedang diproses...").await;
+        return;
+    }
     // 1. Verify user is registered
     let user_check = crate::db::query(
         "SELECT id, display_name FROM opentask.users WHERE telegram_chat_id = $1 LIMIT 1;"
@@ -460,6 +535,11 @@ pub async fn handle_incoming_telegram_message(
     chat_id: &str,
     text: &str,
 ) {
+    // Prevent duplicate processing from double-taps or duplicate poll deliveries within 2 seconds
+    if check_and_record_command_cooldown(chat_id, text, 2) {
+        tracing::info!("[Telegram] Ignored duplicate command '{text}' for chat_id={chat_id}");
+        return;
+    }
     if text.starts_with("/start") {
         let parts: Vec<&str> = text.split_whitespace().collect();
         if parts.len() > 1 && parts[1].starts_with("link_") {
@@ -612,7 +692,7 @@ pub async fn handle_incoming_telegram_message(
 
                 match tasks_res {
                     Ok(tasks) if !tasks.is_empty() => {
-                        let mut msg = format!("📋 *Daftar Tugas Aktif ({})*\n\n", name);
+                        let mut msg = format!("📋 *Daftar Tugas Aktif ({})*\n\n", escape_markdown(&name));
                         for (i, t) in tasks.iter().enumerate() {
                             let tid: i64 = t.try_get("id").unwrap_or(0);
                             let title: String = t.try_get("title").unwrap_or_default();
@@ -621,7 +701,7 @@ pub async fn handle_incoming_telegram_message(
                             let pid: i64 = t.try_get("project_id").unwrap_or(0);
                             msg.push_str(&format!(
                                 "{}. *{}*\n   📁 Project: {}\n   🏷️ Status: {}\n   🔗 [Buka Task](https://open-task-five.vercel.app/projects/{}?taskId={})\n\n",
-                                i + 1, title, proj, b_name, pid, tid
+                                i + 1, escape_markdown(&title), escape_markdown(&proj), escape_markdown(&b_name), pid, tid
                             ));
                         }
                         msg.push_str("💡 *Tips:* Gunakan perintah `/updatetask` untuk mengubah status progress tugas langsung dari Telegram.");
@@ -701,7 +781,7 @@ pub async fn handle_incoming_telegram_message(
                              📁 Project: {}\n\
                              🏷️ Status Saat Ini: *{}*\n\n\
                              Pilih status baru yang diinginkan:",
-                            title, proj, b_name
+                            escape_markdown(&title), escape_markdown(&proj), escape_markdown(&b_name)
                         );
 
                         let action_row = if is_ongoing {
@@ -728,7 +808,7 @@ pub async fn handle_incoming_telegram_message(
                         let _ = send_telegram_message_with_keyboard(bot_token, chat_id, &card_text, Some(keyboard)).await;
                     }
                     Ok(tasks) => {
-                        let mut list_text = format!("🔄 *Pilih Tugas untuk Diupdate Progress ({})*\n\n", name);
+                        let mut list_text = format!("🔄 *Pilih Tugas untuk Diupdate Progress ({})*\n\n", escape_markdown(&name));
                         let mut keyboard_rows = Vec::new();
 
                         for (i, t) in tasks.iter().enumerate() {
@@ -737,7 +817,7 @@ pub async fn handle_incoming_telegram_message(
                             let proj: String = t.try_get("project_name").unwrap_or_else(|_| "Project".to_string());
                             let b_name: String = t.try_get("bucket_name").unwrap_or_else(|_| "TODO".to_string());
 
-                            list_text.push_str(&format!("{}. *{}*\n   📁 {} | 🏷️ {}\n", i + 1, title, proj, b_name));
+                            list_text.push_str(&format!("{}. *{}*\n   📁 {} | 🏷️ {}\n", i + 1, escape_markdown(&title), escape_markdown(&proj), escape_markdown(&b_name)));
 
                             let short_title = if title.chars().count() > 24 {
                                 format!("{}...", title.chars().take(22).collect::<String>())
@@ -837,6 +917,7 @@ pub async fn run_telegram_polling(pool: PgPool, config: Config) {
     let _ = client.post(&set_cmd_url).json(&cmd_payload).send().await;
 
     let mut offset: i64 = 0;
+    let mut processed_updates: HashSet<i64> = HashSet::new();
 
     loop {
         let url = format!(
@@ -845,11 +926,28 @@ pub async fn run_telegram_polling(pool: PgPool, config: Config) {
 
         match client.get(&url).send().await {
             Ok(resp) => {
+                if resp.status().as_u16() == 409 {
+                    tracing::warn!("[Telegram Polling] 409 Conflict: another instance is running getUpdates with this bot token. Backing off 5s...");
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+
                 if let Ok(data) = resp.json::<Value>().await {
                     if let Some(updates) = data["result"].as_array() {
                         for update in updates {
-                            if let Some(uid) = update["update_id"].as_i64() {
-                                offset = uid + 1;
+                            let uid = match update["update_id"].as_i64() {
+                                Some(id) => id,
+                                None => continue,
+                            };
+                            offset = uid + 1;
+
+                            if !processed_updates.insert(uid) {
+                                tracing::debug!("[Telegram Polling] Skip already processed update_id {uid}");
+                                continue;
+                            }
+                            if processed_updates.len() > 1000 {
+                                processed_updates.clear();
+                                processed_updates.insert(uid);
                             }
 
                             if let Some(message) = update.get("message") {
@@ -896,6 +994,98 @@ pub async fn run_telegram_polling(pool: PgPool, config: Config) {
             Err(e) => {
                 tracing::warn!("[Telegram Polling] Error: {e}. Retrying in 3s...");
                 tokio::time::sleep(Duration::from_secs(3)).await;
+            }
+        }
+    }
+}
+
+pub async fn run_telegram_alert_dispatcher(pool: PgPool, config: Config) {
+    let bot_token = match &config.telegram_bot_token {
+        Some(t) if !t.trim().is_empty() => t.clone(),
+        _ => return,
+    };
+
+    tracing::info!("[Telegram Dispatcher] Starting guaranteed 24/7 background notification dispatcher (3s interval)...");
+    let mut interval = tokio::time::interval(Duration::from_secs(3));
+
+    loop {
+        interval.tick().await;
+
+        let query_str = r#"
+            SELECT a.id, a.user_id, a.context_id, a.project_id, a.title, a.description, a.type,
+                   u.telegram_chat_id
+            FROM opentask.alerts a
+            JOIN opentask.users u ON a.user_id = u.id
+            WHERE (a.telegram_sent IS FALSE OR a.telegram_sent IS NULL)
+              AND u.telegram_chat_id IS NOT NULL
+              AND u.telegram_chat_id != ''
+              AND a.created_at >= NOW() - INTERVAL '2 hours'
+            ORDER BY a.created_at ASC
+            LIMIT 10;
+        "#;
+
+        let rows = match crate::db::query(query_str).fetch_all(&pool).await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        for r in rows {
+            let alert_id: i64 = r.try_get("id").unwrap_or(0);
+            let chat_id: String = r.try_get("telegram_chat_id").unwrap_or_default();
+            let alert_title: String = r.try_get("title").unwrap_or_default();
+            let alert_desc: String = r.try_get("description").unwrap_or_default();
+            let context_id: Option<i64> = r.try_get("context_id").ok().flatten();
+            let project_id: Option<i64> = r.try_get("project_id").ok().flatten();
+            let alert_type: String = r.try_get("type").unwrap_or_default();
+
+            if chat_id.trim().is_empty() {
+                continue;
+            }
+
+            let base_url = if !config.frontend_url.trim().is_empty() && !config.frontend_url.contains("localhost") {
+                config.frontend_url.trim_end_matches('/')
+            } else {
+                "https://open-task-five.vercel.app"
+            };
+
+            let path_url = match (project_id, context_id) {
+                (Some(pid), Some(tid)) => format!("{}/projects/{}?taskId={}", base_url, pid, tid),
+                (Some(pid), None) => format!("{}/projects/{}", base_url, pid),
+                _ => base_url.to_string(),
+            };
+
+            let text = format!("🔔 *{}*\n\n{}", alert_title, alert_desc);
+
+            let mut keyboard_rows = vec![
+                vec![
+                    json!({ "text": "🔗 Buka di OpenTask", "url": path_url })
+                ]
+            ];
+
+            if alert_type == "TASK_ASSIGNED" {
+                if let Some(tid) = context_id {
+                    keyboard_rows.push(vec![
+                        json!({ "text": "▶️ Kerjakan (Ongoing)", "callback_data": format!("act_ongoing_{}", tid) }),
+                        json!({ "text": "✅ Selesai (Done)", "callback_data": format!("act_done_{}", tid) }),
+                    ]);
+                }
+            }
+
+            let reply_markup = json!({ "inline_keyboard": keyboard_rows });
+
+            let send_res = send_telegram_message_with_keyboard(
+                &bot_token,
+                &chat_id,
+                &text,
+                Some(reply_markup),
+            ).await;
+
+            if send_res.is_ok() {
+                let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE, updated_at = NOW() WHERE id = $1;")
+                    .bind(alert_id)
+                    .execute(&pool)
+                    .await;
+                tracing::info!("[Telegram Dispatcher] Successfully delivered alert {} to chat_id={}", alert_id, chat_id);
             }
         }
     }

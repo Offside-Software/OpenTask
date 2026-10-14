@@ -57,11 +57,17 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // 5. Telegram 24/7 Polling Worker
+    // 5. Telegram 24/7 Polling Worker & Guaranteed Notification Dispatcher
     let telegram_pool = pool.clone();
     let telegram_config = config.clone();
     tokio::spawn(async move {
         services::telegram::run_telegram_polling(telegram_pool, telegram_config).await;
+    });
+
+    let dispatcher_pool = pool.clone();
+    let dispatcher_config = config.clone();
+    tokio::spawn(async move {
+        services::telegram::run_telegram_alert_dispatcher(dispatcher_pool, dispatcher_config).await;
     });
 
     // 6. Setup CORS

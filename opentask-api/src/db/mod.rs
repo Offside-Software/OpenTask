@@ -139,11 +139,14 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
             severity TEXT NOT NULL DEFAULT 'info',
             suggested_actions TEXT[] DEFAULT '{}',
             is_resolved BOOLEAN DEFAULT FALSE,
+            telegram_sent BOOLEAN DEFAULT FALSE,
             pr_url TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW()
         );
+        ALTER TABLE opentask.alerts ADD COLUMN IF NOT EXISTS telegram_sent BOOLEAN DEFAULT FALSE;
         CREATE INDEX IF NOT EXISTS idx_alerts_user_id ON opentask.alerts(user_id);
+        CREATE INDEX IF NOT EXISTS idx_alerts_unsent_tg ON opentask.alerts(telegram_sent, created_at) WHERE telegram_sent = FALSE;
         "#,
     )
     .execute(pool)
