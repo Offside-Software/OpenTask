@@ -998,3 +998,95 @@ pub async fn run_telegram_polling(pool: PgPool, config: Config) {
         }
     }
 }
+
+pub async fn run_telegram_alert_dispatcher(pool: PgPool, config: Config) {
+    let bot_token = match &config.telegram_bot_token {
+        Some(t) if !t.trim().is_empty() => t.clone(),
+        _ => return,
+    };
+
+    tracing::info!("[Telegram Dispatcher] Starting guaranteed 24/7 background notification dispatcher (3s interval)...");
+    let mut interval = tokio::time::interval(Duration::from_secs(3));
+
+    loop {
+        interval.tick().await;
+
+        let query_str = r#"
+            SELECT a.id, a.user_id, a.context_id, a.project_id, a.title, a.description, a.type,
+                   u.telegram_chat_id
+            FROM opentask.alerts a
+            JOIN opentask.users u ON a.user_id = u.id
+            WHERE (a.telegram_sent IS FALSE OR a.telegram_sent IS NULL)
+              AND u.telegram_chat_id IS NOT NULL
+              AND u.telegram_chat_id != ''
+              AND a.created_at >= NOW() - INTERVAL '2 hours'
+            ORDER BY a.created_at ASC
+            LIMIT 10;
+        "#;
+
+        let rows = match crate::db::query(query_str).fetch_all(&pool).await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        for r in rows {
+            let alert_id: i64 = r.try_get("id").unwrap_or(0);
+            let chat_id: String = r.try_get("telegram_chat_id").unwrap_or_default();
+            let alert_title: String = r.try_get("title").unwrap_or_default();
+            let alert_desc: String = r.try_get("description").unwrap_or_default();
+            let context_id: Option<i64> = r.try_get("context_id").ok().flatten();
+            let project_id: Option<i64> = r.try_get("project_id").ok().flatten();
+            let alert_type: String = r.try_get("type").unwrap_or_default();
+
+            if chat_id.trim().is_empty() {
+                continue;
+            }
+
+            let base_url = if !config.frontend_url.trim().is_empty() && !config.frontend_url.contains("localhost") {
+                config.frontend_url.trim_end_matches('/')
+            } else {
+                "https://open-task-five.vercel.app"
+            };
+
+            let path_url = match (project_id, context_id) {
+                (Some(pid), Some(tid)) => format!("{}/projects/{}?taskId={}", base_url, pid, tid),
+                (Some(pid), None) => format!("{}/projects/{}", base_url, pid),
+                _ => base_url.to_string(),
+            };
+
+            let text = format!("🔔 *{}*\n\n{}", alert_title, alert_desc);
+
+            let mut keyboard_rows = vec![
+                vec![
+                    json!({ "text": "🔗 Buka di OpenTask", "url": path_url })
+                ]
+            ];
+
+            if alert_type == "TASK_ASSIGNED" {
+                if let Some(tid) = context_id {
+                    keyboard_rows.push(vec![
+                        json!({ "text": "▶️ Kerjakan (Ongoing)", "callback_data": format!("act_ongoing_{}", tid) }),
+                        json!({ "text": "✅ Selesai (Done)", "callback_data": format!("act_done_{}", tid) }),
+                    ]);
+                }
+            }
+
+            let reply_markup = json!({ "inline_keyboard": keyboard_rows });
+
+            let send_res = send_telegram_message_with_keyboard(
+                &bot_token,
+                &chat_id,
+                &text,
+                Some(reply_markup),
+            ).await;
+
+            if send_res.is_ok() {
+                let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE, updated_at = NOW() WHERE id = $1;")
+                    .bind(alert_id)
+                    .execute(&pool)
+                    .await;
+                tracing::info!("[Telegram Dispatcher] Successfully delivered alert {} to chat_id={}", alert_id, chat_id);
+            }
+        }
+    }
+}
