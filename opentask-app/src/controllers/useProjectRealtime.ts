@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { getStoredToken, resolveApiUrl } from "../services/apiClient";
+import { apiFetch, getStoredToken, resolveApiUrl } from "../services/apiClient";
 
 export interface ProjectEvent {
   version: number;
@@ -30,7 +30,7 @@ export const useProjectRealtime = (
     let reconnectDelay = 1_000;
     let stopped = false;
 
-    const connect = () => {
+    const connect = async () => {
       if (stopped) return;
 
       const token = getStoredToken();
@@ -39,12 +39,30 @@ export const useProjectRealtime = (
         return;
       }
 
+      // Request a short-lived one-time ticket to avoid leaking access tokens in URL query params
+      let ticket: string | null = null;
+      try {
+        const ticketRes = await apiFetch<{ ticket: string }>(
+          `/projects/${projectId}/events/ticket`,
+          { method: "POST" }
+        );
+        ticket = ticketRes.ticket;
+      } catch (err) {
+        console.warn("Failed to acquire WebSocket one-time ticket, falling back to query token:", err);
+      }
+
+      if (stopped) return;
+
       const httpUrl = new URL(
         resolveApiUrl(`/projects/${projectId}/events`),
         window.location.origin,
       );
       httpUrl.protocol = httpUrl.protocol === "https:" ? "wss:" : "ws:";
-      httpUrl.searchParams.set("token", token);
+      if (ticket) {
+        httpUrl.searchParams.set("ticket", ticket);
+      } else {
+        httpUrl.searchParams.set("token", token);
+      }
 
       socket = new WebSocket(httpUrl.toString());
       socket.onopen = () => {

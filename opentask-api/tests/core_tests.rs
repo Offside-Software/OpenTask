@@ -110,7 +110,8 @@ async fn test_router_construction() {
 
     let pool = PgPoolOptions::new().connect_lazy("postgres://dummy:dummy@localhost:5432/dummy").unwrap();
     let config = Config::load();
-    let state = AppState { pool, config };
+    let realtime = opentask_api::services::realtime::RealtimeHub::new();
+    let state = AppState { pool, config, realtime };
     let _app = build_router(state);
 }
 
@@ -140,7 +141,8 @@ async fn replace_api() {
         }
     };
 
-    let state = AppState { pool: pool.clone(), config };
+    let realtime = opentask_api::services::realtime::RealtimeHub::new();
+    let state = AppState { pool: pool.clone(), config, realtime };
     let _app = build_router(state);
 
     // Run once or include in an admin migration handler:

@@ -1,14 +1,22 @@
 # Project Realtime Synchronization
 
-The Rust API exposes a project-scoped WebSocket endpoint:
+The Rust API exposes a project-scoped WebSocket endpoint authenticated via a short-lived one-time ticket (to prevent leaking access tokens in query parameters and reverse proxy access logs):
 
 ```text
-GET /projects/{project_id}/events?token={github_access_token}
+POST /projects/{project_id}/events/ticket
+Authorization: Bearer {github_access_token}
+
+-> Response: { "ticket": "wst_...", "expires_in": 60 }
 ```
 
-The browser client connects automatically while a project page is open. The
-server verifies the GitHub token and checks that the user is a member of the
-project before upgrading the connection.
+Then upgrade the WebSocket connection using the one-time ticket:
+
+```text
+GET /projects/{project_id}/events?ticket={ticket}
+```
+
+(The endpoint also maintains backward-compatible support for `?token={github_access_token}` as a fallback).
+The server verifies the ticket (or token) and checks that the user is a member of the project before upgrading the connection. Each ticket is strictly single-use and consumed immediately upon upgrade.
 
 Mutation events use this JSON envelope:
 

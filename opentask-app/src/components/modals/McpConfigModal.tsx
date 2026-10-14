@@ -368,16 +368,17 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
           <div>
             <div className="font-mono text-[11px] font-black text-white uppercase mb-2 flex items-center gap-2">
               <Layers size={14} className="text-[#FFE600]" />
-              <span>// AVAILABLE PROJECT MCP TOOLS (6)</span>
+              <span>// AVAILABLE PROJECT MCP TOOLS (7)</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 font-mono text-[11px]">
               {[
-                { name: 'list_tasks', desc: 'List all project tasks filtered by column or search query' },
-                { name: 'get_task', desc: 'Fetch full requirements and specs by task ID or title' },
-                { name: 'create_task', desc: 'Create tasks, bug reports, and features in the board' },
-                { name: 'update_task', desc: 'Update title, description, or move task to another column' },
+                { name: 'list_projects', desc: 'List all accessible projects in session with Snowflake IDs and stats' },
+                { name: 'list_tasks', desc: 'List tasks in project board; supports target project_id filter' },
+                { name: 'get_task', desc: 'Fetch full requirements and specs by task ID across all projects' },
+                { name: 'create_task', desc: 'Create tasks, bug reports, and features in any accessible project' },
+                { name: 'update_task', desc: 'Update title, description, or move task across any project' },
                 { name: 'complete_task', desc: 'Mark a task completed and archive it to the Done column' },
-                { name: 'get_project_summary', desc: 'Live markdown overview of pipeline stages and team' },
+                { name: 'get_project_summary', desc: 'Live markdown overview of pipeline stages, team, and projects' },
               ].map(tool => (
                 <div key={tool.name} className="p-2.5 bg-[#141619] border border-neutral-800">
                   <div className="text-[#FFE600] font-bold">⚙ {tool.name}</div>
