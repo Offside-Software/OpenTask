@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, Briefcase, Bell, Settings, LogOut, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Bell, Settings, LogOut, Sun, Moon, MessageSquarePlus, Github, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../context/themeContext';
 import { getDisplayName } from '../../auth/displayName';
@@ -16,9 +16,10 @@ const NAV_ITEMS = [
 
 interface SidebarProps {
   onOpenSettings?: () => void;
+  onOpenFeedback?: () => void;
 }
 
-export function Sidebar({ onOpenSettings }: SidebarProps) {
+export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
@@ -44,9 +45,8 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
         <aside
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
-          className={`absolute inset-y-0 left-0 border-r-2 border-black flex flex-col py-5 px-3 bg-[#0C0D0E] z-40 transition-all duration-200 ease-in-out overflow-hidden shadow-[4px_0px_0px_0px_rgba(0,0,0,0.4)] ${
-            isHovered ? 'w-60' : 'w-[68px]'
-          }`}
+          className={`absolute inset-y-0 left-0 border-r-2 border-black flex flex-col py-5 px-3 bg-[#0C0D0E] z-40 transition-all duration-200 ease-in-out overflow-hidden shadow-[4px_0px_0px_0px_rgba(0,0,0,0.4)] ${isHovered ? 'w-60' : 'w-[68px]'
+            }`}
         >
           {/* Brutalist Brand Badge */}
           <div
@@ -77,11 +77,10 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                   key={id}
                   to={`/${id}`}
                   title={fullLabel}
-                  className={`h-11 rounded-none border-2 transition-all duration-75 relative flex items-center overflow-hidden ${
-                    isActive
+                  className={`h-11 rounded-none border-2 transition-all duration-75 relative flex items-center overflow-hidden ${isActive
                       ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
                       : 'bg-[#141619] text-neutral-400 border-neutral-800 hover:border-white hover:text-white hover:shadow-[2px_2px_0px_0px_#000000]'
-                  }`}
+                    }`}
                 >
                   <div className="w-10 h-full flex items-center justify-center shrink-0 relative">
                     <Icon size={19} strokeWidth={2.5} />
@@ -122,6 +121,48 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                 </span>
               </div>
             </button>
+
+            {/* User Feedback & Report */}
+            <button
+              onClick={onOpenFeedback}
+              title="User Feedback & Bug Report (Alpha Release)"
+              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-[#FFE600] hover:border-[#FFE600] transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
+            >
+              <div className="w-10 h-full flex items-center justify-center shrink-0">
+                <MessageSquarePlus size={18} strokeWidth={2.5} className="group-hover:text-[#FFE600] text-[#FFE600]" />
+              </div>
+              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 group-hover:text-[#FFE600] block">
+                    FEEDBACK
+                  </span>
+                  <span className="text-[8px] font-mono font-black bg-[#FFE600] text-black px-1 py-0.5 border border-black leading-none">
+                    ALPHA
+                  </span>
+                </div>
+              </div>
+            </button>
+
+            {/* GitHub Open Source Repo */}
+            <a
+              href="https://github.com/Offside-Software/OpenTask/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="OpenTask Source Code on GitHub (Open Source)"
+              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
+            >
+              <div className="w-10 h-full flex items-center justify-center shrink-0">
+                <Github size={18} strokeWidth={2.2} />
+              </div>
+              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 group-hover:text-white block">
+                    SOURCE CODE
+                  </span>
+                  <ExternalLink size={10} className="text-neutral-500 group-hover:text-neutral-300" />
+                </div>
+              </div>
+            </a>
 
             <button
               onClick={onOpenSettings}

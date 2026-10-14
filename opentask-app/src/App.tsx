@@ -15,18 +15,23 @@ import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPromp
 import { useState } from "react";
 import { ThemeProvider } from "./context/themeContext";
 import { NetworkBadge } from "./components/ui/NetworkBadge";
+import { FeedbackModal } from "./components/modals/FeedbackModal";
 import "./App.css";
 
 function AppShell() {
   const { user, isLoading } = useAuth();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   if (isLoading) return <LoadingScreen message="Resolving session…" />;
   if (!user) return <LoginPage />;
 
   return (
     <div className="h-screen w-full bg-[var(--cmd-app-bg)] text-[var(--cmd-text-body)] font-sans flex overflow-hidden selection:bg-[#FFE600]/30 transition-colors duration-150 relative">
-      <Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
+      <Sidebar
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
+      />
 
       {/* Global Telemetry & Network Status Badge */}
       <NetworkBadge />
@@ -47,6 +52,7 @@ function AppShell() {
 
       <TelegramLinkPrompt onOpenSettings={() => setIsSettingsOpen(true)} />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </div>
   );
 }

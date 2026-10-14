@@ -55,17 +55,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                             <AlertTriangle size={24} strokeWidth={2.5} />
                         </div>
                         <div className="flex-1 font-mono">
-                            <h2 className="text-white font-mono font-black uppercase text-base mb-1.5">{title}</h2>
-                            <p className="text-neutral-300 font-mono text-[12px] leading-relaxed">{message}</p>
+                            <h2 className="text-neutral-900 dark:text-white font-mono font-black uppercase text-base mb-1.5">{title}</h2>
+                            <p className="text-neutral-700 dark:text-neutral-300 font-mono text-[12px] leading-relaxed">{message}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="px-6 py-4 bg-[#0E1012] border-t-2 border-black flex justify-end gap-3">
+                <div className="px-6 py-4 bg-neutral-100 dark:bg-[#0E1012] border-t-2 border-black flex justify-end gap-3">
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="px-4 py-2 rounded-none text-[12px] font-mono font-black uppercase tracking-wider text-neutral-300 border-2 border-black bg-[#1E2227] shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                        className="px-4 py-2 rounded-none text-[12px] font-mono font-black uppercase tracking-wider text-neutral-800 dark:text-neutral-300 border-2 border-black bg-neutral-200 dark:bg-[#1E2227] shadow-[2px_2px_0px_0px_#000000] hover:bg-black hover:text-white transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         {cancelLabel}
                     </button>

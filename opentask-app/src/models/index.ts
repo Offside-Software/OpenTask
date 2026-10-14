@@ -261,3 +261,34 @@ export interface PrReview {
   completeness_score?: number;
   reviewed_at?: string;
 }
+
+export type FeedbackType = 'FEEDBACK' | 'BUG' | 'FEATURE' | 'GENERAL';
+export type FeedbackStatus = 'PENDING' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED';
+
+export interface Feedback {
+  id: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  feedback_type: FeedbackType;
+  category?: string | null;
+  rating?: number | null;
+  title?: string | null;
+  description: string;
+  device_info?: Record<string, any> | null;
+  status: FeedbackStatus;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateFeedbackInput {
+  feedback_type?: FeedbackType;
+  category?: string;
+  rating?: number;
+  title?: string;
+  description: string;
+  user_email?: string;
+  user_name?: string;
+  device_info?: Record<string, any>;
+}
+

@@ -322,3 +322,38 @@ fn test_task_update_payload_deserialization() {
         Some(Some(SafeId(94695191667019776)))
     );
 }
+
+#[test]
+fn test_feedback_model_serialization() {
+    use opentask_api::models::feedback::{CreateFeedbackPayload, Feedback};
+
+    let feedback = Feedback {
+        id: SafeId(103888871078498304),
+        user_id: Some(SafeId(94695191667019776)),
+        user_name: Some("tester".to_string()),
+        user_email: Some("tester@example.com".to_string()),
+        feedback_type: "BUG".to_string(),
+        category: Some("UI/UX".to_string()),
+        rating: Some(4),
+        title: Some("Modal issue".to_string()),
+        description: "Modal needs wider margin".to_string(),
+        device_info: Some(serde_json::json!({"browser": "Chrome"})),
+        status: "PENDING".to_string(),
+        created_at: None,
+        updated_at: None,
+    };
+
+    let serialized = serde_json::to_string(&feedback).unwrap();
+    assert!(serialized.contains(r#""id":"103888871078498304""#));
+    assert!(serialized.contains(r#""user_id":"94695191667019776""#));
+
+    let json_payload = r#"{
+        "feedback_type": "FEEDBACK",
+        "description": "Great alpha experience!",
+        "rating": 5
+    }"#;
+    let payload: CreateFeedbackPayload = serde_json::from_str(json_payload).unwrap();
+    assert_eq!(payload.feedback_type.as_deref(), Some("FEEDBACK"));
+    assert_eq!(payload.rating, Some(5));
+}
+
