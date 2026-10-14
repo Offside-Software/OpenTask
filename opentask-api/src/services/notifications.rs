@@ -206,8 +206,16 @@ pub async fn send_telegram_alert(
     body: &str,
     path_url: &str,
     task_id: Option<i64>,
+    alert_id: Option<i64>,
     allow_actions: bool,
 ) {
+    if let Some(aid) = alert_id {
+        if crate::services::telegram::check_and_record_alert_sent(aid) {
+            tracing::debug!("[TELEGRAM_ALERT] Skip already sent alert_id={aid}");
+            return;
+        }
+    }
+
     if let Some(bot_token) = &config.telegram_bot_token {
         let chat_id = match get_user_telegram_chat_id(pool, user_id).await {
             Some(cid) if !cid.trim().is_empty() => cid,
@@ -256,10 +264,9 @@ pub async fn send_telegram_alert(
             Some(reply_markup),
         ).await;
         if res.is_ok() {
-            if let Some(tid) = task_id {
-                let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE, updated_at = NOW() WHERE context_id = $1 AND user_id = $2;")
-                    .bind(tid)
-                    .bind(user_id)
+            if let Some(aid) = alert_id {
+                let _ = crate::db::query("UPDATE opentask.alerts SET telegram_sent = TRUE, updated_at = NOW() WHERE id = $1;")
+                    .bind(aid)
                     .execute(pool)
                     .await;
             }
@@ -293,8 +300,6 @@ pub async fn notify_task_assigned(
     let alert_id = next_id();
     let context_id = task_id.unwrap_or(project_id);
 
-    let title = "Task Assigned";
-    let body = format!("You were assigned to \"{}\"{}{}.", task_title, by_text, proj_text);
     let url = match task_id {
         Some(tid) => format!("/projects/{}?taskId={}", project_id, tid),
         None => format!("/projects/{}", project_id),
@@ -321,8 +326,8 @@ pub async fn notify_task_assigned(
     .execute(pool)
     .await;
 
-    let push_fut = send_push_notification(pool, config, assignee_id, title, &body, &url, &tag);
-    let tg_fut = send_telegram_alert(pool, config, assignee_id, title, &body, &url, task_id, true);
+    let push_fut = send_push_notification(pool, config, assignee_id, &alert_title, &alert_body, &url, &tag);
+    let tg_fut = send_telegram_alert(pool, config, assignee_id, &alert_title, &alert_body, &url, task_id, Some(alert_id), true);
 
     let _ = tokio::join!(push_fut, tg_fut);
 }
@@ -351,8 +356,6 @@ pub async fn notify_task_unassigned(
     let alert_id = next_id();
     let context_id = task_id.unwrap_or(project_id);
 
-    let title = "Task Unassigned";
-    let body = format!("You were unassigned from \"{}\"{}{}.", task_title, by_text, proj_text);
     let url = match task_id {
         Some(tid) => format!("/projects/{}?taskId={}", project_id, tid),
         None => format!("/projects/{}", project_id),
@@ -379,8 +382,8 @@ pub async fn notify_task_unassigned(
     .execute(pool)
     .await;
 
-    let push_fut = send_push_notification(pool, config, unassigned_user_id, title, &body, &url, &tag);
-    let tg_fut = send_telegram_alert(pool, config, unassigned_user_id, title, &body, &url, task_id, false);
+    let push_fut = send_push_notification(pool, config, unassigned_user_id, &alert_title, &alert_body, &url, &tag);
+    let tg_fut = send_telegram_alert(pool, config, unassigned_user_id, &alert_title, &alert_body, &url, task_id, Some(alert_id), false);
     let _ = tokio::join!(push_fut, tg_fut);
 }
 
@@ -439,7 +442,7 @@ pub async fn notify_task_completed(
         .execute(pool);
 
         let push_fut = send_push_notification(pool, config, uid, "Task Completed", &body, &url, &tag);
-        let tg_fut = send_telegram_alert(pool, config, uid, "Task Completed", &body, &url, task_id, false);
+        let tg_fut = send_telegram_alert(pool, config, uid, &alert_title, &body, &url, task_id, Some(alert_id), false);
         let _ = tokio::join!(db_fut, push_fut, tg_fut);
     }
 }
@@ -499,7 +502,7 @@ pub async fn notify_task_reopened(
         .execute(pool);
 
         let push_fut = send_push_notification(pool, config, uid, "Task Reopened", &body, &url, &tag);
-        let tg_fut = send_telegram_alert(pool, config, uid, "Task Reopened", &body, &url, task_id, true);
+        let tg_fut = send_telegram_alert(pool, config, uid, &alert_title, &body, &url, task_id, Some(alert_id), true);
         let _ = tokio::join!(db_fut, push_fut, tg_fut);
     }
 }
@@ -560,7 +563,7 @@ pub async fn notify_pr_reviewed(
         .execute(pool);
 
         let push_fut = send_push_notification(pool, config, uid, &alert_title, &body, &direct_url, &tag);
-        let tg_fut = send_telegram_alert(pool, config, uid, &alert_title, &body, &direct_url, task_id, false);
+        let tg_fut = send_telegram_alert(pool, config, uid, &alert_title, &body, &direct_url, task_id, Some(alert_id), false);
         let _ = tokio::join!(db_fut, push_fut, tg_fut);
     }
 }
