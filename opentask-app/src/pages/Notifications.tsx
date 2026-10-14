@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, Clock, CheckCircle2, ArrowRight, Sparkles, AlertTriangle, X, ExternalLink, Radio, Send, RefreshCw } from 'lucide-react';
+import { Bell, Clock, CheckCircle2, ArrowRight, Sparkles, AlertTriangle, X, ExternalLink, Radio, Send, RefreshCw, Monitor, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../design-system/Badge';
 import { useAlerts } from '../controllers/useAlerts';
@@ -18,7 +18,15 @@ export const NotificationsPage: React.FC = () => {
     includeResolved: true,
     pageSize: 20,
   });
-  const { isSupported, permission, loading: pushLoading, subscribe, sendTestAlert } = usePushNotifications();
+  const {
+    isSupported,
+    isDesktop,
+    permission,
+    loading: pushLoading,
+    subscribe,
+    unsubscribe,
+    sendTestAlert,
+  } = usePushNotifications();
   const { leadProjects, collaboratingProjects } = useProjects();
   const allProjects = [...leadProjects, ...collaboratingProjects];
 
@@ -155,15 +163,17 @@ export const NotificationsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Web Push Notification Control Card */}
+      {/* Push / Desktop Notification Control Card */}
       <div className="mb-6 p-4 bg-[#121417] border-2 border-black rounded-none shadow-[4px_4px_0px_0px_#000000] flex items-center justify-between flex-wrap gap-4 font-mono">
         <div className="flex items-center gap-3.5">
           <div className="w-10 h-10 bg-black text-[#FFE600] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000000] flex-shrink-0">
-            <Radio size={20} strokeWidth={2.5} />
+            {isDesktop ? <Monitor size={20} strokeWidth={2.5} /> : <Radio size={20} strokeWidth={2.5} />}
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-white font-black text-[13px] uppercase tracking-wider">// WEB PUSH DISPATCH ENGINE</h3>
+              <h3 className="text-white font-black text-[13px] uppercase tracking-wider">
+                // {isDesktop ? 'DESKTOP NOTIFICATION DISPATCH ENGINE' : 'WEB PUSH DISPATCH ENGINE'}
+              </h3>
               <span className={`px-2 py-0.5 text-[9px] font-black uppercase border border-black ${permission === 'granted'
                   ? 'bg-[#22C55E] text-black'
                   : permission === 'denied'
@@ -175,8 +185,16 @@ export const NotificationsPage: React.FC = () => {
             </div>
             <p className="text-[11px] text-neutral-400 mt-0.5">
               {permission === 'granted'
-                ? 'Browser device registered for real-time task assignment alerts.'
-                : 'Enable browser push notifications to receive instant assignee dispatches.'}
+                ? (isDesktop
+                    ? 'Native desktop notifications active. New task assignments & events pop up natively via OS.'
+                    : 'Browser device registered for real-time task assignment alerts.')
+                : permission === 'denied'
+                  ? (isDesktop
+                      ? 'Desktop notifications are blocked by system settings. Check your OS notification permissions.'
+                      : 'Web push notifications are blocked in your browser settings.')
+                  : (isDesktop
+                      ? 'Enable native desktop notifications to receive instant OS alerts on task and project events.'
+                      : 'Enable browser push notifications to receive instant assignee dispatches.')}
             </p>
           </div>
         </div>
@@ -189,17 +207,28 @@ export const NotificationsPage: React.FC = () => {
               className="px-4 py-2 bg-[#FFE600] hover:bg-[#ffe81a] text-black border-2 border-black text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               <Bell size={13} strokeWidth={3} />
-              <span>{pushLoading ? 'ENABLING...' : 'ENABLE WEB PUSH'}</span>
+              <span>{pushLoading ? 'ENABLING...' : isDesktop ? 'ENABLE DESKTOP ALERTS' : 'ENABLE WEB PUSH'}</span>
             </button>
           ) : (
-            <button
-              onClick={handleSendTestAlert}
-              disabled={pushLoading}
-              className="px-4 py-2 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-            >
-              <Send size={13} strokeWidth={2.5} />
-              <span>{pushLoading ? 'DISPATCHING...' : 'SEND TEST ALERT'}</span>
-            </button>
+            <>
+              <button
+                onClick={handleSendTestAlert}
+                disabled={pushLoading}
+                className="px-4 py-2 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Send size={13} strokeWidth={2.5} />
+                <span>{pushLoading ? 'DISPATCHING...' : 'SEND TEST ALERT'}</span>
+              </button>
+              <button
+                onClick={unsubscribe}
+                disabled={pushLoading}
+                className="px-3 py-2 bg-[#141619] hover:bg-[#FF3333] text-neutral-400 hover:text-white border-2 border-black text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+                title="Deactivate notifications"
+              >
+                <BellOff size={13} strokeWidth={2.5} />
+                <span>DEACTIVATE</span>
+              </button>
+            </>
           )}
         </div>
       </div>
