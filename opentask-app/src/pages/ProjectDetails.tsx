@@ -30,6 +30,7 @@ import { useProjectRealtime, type ProjectEvent } from '../controllers/useProject
 import { projectService } from '../services/projectService';
 import { prReviewService } from '../services/prReviewService';
 import { taskService } from '../services/taskService';
+import { deleteAllTaskAttachments } from '../services/supabaseStorage';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { NotFoundPage } from './NotFound';
 
@@ -480,7 +481,18 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     setDeletingTaskIds(prev => new Set(prev).add(taskId));
     // Remove from any debounced reorder queues immediately to avoid deadlocks
     cancelTaskFromQueue(taskId);
+
+    const taskToDelete = tasks.find(t => String(t.id) === String(taskId));
+
     try {
+      // 1. Delete all attachments associated with this task from Supabase Storage
+      try {
+        await deleteAllTaskAttachments(taskId, taskToDelete?.attachments);
+      } catch (storageErr) {
+        console.warn("Failed to delete attachments from storage:", storageErr);
+      }
+
+      // 2. Delete task from database
       await deleteTask(taskId);
       removeTaskLocally(taskId);
       await Promise.all([refreshBoard(true), refreshDashboard(true)]);
@@ -501,12 +513,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const handleUpdateTask = async (taskId: number | string, data: Partial<Task>) => {
     // 1. Write optimistic patch to state + cache immediately (no delay)
     updateTaskLocally(taskId, data);
+    setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(taskId) ? { ...prev, ...data } : prev));
     // 2. Fire API in background
     updateTask(taskId, data)
       .then((confirmed) => {
         // 3. Write server-confirmed result back to cache to prevent stale reload
         if (confirmed?.id) {
           updateTaskLocally(confirmed.id, confirmed);
+          setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(confirmed.id) ? { ...prev, ...confirmed } : prev));
         }
         refreshDashboard(true);
         refreshBoard(true);

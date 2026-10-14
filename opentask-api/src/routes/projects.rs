@@ -304,7 +304,9 @@ pub async fn get_project_board(
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
-               title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
+               title, description, type as task_type, weight, branch_name, repo_url,
+               COALESCE(attachments, '[]'::jsonb) as attachments,
+               last_activity_at, order_idx, created_at, updated_at
         FROM (
             SELECT *, ROW_NUMBER() OVER (PARTITION BY bucket_id ORDER BY order_idx ASC) as rn
             FROM opentask.tasks

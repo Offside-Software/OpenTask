@@ -78,6 +78,7 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
     let _ = sqlx::raw_sql(
         r#"
         ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS assignee_ids BIGINT[] DEFAULT '{}';
+        ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
         UPDATE opentask.tasks
         SET assignee_ids = ARRAY[lead_assignee_id]
         WHERE lead_assignee_id IS NOT NULL AND (assignee_ids IS NULL OR assignee_ids = '{}');

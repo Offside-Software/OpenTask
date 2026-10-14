@@ -109,12 +109,14 @@ pub async fn create_task(
         r#"
         INSERT INTO opentask.tasks
             (id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, assignee_ids,
-             title, description, type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), $15, NOW(), NOW())
+             title, description, type, weight, branch_name, repo_url, attachments, last_activity_at, order_idx, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, '[]'::jsonb), NOW(), $16, NOW(), NOW())
         RETURNING id, project_id, bucket_id, meeting_id,
                   parent_task_id, lead_assignee_id, suggested_assignee_id,
                   COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
-                  title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at;
+                  title, description, type as task_type, weight, branch_name, repo_url,
+                  COALESCE(attachments, '[]'::jsonb) as attachments,
+                  last_activity_at, order_idx, created_at, updated_at;
         "#
     )
     .bind(task_id)
@@ -131,6 +133,7 @@ pub async fn create_task(
     .bind(payload.weight.unwrap_or(1))
     .bind(payload.branch_name)
     .bind(payload.repo_url)
+    .bind(payload.attachments)
     .bind(order_idx)
     .fetch_one(&state.pool)
     .await?;
@@ -191,7 +194,9 @@ pub async fn list_tasks(
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
-               title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
+               title, description, type as task_type, weight, branch_name, repo_url,
+               COALESCE(attachments, '[]'::jsonb) as attachments,
+               last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE ($1::BIGINT IS NULL OR project_id = $1)
           AND ($2::BIGINT IS NULL OR bucket_id = $2)
@@ -215,7 +220,9 @@ pub async fn get_task(
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
-               title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
+               title, description, type as task_type, weight, branch_name, repo_url,
+               COALESCE(attachments, '[]'::jsonb) as attachments,
+               last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE id = $1
         LIMIT 1;
@@ -240,6 +247,7 @@ pub async fn update_task(
                 parent_task_id, lead_assignee_id, suggested_assignee_id, \
                 COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids, \
                 title, description, type as task_type, weight, branch_name, repo_url, \
+                COALESCE(attachments, '[]'::jsonb) as attachments, \
                 last_activity_at, order_idx, created_at, updated_at \
          FROM opentask.tasks WHERE id = $1 LIMIT 1;"
     )
@@ -303,6 +311,10 @@ pub async fn update_task(
         builder.push(", repo_url = ");
         builder.push_bind(repo_url);
     }
+    if let Some(ref attachments) = payload.attachments {
+        builder.push(", attachments = ");
+        builder.push_bind(attachments);
+    }
     if let Some(order_idx) = payload.order_idx {
         builder.push(", order_idx = ");
         builder.push_bind(order_idx);
@@ -315,6 +327,7 @@ pub async fn update_task(
                    parent_task_id, lead_assignee_id, suggested_assignee_id, \
                    COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids, \
                    title, description, type as task_type, weight, branch_name, repo_url, \
+                   COALESCE(attachments, '[]'::jsonb) as attachments, \
                    last_activity_at, order_idx, created_at, updated_at;",
     );
 
@@ -480,7 +493,7 @@ pub async fn delete_task(
     State(state): State<AppState>,
     Path(task_id): Path<SafeId>,
 ) -> Result<StatusCode, AppError> {
-    let task_info = crate::db::query("SELECT project_id, title FROM opentask.tasks WHERE id = $1;")
+    let task_info = crate::db::query("SELECT project_id, title, attachments FROM opentask.tasks WHERE id = $1;")
         .bind(task_id.0)
         .fetch_optional(&state.pool)
         .await?;
@@ -495,6 +508,28 @@ pub async fn delete_task(
     }
 
     if let Some(t) = task_info {
+        // Collect attachment paths if available
+        let mut known_paths = Vec::new();
+        if let Ok(attachments_val) = t.try_get::<serde_json::Value, _>("attachments") {
+            if let Some(arr) = attachments_val.as_array() {
+                for item in arr {
+                    if let Some(p) = item.get("path").and_then(|v| v.as_str()) {
+                        known_paths.push(p.to_string());
+                    }
+                }
+            }
+        }
+
+        // Clean up Supabase Storage in background if configured
+        let supabase_url = state.config.supabase_url.clone();
+        let supabase_key = state.config.supabase_key.clone();
+        let tid_raw = task_id.0;
+        if !supabase_url.is_empty() && !supabase_key.is_empty() {
+            tokio::spawn(async move {
+                cleanup_task_storage(&supabase_url, &supabase_key, tid_raw, known_paths).await;
+            });
+        }
+
         if let (Ok(pid), Ok(title)) = (
             t.try_get::<i64, _>("project_id"),
             t.try_get::<String, _>("title"),
@@ -517,6 +552,58 @@ pub async fn delete_task(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn cleanup_task_storage(
+    supabase_url: &str,
+    supabase_key: &str,
+    task_id: i64,
+    mut paths: Vec<String>,
+) {
+    let client = reqwest::Client::new();
+    let prefix = format!("tasks-attachments/{}", task_id);
+
+    // List folder to ensure any unreferenced or orphaned files are caught
+    let list_url = format!("{}/storage/v1/object/list/opentask", supabase_url.trim_end_matches('/'));
+    if let Ok(resp) = client
+        .post(&list_url)
+        .header("apikey", supabase_key)
+        .header("Authorization", format!("Bearer {}", supabase_key))
+        .json(&json!({
+            "prefix": prefix,
+            "limit": 100
+        }))
+        .send()
+        .await
+    {
+        if let Ok(files) = resp.json::<Vec<serde_json::Value>>().await {
+            for file in files {
+                if let Some(name) = file.get("name").and_then(|v| v.as_str()) {
+                    if name != ".emptyFolderPlaceholder" {
+                        let full_path = format!("{}/{}", prefix, name);
+                        if !paths.contains(&full_path) {
+                            paths.push(full_path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !paths.is_empty() {
+        let del_url = format!("{}/storage/v1/object/opentask", supabase_url.trim_end_matches('/'));
+        let res = client
+            .delete(&del_url)
+            .header("apikey", supabase_key)
+            .header("Authorization", format!("Bearer {}", supabase_key))
+            .json(&json!({ "prefixes": paths }))
+            .send()
+            .await;
+
+        if let Err(e) = res {
+            tracing::warn!("Failed to delete task attachments from Supabase storage: {e}");
+        }
+    }
 }
 
 pub async fn redirect_task(
@@ -551,7 +638,9 @@ pub async fn search_tasks(
         SELECT id, project_id, bucket_id, meeting_id,
                parent_task_id, lead_assignee_id, suggested_assignee_id,
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
-               title, description, type as task_type, weight, branch_name, repo_url, last_activity_at, order_idx, created_at, updated_at
+               title, description, type as task_type, weight, branch_name, repo_url,
+               COALESCE(attachments, '[]'::jsonb) as attachments,
+               last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1
           AND (title ILIKE $2 OR description ILIKE $2)
@@ -743,6 +832,7 @@ pub async fn get_bucket_tasks(
                parent_task_id, lead_assignee_id, suggested_assignee_id,
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url,
+               COALESCE(attachments, '[]'::jsonb) as attachments,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1 AND bucket_id = $2

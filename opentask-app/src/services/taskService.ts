@@ -1,6 +1,7 @@
 import { apiFetch } from "./apiClient";
 import type { Task, Bucket } from "../models";
 import JSONBig from "json-bigint";
+import { deleteAllTaskAttachments } from "./supabaseStorage";
 
 export const taskService = {
   getTasksByProject: async (projectId: string | number): Promise<Task[]> => {
@@ -39,6 +40,7 @@ export const taskService = {
       "weight",
       "branch_name",
       "repo_url",
+      "attachments",
       "order_idx",
     ];
 
@@ -71,6 +73,11 @@ export const taskService = {
   },
 
   deleteTask: async (id: number | string): Promise<void> => {
+    try {
+      await deleteAllTaskAttachments(id);
+    } catch (err) {
+      console.warn(`Failed to clean up attachments for task ${id}:`, err);
+    }
     await apiFetch(`/tasks/${id}`, {
       method: "DELETE",
     });
