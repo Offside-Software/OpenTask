@@ -1,10 +1,63 @@
 use reqwest::Client;
 use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
-use std::time::Duration;
+use std::collections::{HashSet, HashMap};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::error::AppError;
+
+static RECENT_COMMANDS: Mutex<Option<HashMap<(String, String), Instant>>> = Mutex::new(None);
+static RECENT_CALLBACKS: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
+
+pub fn escape_markdown(text: &str) -> String {
+    text.replace('_', "\\_")
+        .replace('*', "\\*")
+        .replace('`', "\\`")
+        .replace('[', "\\[")
+}
+
+fn check_and_record_command_cooldown(chat_id: &str, text: &str, cooldown_secs: u64) -> bool {
+    let mut guard = match RECENT_COMMANDS.lock() {
+        Ok(g) => g,
+        Err(_) => return false,
+    };
+    let map = guard.get_or_insert_with(HashMap::new);
+
+    let now = Instant::now();
+    // Prune entries older than 30s
+    map.retain(|_, time| now.duration_since(*time) < Duration::from_secs(30));
+
+    let key = (chat_id.to_string(), text.to_string());
+    if let Some(prev) = map.get(&key) {
+        if now.duration_since(*prev) < Duration::from_secs(cooldown_secs) {
+            return true; // Already processed recently (duplicate / double-click)
+        }
+    }
+    map.insert(key, now);
+    false
+}
+
+fn check_and_record_callback_cooldown(callback_id_or_key: &str, cooldown_secs: u64) -> bool {
+    let mut guard = match RECENT_CALLBACKS.lock() {
+        Ok(g) => g,
+        Err(_) => return false,
+    };
+    let map = guard.get_or_insert_with(HashMap::new);
+
+    let now = Instant::now();
+    map.retain(|_, time| now.duration_since(*time) < Duration::from_secs(30));
+
+    let key = callback_id_or_key.to_string();
+    if let Some(prev) = map.get(&key) {
+        if now.duration_since(*prev) < Duration::from_secs(cooldown_secs) {
+            return true;
+        }
+    }
+    map.insert(key, now);
+    false
+}
 
 pub async fn send_telegram_message(
     bot_token: &str,
@@ -101,6 +154,12 @@ pub async fn handle_telegram_callback_query(
     original_text: &str,
     data: &str,
 ) {
+    // Prevent duplicate button click processing within 1.5 seconds
+    let cb_key = format!("{}:{}:{}", chat_id, message_id.unwrap_or(0), data);
+    if check_and_record_callback_cooldown(&cb_key, 2) {
+        answer_callback_query(bot_token, callback_query_id, "Sedang diproses...").await;
+        return;
+    }
     // 1. Verify user is registered
     let user_check = crate::db::query(
         "SELECT id, display_name FROM opentask.users WHERE telegram_chat_id = $1 LIMIT 1;"
@@ -460,6 +519,11 @@ pub async fn handle_incoming_telegram_message(
     chat_id: &str,
     text: &str,
 ) {
+    // Prevent duplicate processing from double-taps or duplicate poll deliveries within 2 seconds
+    if check_and_record_command_cooldown(chat_id, text, 2) {
+        tracing::info!("[Telegram] Ignored duplicate command '{text}' for chat_id={chat_id}");
+        return;
+    }
     if text.starts_with("/start") {
         let parts: Vec<&str> = text.split_whitespace().collect();
         if parts.len() > 1 && parts[1].starts_with("link_") {
@@ -612,7 +676,7 @@ pub async fn handle_incoming_telegram_message(
 
                 match tasks_res {
                     Ok(tasks) if !tasks.is_empty() => {
-                        let mut msg = format!("📋 *Daftar Tugas Aktif ({})*\n\n", name);
+                        let mut msg = format!("📋 *Daftar Tugas Aktif ({})*\n\n", escape_markdown(&name));
                         for (i, t) in tasks.iter().enumerate() {
                             let tid: i64 = t.try_get("id").unwrap_or(0);
                             let title: String = t.try_get("title").unwrap_or_default();
@@ -621,7 +685,7 @@ pub async fn handle_incoming_telegram_message(
                             let pid: i64 = t.try_get("project_id").unwrap_or(0);
                             msg.push_str(&format!(
                                 "{}. *{}*\n   📁 Project: {}\n   🏷️ Status: {}\n   🔗 [Buka Task](https://open-task-five.vercel.app/projects/{}?taskId={})\n\n",
-                                i + 1, title, proj, b_name, pid, tid
+                                i + 1, escape_markdown(&title), escape_markdown(&proj), escape_markdown(&b_name), pid, tid
                             ));
                         }
                         msg.push_str("💡 *Tips:* Gunakan perintah `/updatetask` untuk mengubah status progress tugas langsung dari Telegram.");
@@ -701,7 +765,7 @@ pub async fn handle_incoming_telegram_message(
                              📁 Project: {}\n\
                              🏷️ Status Saat Ini: *{}*\n\n\
                              Pilih status baru yang diinginkan:",
-                            title, proj, b_name
+                            escape_markdown(&title), escape_markdown(&proj), escape_markdown(&b_name)
                         );
 
                         let action_row = if is_ongoing {
@@ -728,7 +792,7 @@ pub async fn handle_incoming_telegram_message(
                         let _ = send_telegram_message_with_keyboard(bot_token, chat_id, &card_text, Some(keyboard)).await;
                     }
                     Ok(tasks) => {
-                        let mut list_text = format!("🔄 *Pilih Tugas untuk Diupdate Progress ({})*\n\n", name);
+                        let mut list_text = format!("🔄 *Pilih Tugas untuk Diupdate Progress ({})*\n\n", escape_markdown(&name));
                         let mut keyboard_rows = Vec::new();
 
                         for (i, t) in tasks.iter().enumerate() {
@@ -737,7 +801,7 @@ pub async fn handle_incoming_telegram_message(
                             let proj: String = t.try_get("project_name").unwrap_or_else(|_| "Project".to_string());
                             let b_name: String = t.try_get("bucket_name").unwrap_or_else(|_| "TODO".to_string());
 
-                            list_text.push_str(&format!("{}. *{}*\n   📁 {} | 🏷️ {}\n", i + 1, title, proj, b_name));
+                            list_text.push_str(&format!("{}. *{}*\n   📁 {} | 🏷️ {}\n", i + 1, escape_markdown(&title), escape_markdown(&proj), escape_markdown(&b_name)));
 
                             let short_title = if title.chars().count() > 24 {
                                 format!("{}...", title.chars().take(22).collect::<String>())
@@ -837,6 +901,7 @@ pub async fn run_telegram_polling(pool: PgPool, config: Config) {
     let _ = client.post(&set_cmd_url).json(&cmd_payload).send().await;
 
     let mut offset: i64 = 0;
+    let mut processed_updates: HashSet<i64> = HashSet::new();
 
     loop {
         let url = format!(
@@ -845,11 +910,28 @@ pub async fn run_telegram_polling(pool: PgPool, config: Config) {
 
         match client.get(&url).send().await {
             Ok(resp) => {
+                if resp.status().as_u16() == 409 {
+                    tracing::warn!("[Telegram Polling] 409 Conflict: another instance is running getUpdates with this bot token. Backing off 5s...");
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+
                 if let Ok(data) = resp.json::<Value>().await {
                     if let Some(updates) = data["result"].as_array() {
                         for update in updates {
-                            if let Some(uid) = update["update_id"].as_i64() {
-                                offset = uid + 1;
+                            let uid = match update["update_id"].as_i64() {
+                                Some(id) => id,
+                                None => continue,
+                            };
+                            offset = uid + 1;
+
+                            if !processed_updates.insert(uid) {
+                                tracing::debug!("[Telegram Polling] Skip already processed update_id {uid}");
+                                continue;
+                            }
+                            if processed_updates.len() > 1000 {
+                                processed_updates.clear();
+                                processed_updates.insert(uid);
                             }
 
                             if let Some(message) = update.get("message") {
