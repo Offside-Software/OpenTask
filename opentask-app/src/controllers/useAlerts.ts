@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Alert } from "../models";
 import { alertService } from "../services/alertService";
+import { pushNotificationService } from "../services/pushNotificationService";
 
 interface UseAlertsOptions {
   userId?: string | number;
@@ -70,6 +71,7 @@ export const useAlerts = (
 
         setAlerts(filtered);
         setError(null);
+        pushNotificationService.notifyNewAlerts(data);
       } catch {
         setError("Failed to fetch alerts");
       } finally {

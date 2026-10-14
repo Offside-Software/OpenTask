@@ -1,4 +1,7 @@
-import { apiFetch } from "./apiClient";
+import { apiFetch, isTauriEnvironment } from "./apiClient";
+import type { Alert } from "../models";
+
+export const DESKTOP_PUSH_ENABLED_KEY = "opentask.desktop-notifications-enabled";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -16,7 +19,15 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export const pushNotificationService = {
+  dispatchedAlertIds: new Set<string>(),
+  hasInitializedAlerts: false,
+
+  isDesktop(): boolean {
+    return isTauriEnvironment();
+  },
+
   isSupported(): boolean {
+    if (this.isDesktop()) return true;
     return (
       typeof window !== "undefined" &&
       "serviceWorker" in navigator &&
@@ -25,15 +36,39 @@ export const pushNotificationService = {
     );
   },
 
-  getPermissionState(): NotificationPermission {
-    if (typeof window === "undefined" || !("Notification" in window)) {
+  isDesktopEnabled(): boolean {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(DESKTOP_PUSH_ENABLED_KEY) === "true";
+  },
+
+  async getPermissionState(): Promise<NotificationPermission> {
+    if (typeof window === "undefined") return "denied";
+
+    if (this.isDesktop()) {
+      // In WebView2 on desktop, window.Notification.permission is 'granted' by default.
+      // We enforce explicit user activation in OpenTask:
+      if (!this.isDesktopEnabled()) {
+        return "default"; // Standby until user explicitly enables it
+      }
+
+      try {
+        const { isPermissionGranted } = await import("@tauri-apps/plugin-notification");
+        const granted = await isPermissionGranted();
+        return granted ? "granted" : "denied";
+      } catch (err) {
+        console.warn("[Desktop Notification] Failed to check permission:", err);
+        return "default";
+      }
+    }
+
+    if (!("Notification" in window)) {
       return "denied";
     }
     return Notification.permission;
   },
 
   async registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-    if (!this.isSupported()) return null;
+    if (this.isDesktop() || !this.isSupported()) return null;
     try {
       const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       await navigator.serviceWorker.ready;
@@ -50,6 +85,34 @@ export const pushNotificationService = {
   },
 
   async subscribe(userId?: string | number): Promise<boolean> {
+    if (this.isDesktop()) {
+      try {
+        const { isPermissionGranted, requestPermission, sendNotification } = await import("@tauri-apps/plugin-notification");
+        let granted = await isPermissionGranted();
+        if (!granted) {
+          const res = await requestPermission();
+          granted = res === "granted";
+        }
+
+        if (!granted) {
+          throw new Error("Desktop notification permission was denied by your operating system.");
+        }
+
+        localStorage.setItem(DESKTOP_PUSH_ENABLED_KEY, "true");
+
+        // Send confirmation toast to verify system integration
+        sendNotification({
+          title: "🔔 OpenTask Desktop",
+          body: "Desktop notifications have been activated successfully!",
+        });
+
+        return true;
+      } catch (err: any) {
+        console.error("[Desktop Notification] Failed to enable:", err);
+        throw err;
+      }
+    }
+
     if (!this.isSupported()) {
       throw new Error("Push notifications are not supported in this browser.");
     }
@@ -96,7 +159,105 @@ export const pushNotificationService = {
     return true;
   },
 
+  async unsubscribe(): Promise<boolean> {
+    if (this.isDesktop()) {
+      localStorage.setItem(DESKTOP_PUSH_ENABLED_KEY, "false");
+      return true;
+    }
+
+    try {
+      if (!this.isSupported()) return true;
+      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+      if (reg) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          const endpoint = sub.endpoint;
+          await sub.unsubscribe();
+          try {
+            await apiFetch("/notifications/unsubscribe", {
+              method: "POST",
+              body: JSON.stringify({ endpoint }),
+            });
+          } catch {
+            // Ignore backend cleanup failure
+          }
+        }
+      }
+      return true;
+    } catch (err) {
+      console.warn("[Push] Unsubscribe error:", err);
+      return false;
+    }
+  },
+
+  async sendDesktopAlert(title: string, body: string): Promise<void> {
+    if (!this.isDesktop() || !this.isDesktopEnabled()) return;
+    try {
+      const { sendNotification } = await import("@tauri-apps/plugin-notification");
+      sendNotification({ title, body });
+    } catch (err) {
+      console.warn("[Desktop Notification] Failed to send notification:", err);
+    }
+  },
+
+  notifyNewAlerts(alerts: Alert[]): void {
+    if (!this.isDesktop() || !this.isDesktopEnabled()) return;
+    if (!alerts || !Array.isArray(alerts)) return;
+
+    // Seed existing alerts on app startup so we don't bombard the user with historical logs
+    if (!this.hasInitializedAlerts) {
+      for (const alert of alerts) {
+        if (alert.id != null) {
+          this.dispatchedAlertIds.add(String(alert.id));
+        }
+      }
+      this.hasInitializedAlerts = true;
+      return;
+    }
+
+    // Dispatch OS notification for newly received unresolved alerts
+    for (const alert of alerts) {
+      if (alert.id == null || alert.is_resolved) continue;
+      const alertId = String(alert.id);
+      if (!this.dispatchedAlertIds.has(alertId)) {
+        this.dispatchedAlertIds.add(alertId);
+        void this.sendDesktopAlert(
+          alert.title || "🔔 OpenTask Alert",
+          alert.description || "You have a new project event alert."
+        );
+      }
+    }
+  },
+
   async sendTestAlert(): Promise<{ status: string; message: string; delivered: number }> {
+    if (this.isDesktop()) {
+      const { sendNotification } = await import("@tauri-apps/plugin-notification");
+      sendNotification({
+        title: "🔔 OpenTask Desktop Verification",
+        body: "Native desktop notifications are active and verified!",
+      });
+
+      // Also dispatch to backend so an alert record is created in database history
+      try {
+        await apiFetch("/notifications/test", {
+          method: "POST",
+          body: JSON.stringify({
+            title: "🔔 OpenTask Desktop Verification",
+            body: "Native desktop notifications are active and verified!",
+            url: "/notifications",
+          }),
+        });
+      } catch {
+        // Ignore backend test alert failure
+      }
+
+      return {
+        status: "ok",
+        message: "Desktop notification dispatched to your operating system!",
+        delivered: 1,
+      };
+    }
+
     return await apiFetch<{ status: string; message: string; delivered: number }>(
       "/notifications/test",
       {
