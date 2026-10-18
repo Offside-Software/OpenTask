@@ -167,13 +167,7 @@ async fn authenticate_mcp_context(
     for r in &project_rows {
         let stored_key: Option<String> = r.try_get("api_key").ok().flatten();
         if let Some(stored) = stored_key {
-            let is_valid = if stored.starts_with("$argon2") {
-                crate::services::hasher::verify_hash(&token, &stored)
-            } else {
-                stored == token
-            };
-
-            if is_valid {
+            if stored == token {
                 let pid: i64 = r.try_get("id").unwrap_or(0);
                 let pname: String = r.try_get("name").unwrap_or_default();
                 let pdesc: Option<String> = r.try_get("description").ok();

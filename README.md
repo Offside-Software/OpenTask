@@ -1,10 +1,19 @@
 # OpenTask
 
-**OpenTask** is a neo-brutalist project management and task tracking platform featuring real-time AI code reviews, GitHub App integration, meeting intelligence, and push notifications.
+**OpenTask** is a bold, distraction-free project workspace built for modern software teams. Turn code reviews, team meetings, and backlogs into shipped software without the project management clutter.
 
 Built with a high-performance **Rust (Axum + Tokio)** backend and a reactive **React 19 (TypeScript + Vite)** frontend.
 
 ---
+
+<a href="https://supabase.com">
+  <img
+    width="168"
+    height="30"
+    src="https://supabase.com/badge-made-with-supabase-dark.svg"
+    alt="Made with Supabase"
+  />
+</a>
 
 ## Key Features
 
