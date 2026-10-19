@@ -6,6 +6,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::cf_whisper::CfWhisper;
 use super::jobs::{self, ClaimedJob};
 use super::llm::{LlmClient, LlmError, WhisperResponse};
 use super::media::{self, MediaError, TempDir};
@@ -13,6 +14,7 @@ use super::postprocess::match_assignee;
 use super::recall::{self, DownloadError};
 use super::steps::project_members;
 use super::transcript::{assign_speakers, parse_speaker_timeline, segments_from_asr};
+use super::uploads;
 use super::{StepError, StepOutcome, WorkerContext};
 use crate::models::meeting::{GateResult, GateVerdict, JobStatus, Segment, SourceType};
 
@@ -126,6 +128,15 @@ async fn transcribe_part(
                     continue;
                 }
                 let until = Utc::now() + chrono::Duration::from_std(wait).unwrap_or(chrono::Duration::minutes(5));
+                if let Some(cf) = cloudflare(ctx) {
+                    match cf.transcribe(path, ctx.cfg.asr_language.as_deref(), Some(prompt)).await {
+                        Ok(response) => {
+                            tracing::info!("[Meeting Pipeline] Groq Whisper is rate limited; transcribed the part with Cloudflare");
+                            return Ok(PartOutcome::Done(response));
+                        }
+                        Err(e) => tracing::warn!("[Meeting Pipeline] Cloudflare Whisper fallback failed: {e:?}"),
+                    }
+                }
                 return Ok(PartOutcome::Defer(until));
             }
             Err(LlmError::Transient(m)) => return Err(StepError::Retryable(format!("Whisper: {m}"))),
@@ -134,8 +145,22 @@ async fn transcribe_part(
     }
 }
 
+fn cloudflare(ctx: &WorkerContext) -> Option<CfWhisper<'_>> {
+    Some(CfWhisper {
+        base_url: &ctx.cfg.cf_api_base,
+        account_id: ctx.cfg.cf_account_id.as_deref()?,
+        api_token: ctx.cfg.cf_api_token.as_deref()?,
+        model: ctx.cfg.cf_asr_model,
+    })
+}
+
+enum AudioSource {
+    Url(String),
+    Stored(String),
+}
+
 /// Where the job's audio is, plus Recall's speaker timeline when there is one.
-async fn locate_audio(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<(String, Option<String>), StepError> {
+async fn locate_audio(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<(AudioSource, Option<String>), StepError> {
     match claimed.job.source_type {
         SourceType::RecallBot => {
             let key = ctx
@@ -157,10 +182,38 @@ async fn locate_audio(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<(Stri
             let audio = media
                 .audio_url
                 .ok_or_else(|| StepError::Retryable("Recall has not published the audio yet".to_string()))?;
-            Ok((audio, media.speaker_timeline_url))
+            Ok((AudioSource::Url(audio), media.speaker_timeline_url))
         }
-        _ => Err(StepError::Fatal("audio and video uploads are not supported yet".to_string())),
+        SourceType::Media => {
+            let key = claimed
+                .job
+                .r2_keys
+                .0
+                .first()
+                .cloned()
+                .ok_or_else(|| StepError::Fatal("the job has no uploaded recording".to_string()))?;
+            Ok((AudioSource::Stored(key), None))
+        }
+        other => Err(StepError::Fatal(format!("a {other} job has no recording to transcribe"))),
     }
+}
+
+fn download_error(e: DownloadError) -> StepError {
+    match e {
+        DownloadError::TooLarge(m) => StepError::Fatal(m),
+        DownloadError::Failed(m) => StepError::Retryable(m),
+    }
+}
+
+async fn stored_checkpoint(ctx: &WorkerContext, job_id: i64) -> Result<Option<AsrCheckpoint>, StepError> {
+    let stored: Option<Value> =
+        crate::db::query_scalar("SELECT asr_checkpoint FROM opentask.meeting_transcripts WHERE job_id = $1;")
+            .bind(job_id)
+            .fetch_optional(&ctx.pool)
+            .await
+            .map_err(db_error)?
+            .flatten();
+    Ok(stored.and_then(|v| serde_json::from_value::<AsrCheckpoint>(v).ok()))
 }
 
 pub async fn transcribe_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutcome, StepError> {
@@ -174,49 +227,58 @@ pub async fn transcribe_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Resul
     let pool = &ctx.pool;
     let cfg = &ctx.cfg;
 
-    let (audio_url, timeline_url) = locate_audio(ctx, claimed).await?;
-
+    let (source, timeline_url) = locate_audio(ctx, claimed).await?;
+    let stored = stored_checkpoint(ctx, job_id).await?;
     let dir = TempDir::create("opentask-meeting").map_err(|e| StepError::Retryable(format!("no temp dir: {e}")))?;
-    let input = dir.path().join("recording");
-    recall::download_to_file(&audio_url, &input, cfg.max_download_mb * 1024 * 1024)
-        .await
-        .map_err(|e| match e {
-            DownloadError::TooLarge(m) => StepError::Fatal(m),
-            DownloadError::Failed(m) => StepError::Retryable(m),
-        })?;
 
-    let duration = media::probe_audio_duration(&cfg.ffprobe_path, &input).await.map_err(media_error)?;
-    if duration > cfg.max_audio_minutes as f32 * 60.0 {
-        return Err(StepError::Fatal(format!(
-            "the recording is {} minutes; the limit is {}",
-            (duration / 60.0).round(),
-            cfg.max_audio_minutes
-        )));
-    }
-    crate::db::query("UPDATE opentask.meeting_jobs SET duration_sec = $2 WHERE id = $1;")
-        .bind(job_id)
-        .bind(duration.round() as i32)
-        .execute(pool)
-        .await
-        .map_err(db_error)?;
+    // Every part already transcribed (a retry after a crash, or after the upload was removed):
+    // nothing needs downloading again.
+    let complete = stored
+        .as_ref()
+        .filter(|c| c.part_secs == cfg.asr_part_secs && c.part_count > 0 && c.parts.len() == c.part_count)
+        .cloned();
+    let (mut checkpoint, parts) = match complete {
+        Some(checkpoint) => (checkpoint, Vec::new()),
+        None => {
+            let input = dir.path().join("recording");
+            let max_bytes = cfg.max_download_mb * 1024 * 1024;
+            match &source {
+                AudioSource::Url(url) => recall::download_to_file(url, &input, max_bytes).await.map_err(download_error)?,
+                AudioSource::Stored(key) => {
+                    let store = cfg
+                        .media_store
+                        .as_ref()
+                        .ok_or_else(|| StepError::Fatal("recording uploads are not configured".to_string()))?;
+                    store.download(key, &input, max_bytes).await.map_err(download_error)?
+                }
+            };
 
-    let parts_dir = dir.path().join("parts");
-    std::fs::create_dir_all(&parts_dir).map_err(|e| StepError::Retryable(format!("no temp dir: {e}")))?;
-    let parts = media::split_for_asr(&cfg.ffmpeg_path, &input, &parts_dir, cfg.asr_part_secs, cfg.asr_bitrate)
-        .await
-        .map_err(media_error)?;
+            let duration = media::probe_audio_duration(&cfg.ffprobe_path, &input).await.map_err(media_error)?;
+            if duration > cfg.max_audio_minutes as f32 * 60.0 {
+                return Err(StepError::Fatal(format!(
+                    "the recording is {} minutes; the limit is {}",
+                    (duration / 60.0).round(),
+                    cfg.max_audio_minutes
+                )));
+            }
+            crate::db::query("UPDATE opentask.meeting_jobs SET duration_sec = $2 WHERE id = $1;")
+                .bind(job_id)
+                .bind(duration.round() as i32)
+                .execute(pool)
+                .await
+                .map_err(db_error)?;
 
-    let stored: Option<Value> =
-        crate::db::query_scalar("SELECT asr_checkpoint FROM opentask.meeting_transcripts WHERE job_id = $1;")
-            .bind(job_id)
-            .fetch_optional(pool)
-            .await
-            .map_err(db_error)?
-            .flatten();
-    let mut checkpoint = stored
-        .and_then(|v| serde_json::from_value::<AsrCheckpoint>(v).ok())
-        .filter(|c| c.part_secs == cfg.asr_part_secs && c.part_count == parts.len())
-        .unwrap_or_else(|| AsrCheckpoint { part_secs: cfg.asr_part_secs, part_count: parts.len(), ..Default::default() });
+            let parts_dir = dir.path().join("parts");
+            std::fs::create_dir_all(&parts_dir).map_err(|e| StepError::Retryable(format!("no temp dir: {e}")))?;
+            let parts = media::split_for_asr(&cfg.ffmpeg_path, &input, &parts_dir, cfg.asr_part_secs, cfg.asr_bitrate)
+                .await
+                .map_err(media_error)?;
+            let checkpoint = stored
+                .filter(|c| c.part_secs == cfg.asr_part_secs && c.part_count == parts.len())
+                .unwrap_or_else(|| AsrCheckpoint { part_secs: cfg.asr_part_secs, part_count: parts.len(), ..Default::default() });
+            (checkpoint, parts)
+        }
+    };
 
     let project_name: Option<String> = crate::db::query_scalar("SELECT name FROM opentask.projects WHERE id = $1;")
         .bind(project_id)
@@ -295,6 +357,10 @@ pub async fn transcribe_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Resul
         .await
         .map_err(db_error)?;
     tracing::info!("[Meeting Pipeline] Job {job_id}: transcript has {} segments", segments.len());
+
+    if let (AudioSource::Stored(_), Some(store)) = (&source, cfg.media_store.as_ref()) {
+        uploads::release_objects(pool, store, job_id, &job.r2_keys.0).await;
+    }
 
     if segments.is_empty() {
         let gate = GateResult {

@@ -50,7 +50,7 @@ pub async fn member_ids(pool: &PgPool, project_id: i64, ids: &[i64]) -> Result<V
     .await
 }
 
-async fn insert_meeting_and_job(
+pub(super) async fn insert_meeting_and_job(
     tx: &mut Transaction<'_, Postgres>,
     new: &NewMeeting,
     status: JobStatus,
@@ -114,7 +114,7 @@ async fn insert_transcript(
     Ok(())
 }
 
-async fn load(pool: &PgPool, meeting_id: i64, job_id: i64) -> Result<IntakeResponse, sqlx::Error> {
+pub(super) async fn load(pool: &PgPool, meeting_id: i64, job_id: i64) -> Result<IntakeResponse, sqlx::Error> {
     let meeting = crate::db::query_as::<_, DatabaseMeeting>(&format!(
         "SELECT {MEETING_COLUMNS} FROM opentask.meetings WHERE id = $1;"
     ))
@@ -131,7 +131,7 @@ async fn load(pool: &PgPool, meeting_id: i64, job_id: i64) -> Result<IntakeRespo
 }
 
 /// Moves a job to `status` (with its meeting) only if it is still `from`. Returns whether it moved.
-async fn transition(
+pub(super) async fn transition(
     pool: &PgPool,
     job_id: i64,
     meeting_id: i64,

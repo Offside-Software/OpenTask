@@ -203,8 +203,21 @@ pub async fn delete_meeting(
     Path(meeting_id): Path<SafeId>,
 ) -> Result<StatusCode, AppError> {
     let (meeting, project_id) = fetch_member_meeting(&state.pool, &user, meeting_id.0).await?;
+    let stored: Vec<sqlx::types::Json<Vec<String>>> = crate::db::query_scalar(
+        "SELECT r2_keys FROM opentask.meeting_jobs WHERE meeting_id = $1 AND r2_keys <> '[]'::jsonb;",
+    )
+    .bind(meeting_id.0)
+    .fetch_all(&state.pool)
+    .await?;
 
     let deleted_draft_ids = delete_meeting_and_drafts(&state.pool, meeting_id.0).await?;
+
+    if let Some(store) = pipeline(&state.config).0.media_store.as_ref() {
+        let keys: Vec<String> = stored.into_iter().flat_map(|k| k.0).collect();
+        if !keys.is_empty() {
+            tokio::spawn(async move { crate::services::meeting_pipeline::uploads::delete_objects(store, &keys).await });
+        }
+    }
 
     for task_id in &deleted_draft_ids {
         state.realtime.publish(project_id, "task", "deleted", Some(*task_id));

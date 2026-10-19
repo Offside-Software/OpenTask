@@ -26,6 +26,8 @@ use opentask_api::services::meeting_pipeline::config::PipelineConfig;
 use opentask_api::services::meeting_pipeline::intake::{self, NewMeeting};
 use opentask_api::services::meeting_pipeline::llm::LlmClient;
 use opentask_api::services::meeting_pipeline::media;
+use opentask_api::services::meeting_pipeline::storage::{LocalStore, MediaStore};
+use opentask_api::services::meeting_pipeline::uploads;
 use opentask_api::services::meeting_pipeline::{review, run_next_job, WorkerContext};
 use opentask_api::services::realtime::RealtimeHub;
 
@@ -39,6 +41,9 @@ struct MockState {
     failed_chunk_two_once: bool,
     whisper_calls: u32,
     whisper_language: Option<String>,
+    /// Groq Whisper answers 429 with a long Retry-After while this is set.
+    whisper_rate_limited: bool,
+    cf_calls: u32,
 }
 
 type Shared = Arc<Mutex<MockState>>;
@@ -196,6 +201,9 @@ async fn groq_transcribe(State(state): State<Shared>, body: axum::body::Bytes) -
     let form = String::from_utf8_lossy(&body);
     let mut s = state.lock().unwrap();
     s.whisper_calls += 1;
+    if s.whisper_rate_limited {
+        return (StatusCode::TOO_MANY_REQUESTS, [("retry-after", "600")], "audio seconds per hour exceeded").into_response();
+    }
     s.whisper_language = form
         .split("name=\"language\"")
         .nth(1)
@@ -213,6 +221,29 @@ async fn groq_transcribe(State(state): State<Shared>, body: axum::body::Bytes) -
             segment(10.0, 14.0, " Saya akan memperbaiki bug login hari ini."),
             { "start": 14.0, "end": 15.0, "text": " Terima kasih telah menonton.", "avg_logprob": -1.5, "no_speech_prob": 0.95, "compression_ratio": 1.0 }
         ]
+    }))
+    .into_response()
+}
+
+// ---------- mock Cloudflare Workers AI ----------
+
+async fn cf_whisper(State(state): State<Shared>, Path((account, model)): Path<(String, String)>, Json(body): Json<Value>) -> Response {
+    assert_eq!(account, "acct-1");
+    assert_eq!(model, "@cf/openai/whisper-large-v3-turbo");
+    assert!(body["audio"].as_str().is_some_and(|a| a.len() > 100), "the part goes as base64");
+    state.lock().unwrap().cf_calls += 1;
+    let segment = |start: f64, end: f64, text: &str| json!({ "start": start, "end": end, "text": text, "avg_logprob": -0.2, "no_speech_prob": 0.01 });
+    Json(json!({
+        "success": true,
+        "errors": [],
+        "result": {
+            "transcription_info": { "language": "id", "duration": 15.0 },
+            "text": "...",
+            "segments": [
+                segment(0.0, 4.0, " Selamat pagi, ini rapat evaluasi."),
+                segment(5.0, 9.0, " Saya akan mengirim notulen ke klien besok.")
+            ]
+        }
     }))
     .into_response()
 }
@@ -340,6 +371,7 @@ async fn meeting_flows_against_postgres() {
         Router::new()
             .route("/chat/completions", post(groq_chat))
             .route("/audio/transcriptions", post(groq_transcribe))
+            .route("/accounts/{account}/ai/run/{*model}", post(cf_whisper))
             .with_state(state.clone()),
     )
     .await;
@@ -364,6 +396,10 @@ async fn meeting_flows_against_postgres() {
     config.recall_base_url = recall.clone();
     let mut cfg = PipelineConfig::from_env();
     cfg.groq_base_url = groq.clone();
+    cfg.cf_account_id = None;
+    cfg.cf_api_token = None;
+    let media_dir = std::env::temp_dir().join(format!("opentask-test-media-{}", next_id()));
+    cfg.media_store = Some(MediaStore::Local(LocalStore::new(media_dir.clone())));
     let llm = LlmClient::new(&groq, "test-key");
     let ctx = WorkerContext { pool: pool.clone(), config, realtime: RealtimeHub::new(), cfg, llm: Some(llm.clone()) };
 
@@ -372,13 +408,18 @@ async fn meeting_flows_against_postgres() {
     gate_no_ends_without_tasks(&ctx, &p, &llm).await;
     recall_bot_failure_fails_the_job(&ctx, &p, &phase).await;
     recall_bot_without_audio_fails_after_grace(&ctx, &p, &phase).await;
+    abandoned_upload_fails_and_is_removed(&ctx, &p).await;
     if ffmpeg_ready {
         recall_bot_to_drafts(&ctx, &p, &phase, &state).await;
+        let audio = test_audio(&ctx.cfg.ffmpeg_path).expect("test audio");
+        media_upload_to_drafts(&ctx, &p, &audio).await;
+        media_falls_back_to_cloudflare(&ctx, &p, &state, &groq, &audio).await;
     } else {
         eprintln!("skipped the Recall audio scenario: ffmpeg/ffprobe not found (set FFMPEG_PATH / FFPROBE_PATH)");
     }
     crash_mid_extraction_resumes_from_checkpoint(&ctx, &p, &llm, &state).await;
 
+    let _ = std::fs::remove_dir_all(&media_dir);
     pool.close().await;
 }
 
@@ -730,4 +771,135 @@ async fn crash_mid_extraction_resumes_from_checkpoint(ctx: &WorkerContext, p: &P
 
     let detail = review::job_detail(pool, job_id).await.unwrap();
     assert_eq!(detail.drafts.len(), 2, "overlapping chunks must not duplicate tasks");
+}
+
+/// What the browser's PUT leaves behind: the file at the upload's key.
+async fn put_upload(ctx: &WorkerContext, key: &str, bytes: &[u8]) {
+    let Some(MediaStore::Local(local)) = ctx.cfg.media_store.as_ref() else { panic!("tests use the local store") };
+    let path = local.path_for(key).unwrap();
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, bytes).unwrap();
+}
+
+async fn upload_key(pool: &PgPool, job_id: i64) -> Option<String> {
+    sqlx::query_scalar("SELECT r2_keys->>0 FROM opentask.meeting_jobs WHERE id = $1;")
+        .bind(job_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn media_upload_to_drafts(ctx: &WorkerContext, p: &Project, audio: &[u8]) {
+    let pool = &ctx.pool;
+    let store = ctx.cfg.media_store.as_ref().unwrap();
+    let created = uploads::create_media_job(
+        pool,
+        &ctx.realtime,
+        &ctx.cfg,
+        new_meeting(p, SourceType::Media, "Sprint review"),
+        "Sprint review.wav",
+        Some("audio/wav"),
+        audio.len() as u64,
+    )
+    .await
+    .unwrap();
+    let job_id = created.job.id.0;
+    assert_eq!(created.job.status, JobStatus::Created);
+    assert_eq!(created.meeting.status, MeetingStatus::Processing);
+    assert_eq!(created.upload.method, "PUT");
+    assert!(created.upload.url.starts_with("/meeting-uploads?key=ingest%2F"), "{}", created.upload.url);
+    assert_eq!(created.upload.headers.get("Content-Type").map(String::as_str), Some("audio/wav"));
+    let key = upload_key(pool, job_id).await.unwrap();
+    assert_eq!(key, format!("ingest/{}/{job_id}/source.wav", p.id));
+
+    // Completing before the file is there is refused; the browser retries.
+    let early = uploads::complete_upload(pool, &ctx.realtime, &ctx.cfg, p.id, job_id).await;
+    assert!(matches!(early, Err(AppError::Conflict(_))));
+    assert!(!run_next_job(ctx).await, "nothing to claim before the upload completes");
+
+    put_upload(ctx, &key, audio).await;
+    let done = uploads::complete_upload(pool, &ctx.realtime, &ctx.cfg, p.id, job_id).await.unwrap();
+    assert_eq!(done.job.status, JobStatus::Queued);
+    let again = uploads::complete_upload(pool, &ctx.realtime, &ctx.cfg, p.id, job_id).await.unwrap();
+    assert_eq!(again.job.status, JobStatus::Queued, "completing twice is harmless");
+
+    // One claim: copy from storage, ffmpeg, Whisper, the gate on the transcript, extraction.
+    assert!(run_next_job(ctx).await);
+    let detail = review::job_detail(pool, job_id).await.unwrap();
+    assert_eq!(detail.job.status, JobStatus::DraftsReady, "job ended as {:?}", detail.job.status);
+    assert_eq!(detail.job.duration_sec, Some(15));
+    assert_eq!(detail.job.gate.as_ref().map(|g| g.verdict), Some(GateVerdict::Yes), "uploads are gated, unlike bots");
+    assert_eq!(detail.drafts.len(), 2);
+    let (_, segments) = review::transcript(pool, job_id).await.unwrap();
+    assert_eq!(segments.len(), 3);
+
+    // Transcribed, so the upload is gone and forgotten.
+    assert_eq!(store.size(&key).await.unwrap(), None);
+    assert_eq!(upload_key(pool, job_id).await, None);
+}
+
+async fn media_falls_back_to_cloudflare(ctx: &WorkerContext, p: &Project, state: &Shared, mock_base: &str, audio: &[u8]) {
+    let mut cfg = PipelineConfig::from_env();
+    cfg.groq_base_url = ctx.cfg.groq_base_url.clone();
+    cfg.media_store = ctx.cfg.media_store.clone();
+    cfg.cf_account_id = Some("acct-1".to_string());
+    cfg.cf_api_token = Some("cf-token".to_string());
+    cfg.cf_api_base = mock_base.to_string();
+    let cf_ctx = WorkerContext { pool: ctx.pool.clone(), config: ctx.config.clone(), realtime: ctx.realtime.clone(), cfg, llm: ctx.llm.clone() };
+    let pool = &cf_ctx.pool;
+
+    let created = uploads::create_media_job(pool, &cf_ctx.realtime, &cf_ctx.cfg, new_meeting(p, SourceType::Media, "Evaluasi"), "evaluasi.wav", Some("audio/wav"), audio.len() as u64)
+        .await
+        .unwrap();
+    let job_id = created.job.id.0;
+    put_upload(&cf_ctx, &upload_key(pool, job_id).await.unwrap(), audio).await;
+    uploads::complete_upload(pool, &cf_ctx.realtime, &cf_ctx.cfg, p.id, job_id).await.unwrap();
+
+    // Groq would make the job wait ten minutes; the part goes to Cloudflare instead.
+    state.lock().unwrap().whisper_rate_limited = true;
+    let cf_before = state.lock().unwrap().cf_calls;
+    assert!(run_next_job(&cf_ctx).await);
+    state.lock().unwrap().whisper_rate_limited = false;
+    assert_eq!(state.lock().unwrap().cf_calls, cf_before + 1);
+
+    let detail = review::job_detail(pool, job_id).await.unwrap();
+    assert_eq!(detail.job.status, JobStatus::DraftsReady, "job ended as {:?}", detail.job.status);
+    let (language, segments) = review::transcript(pool, job_id).await.unwrap();
+    assert_eq!(language.as_deref(), Some("id"));
+    assert_eq!(segments.len(), 2);
+    assert_eq!(detail.drafts.len(), 1);
+}
+
+async fn abandoned_upload_fails_and_is_removed(ctx: &WorkerContext, p: &Project) {
+    let pool = &ctx.pool;
+    let store = ctx.cfg.media_store.as_ref().unwrap();
+    let created = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "Never finished"), "call.mp4", Some("video/mp4"), 4096)
+        .await
+        .unwrap();
+    let job_id = created.job.id.0;
+    let key = upload_key(pool, job_id).await.unwrap();
+    put_upload(ctx, &key, &[0u8; 4096]).await;
+
+    // Recent: the sweep leaves it alone.
+    uploads::sweep(pool, &ctx.realtime, &ctx.cfg).await;
+    assert_eq!(job_status(pool, job_id).await, JobStatus::Created);
+
+    sqlx::query("UPDATE opentask.meetings SET created_at = NOW() - INTERVAL '7 hours' WHERE id = $1;")
+        .bind(created.meeting.id.0)
+        .execute(pool)
+        .await
+        .unwrap();
+    uploads::sweep(pool, &ctx.realtime, &ctx.cfg).await;
+    let detail = review::job_detail(pool, job_id).await.unwrap();
+    assert_eq!(detail.job.status, JobStatus::Failed);
+    assert_eq!(detail.job.failure_reason.as_deref(), Some("The upload did not finish within 6 hours."));
+    assert_eq!(store.size(&key).await.unwrap(), None, "the partial upload is removed");
+    assert_eq!(upload_key(pool, job_id).await, None);
+
+    // Too big or empty never gets an upload URL.
+    let too_big = (ctx.cfg.max_upload_mb + 1) * 1024 * 1024;
+    let huge = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "x"), "x.mp4", None, too_big).await;
+    assert!(matches!(huge, Err(AppError::BadRequest(_))));
+    let empty = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "x"), "x.mp4", None, 0).await;
+    assert!(matches!(empty, Err(AppError::BadRequest(_))));
 }

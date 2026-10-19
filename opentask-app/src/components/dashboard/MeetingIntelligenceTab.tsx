@@ -4,6 +4,7 @@ import type { Bucket, Meeting, MeetingJobSummary, ProjectMember } from "../../mo
 import { SurfaceCard } from "../../design-system/SurfaceCard";
 import { Skeleton } from "../../design-system/Skeleton";
 import { meetingJobService } from "../../services/meetingJobService";
+import { useMeetingUploads } from "../../services/meetingUploads";
 import { MeetingIntakePanel } from "../meetings/MeetingIntakePanel";
 import { MeetingJobsPanel } from "../meetings/MeetingJobsPanel";
 import { DraftReviewModal } from "../meetings/DraftReviewModal";
@@ -51,6 +52,12 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
   const reviewTarget = reviewJobId ?? initialJobId ?? null;
   const seenJobs = useRef<Map<string, string> | null>(null);
   const reload = () => setReloadTick((t) => t + 1);
+  // A recording's job only exists once its upload starts; reload when an upload here gets or finishes one.
+  const uploads = useMeetingUploads();
+  const uploadSignal = uploads
+    .filter((u) => u.projectId === String(projectId) && u.jobId)
+    .map((u) => `${u.jobId}:${u.stage}`)
+    .join("|");
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +82,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [projectId, refreshKey, reloadTick, pollTick, onMeetingChanged, onMeetingsChanged]);
+  }, [projectId, refreshKey, reloadTick, pollTick, uploadSignal, onMeetingChanged, onMeetingsChanged]);
 
   const hasActiveJob = jobs.some((job) => isJobActive(job.status));
   useEffect(() => {

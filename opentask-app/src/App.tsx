@@ -16,6 +16,7 @@ import { useState } from "react";
 import { ThemeProvider } from "./context/themeContext";
 import { NetworkBadge } from "./components/ui/NetworkBadge";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
+import { MeetingUploadTray } from "./components/meetings/MeetingUploadTray";
 import "./App.css";
 
 function AppShell() {
@@ -51,6 +52,7 @@ function AppShell() {
       </main>
 
       <TelegramLinkPrompt onOpenSettings={() => setIsSettingsOpen(true)} />
+      <MeetingUploadTray />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </div>

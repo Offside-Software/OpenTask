@@ -3,6 +3,7 @@ import type {
   ApproveDraftItem,
   DraftReviewResult,
   MeetingIntake,
+  MeetingMediaIntake,
   MeetingJobDetail,
   MeetingJobSummary,
   TranscriptSegment,
@@ -36,6 +37,16 @@ export const meetingJobService = {
       method: "POST",
       body: JSON.stringify(fields),
     }),
+
+  /** Creates the meeting and job for a recording and returns where to upload it. */
+  createMediaJob: (fields: MeetingIntakeFields & { file_name: string; content_type?: string; size_bytes: number }) =>
+    apiFetch<MeetingMediaIntake>("/meeting-jobs", {
+      method: "POST",
+      body: JSON.stringify(fields),
+    }),
+
+  completeUpload: (jobId: string) =>
+    apiFetch<MeetingIntake>(`/meeting-jobs/${jobId}/complete`, { method: "POST" }),
 
   approveDrafts: (jobId: string, items: ApproveDraftItem[]) =>
     apiFetch<DraftReviewResult>(`/meeting-jobs/${jobId}/drafts/approve`, {

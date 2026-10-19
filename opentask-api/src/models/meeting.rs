@@ -263,7 +263,8 @@ pub struct MeetingJobResponse {
 
 impl From<MeetingJob> for MeetingJobResponse {
     fn from(job: MeetingJob) -> Self {
-        let failure_reason = (job.status == JobStatus::Failed && job.source_type == SourceType::RecallBot && job.attempts == 0)
+        let from_intake = matches!(job.source_type, SourceType::RecallBot | SourceType::Media) && job.attempts == 0;
+        let failure_reason = (job.status == JobStatus::Failed && from_intake)
             .then(|| job.last_error.clone())
             .flatten();
         Self {
@@ -372,6 +373,28 @@ pub struct InviteBotPayload {
 pub struct IntakeResponse {
     pub meeting: DatabaseMeeting,
     pub job: MeetingJobResponse,
+}
+
+/// `POST /meeting-jobs`: a record browser about to upload.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateMediaJobPayload {
+    pub project_id: SafeId,
+    pub title: Option<String>,
+    pub meeting_date: Option<String>,
+    pub timezone: Option<String>,
+    #[serde(default)]
+    pub attendee_ids: Vec<SafeId>,
+    pub file_name: String,
+    pub content_type: Option<String>,
+    pub size_bytes: u64,
+}
+
+/// The new meeting and job, plus where to send the file.
+#[derive(Debug, Clone, Serialize)]
+pub struct MediaIntakeResponse {
+    pub meeting: DatabaseMeeting,
+    pub job: MeetingJobResponse,
+    pub upload: crate::services::meeting_pipeline::storage::UploadTarget,
 }
 
 /// Project's job.
@@ -567,6 +590,7 @@ mod tests {
         // Failed in the worker (claimed at least once), or not a bot job: kept internal.
         assert_eq!(MeetingJobResponse::from(job(SourceType::RecallBot, 3)).failure_reason, None);
         assert_eq!(MeetingJobResponse::from(job(SourceType::Text, 0)).failure_reason, None);
+        assert!(MeetingJobResponse::from(job(SourceType::Media, 0)).failure_reason.is_some(), "an upload that never finished");
     }
 
     #[test]

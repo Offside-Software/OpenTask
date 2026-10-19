@@ -2,12 +2,13 @@ use chrono::Datelike;
 use sqlx::PgPool;
 
 use super::extract::{self, Checkpoint, ChunkOutcome};
+use super::gate::run_gate;
 use super::jobs::{self, ClaimedJob};
 use super::postprocess::{self, MemberName, PostProcessInput};
 use super::prompts::ExtractContext;
-use super::transcript::{format_segment, head_tail_sample};
+use super::transcript::{format_segment, head_tail_sample, plain_text};
 use super::{drafts, StepError, StepOutcome, WorkerContext};
-use crate::models::meeting::{MeetingTranscript, SourceType};
+use crate::models::meeting::{GateVerdict, JobStatus, MeetingTranscript, SourceType};
 
 pub const DEFAULT_TASK_TYPES: [&str; 5] = ["CODE", "REQUIREMENT", "DESIGN", "NON-CODE", "OTHER"];
 
@@ -57,6 +58,32 @@ async fn save_checkpoint(pool: &PgPool, job_id: i64, checkpoint: &Checkpoint) ->
         .await
         .map_err(db_error)?;
     Ok(())
+}
+
+/// Gate to check unless the source is bot meeting
+pub async fn gate_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutcome, StepError> {
+    let job_id = claimed.job.id.0;
+    let segments = crate::db::query_scalar::<_, sqlx::types::Json<Vec<crate::models::meeting::Segment>>>(
+        "SELECT segments FROM opentask.meeting_transcripts WHERE job_id = $1;",
+    )
+    .bind(job_id)
+    .fetch_optional(&ctx.pool)
+    .await
+    .map_err(db_error)?
+    .ok_or_else(|| StepError::Fatal("the job has no transcript".to_string()))?
+    .0;
+
+    let cfg = &ctx.cfg;
+    let models = [cfg.gate_model, cfg.gate_fallback_model];
+    let gate = run_gate(ctx.llm.as_ref(), &models, &plain_text(&segments), cfg.gate_head_chars, cfg.gate_tail_chars).await;
+    crate::db::query("UPDATE opentask.meeting_jobs SET gate = $2 WHERE id = $1;")
+        .bind(job_id)
+        .bind(serde_json::to_value(&gate).unwrap_or_default())
+        .execute(&ctx.pool)
+        .await
+        .map_err(db_error)?;
+    tracing::info!("[Meeting Pipeline] Job {job_id}: gate said {:?}", gate.verdict);
+    Ok(StepOutcome::Next(if gate.verdict == GateVerdict::No { JobStatus::NoActions } else { JobStatus::Extracting }))
 }
 
 pub async fn extract_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutcome, StepError> {

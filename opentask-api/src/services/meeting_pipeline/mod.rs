@@ -1,4 +1,5 @@
 pub mod asr;
+pub mod cf_whisper;
 pub mod config;
 pub mod drafts;
 pub mod extract;
@@ -12,7 +13,9 @@ pub mod prompts;
 pub mod recall;
 pub mod review;
 pub mod steps;
+pub mod storage;
 pub mod transcript;
+pub mod uploads;
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -66,9 +69,13 @@ pub fn spawn_worker(pool: PgPool, config: Config, realtime: RealtimeHub) {
         loop {
             interval.tick().await;
             intake::poll_recall_bots(&poll_pool, &poll_config, &poll_realtime, &poll_cfg).await;
+            uploads::sweep(&poll_pool, &poll_realtime, &poll_cfg).await;
         }
     });
 
+    if let Some(store) = cfg.media_store.as_ref() {
+        tracing::info!("[Meeting Pipeline] Recording uploads go to the {}", store.kind());
+    }
     let ctx = WorkerContext { pool, config, realtime, cfg, llm };
     tokio::spawn(async move { run_worker(ctx).await });
 }
@@ -203,7 +210,7 @@ async fn run_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutco
         JobStatus::Queued => first_step(claimed.job.source_type).map(StepOutcome::Next),
         JobStatus::Transcribing => asr::transcribe_step(ctx, claimed).await,
         JobStatus::Extracting => steps::extract_step(ctx, claimed).await,
-        JobStatus::Gating => Err(StepError::Fatal("audio and video uploads are not supported yet".to_string())),
+        JobStatus::Gating => steps::gate_step(ctx, claimed).await,
         status => Err(StepError::Fatal(format!("a {status} job has nothing to run"))),
     }
 }

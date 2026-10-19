@@ -6,8 +6,9 @@ import { useToast } from "../../design-system/Toast";
 import type { ProjectMember } from "../../models";
 import { browserTimezone, meetingJobService, todayLocal } from "../../services/meetingJobService";
 import { ACCEPTED_TEXT_FILES, MAX_TEXT_CHARS, MIN_TEXT_CHARS, extractDocumentText } from "../../utils/documentText";
+import { RECORDING_ACCEPT, startMeetingUpload } from "../../services/meetingUploads";
 
-type Source = "link" | "file" | "paste";
+type Source = "link" | "recording" | "file" | "paste";
 
 interface MeetingIntakePanelProps {
   projectId: string | number;
@@ -21,6 +22,7 @@ const labelClass = "block text-neutral-400 font-mono text-[10px] font-bold upper
 
 const SOURCES: { id: Source; label: string; hint: string; icon: React.ElementType }[] = [
   { id: "link", label: "Meeting link", hint: "Send a bot to Zoom, Meet or Teams", icon: LinkIcon },
+  { id: "recording", label: "Recording", hint: "Audio or video file", icon: Video },
   { id: "file", label: "Notes file", hint: ".txt .md .docx .pdf", icon: FileText },
   { id: "paste", label: "Paste text", hint: "Minutes, transcript or chat", icon: ClipboardPaste },
 ];
@@ -34,17 +36,21 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
   const [meetingUrl, setMeetingUrl] = useState("");
   const [pasted, setPasted] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [recording, setRecording] = useState<File | null>(null);
   const [stage, setStage] = useState<"idle" | "reading" | "sending">("idle");
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const recordingInput = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setTitle("");
     setMeetingUrl("");
     setPasted("");
     setFile(null);
+    setRecording(null);
     setAttendees([]);
     if (fileInput.current) fileInput.current.value = "";
+    if (recordingInput.current) recordingInput.current.value = "";
   };
 
   const toggleAttendee = (id: string) =>
@@ -69,6 +75,13 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
         setStage("sending");
         await meetingJobService.inviteBot({ ...common, meeting_url: meetingUrl.trim() });
         showToast("Bot sent. Tasks appear here after the meeting ends.", "success");
+      } else if (source === "recording") {
+        if (!recording) {
+          setError("Choose a recording first.");
+          return;
+        }
+        startMeetingUpload(recording, { ...common, title: common.title ?? recording.name.replace(/\.[^.]+$/, "") });
+        showToast("Uploading in the background. You can keep working; progress is in the corner.", "success");
       } else {
         let text: string;
         if (source === "file") {
@@ -130,11 +143,6 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
               <span className={`block font-mono text-[10px] ${source === id ? "text-black" : "text-neutral-400"}`}>{hint}</span>
             </button>
           ))}
-          <div className="text-left p-3 border-2 border-dashed border-neutral-700 bg-[#121417] opacity-60" aria-disabled="true">
-            <Video size={16} strokeWidth={2.5} className="text-neutral-400" />
-            <span className="block font-mono font-black uppercase text-[12px] mt-1.5 text-neutral-300">Recording</span>
-            <span className="block font-mono text-[10px] text-neutral-400">Audio/video: coming soon</span>
-          </div>
         </div>
 
         {source === "link" && (
@@ -150,6 +158,34 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
             />
             <p className="text-neutral-400 font-mono text-[10px] mt-1">
               The bot records the meeting audio. When it leaves, the audio is transcribed and tasks are drafted.
+            </p>
+          </div>
+        )}
+
+        {source === "recording" && (
+          <div>
+            <label className={labelClass} htmlFor="meeting-recording">Meeting recording</label>
+            <button
+              type="button"
+              onClick={() => recordingInput.current?.click()}
+              className="w-full border-2 border-dashed border-neutral-700 hover:border-[#FFE600] bg-[#121417] p-5 flex items-center gap-3 cursor-pointer"
+            >
+              <Upload size={18} className="text-neutral-300" />
+              <span className="font-mono text-[12px] text-white truncate">
+                {recording ? `${recording.name} · ${(recording.size / 1024 / 1024).toFixed(1)} MB` : "Choose an audio or video file (mp3, m4a, wav, mp4, mov, webm…)"}
+              </span>
+            </button>
+            <input
+              id="meeting-recording"
+              ref={recordingInput}
+              type="file"
+              hidden
+              accept={RECORDING_ACCEPT}
+              onChange={(e) => setRecording(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-neutral-400 font-mono text-[10px] mt-1">
+              The audio is pulled out in your browser first, so an hour of video uploads as about 15 MB. It is transcribed, checked
+              for follow-ups and drafted into tasks; the file is deleted once transcribed.
             </p>
           </div>
         )}
@@ -239,7 +275,7 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
         <div className="flex justify-end">
           <Button type="submit" variant="primary" size="md" disabled={busy}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {stage === "reading" ? "Reading file…" : stage === "sending" ? "Sending…" : source === "link" ? "Send bot" : "Extract tasks"}
+            {stage === "reading" ? "Reading file…" : stage === "sending" ? "Sending…" : source === "link" ? "Send bot" : source === "recording" ? "Upload recording" : "Extract tasks"}
           </Button>
         </div>
       </form>

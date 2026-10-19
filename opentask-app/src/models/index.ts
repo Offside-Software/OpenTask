@@ -227,6 +227,19 @@ export interface MeetingJobDetail {
   drafts: MeetingDraftTask[];
 }
 
+export interface MeetingUploadTarget {
+  url: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  expires_at: string;
+}
+
+export interface MeetingMediaIntake {
+  meeting: Meeting;
+  job: MeetingJob;
+  upload: MeetingUploadTarget;
+}
+
 export interface MeetingIntake {
   meeting: Meeting;
   job: MeetingJob;

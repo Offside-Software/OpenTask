@@ -1,6 +1,8 @@
 use axum::{
+    body::Body,
     extract::{DefaultBodyLimit, Path, Query, State},
-    routing::{get, post},
+    http::StatusCode,
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::Deserialize;
@@ -9,8 +11,8 @@ use serde_json::{json, Value};
 use crate::error::AppError;
 use crate::extractors::auth::CurrentUser;
 use crate::models::meeting::{
-    ApproveDraftsPayload, CreateTextJobPayload, IntakeResponse, MeetingJobDetail, MeetingJobSummary,
-    RejectDraftsPayload, ReviewResult, SourceType,
+    ApproveDraftsPayload, CreateMediaJobPayload, CreateTextJobPayload, IntakeResponse, MediaIntakeResponse,
+    MeetingJobDetail, MeetingJobSummary, RejectDraftsPayload, ReviewResult, SourceType,
 };
 use crate::models::safe_id::SafeId;
 use crate::models::user::GitHubUserResponse;
@@ -19,6 +21,8 @@ use crate::routes::meetings::require_project_member;
 use crate::services::meeting_pipeline::intake::{self, NewMeeting};
 use crate::services::meeting_pipeline::review::{self, ReviewOutcome};
 use crate::services::meeting_pipeline::pipeline;
+use crate::services::meeting_pipeline::storage::MediaStore;
+use crate::services::meeting_pipeline::uploads;
 
 #[derive(Debug, Deserialize)]
 pub struct JobListQuery {
@@ -31,11 +35,14 @@ pub fn router() -> Router<AppState> {
             "/meeting-jobs/text",
             post(create_text_job).layer(DefaultBodyLimit::max(4 * 1024 * 1024)),
         )
-        .route("/meeting-jobs", get(list_jobs))
+        .route("/meeting-jobs", get(list_jobs).post(create_media_job))
+        .route("/meeting-jobs/{job_id}/complete", post(complete_upload))
         .route("/meeting-jobs/{job_id}", get(get_job))
         .route("/meeting-jobs/{job_id}/transcript", get(get_transcript))
         .route("/meeting-jobs/{job_id}/drafts/approve", post(approve_drafts))
         .route("/meeting-jobs/{job_id}/drafts/reject", post(reject_drafts))
+        // Dev route only to accommodate local upload.
+        .route("/meeting-uploads", put(local_upload).layer(DefaultBodyLimit::disable()))
 }
 
 /// Checks access to a job; returns its project and the caller's user id.
@@ -69,6 +76,87 @@ pub async fn create_text_job(
     let (cfg, llm) = pipeline(&state.config);
     let response = intake::create_text_job(&state.pool, &state.realtime, cfg, llm.as_ref(), new, &payload.text).await?;
     Ok(Json(response))
+}
+
+/// A recording the browser is about to upload
+pub async fn create_media_job(
+    State(state): State<AppState>,
+    CurrentUser(user, _): CurrentUser,
+    Json(payload): Json<CreateMediaJobPayload>,
+) -> Result<Json<MediaIntakeResponse>, AppError> {
+    let project_id = payload.project_id.0;
+    let user_id = require_project_member(&state.pool, &user, project_id).await?;
+    let requested: Vec<i64> = payload.attendee_ids.iter().map(|a| a.0).collect();
+    let new = NewMeeting {
+        project_id,
+        created_by: user_id,
+        title: payload
+            .title
+            .map(|t| t.trim().chars().take(200).collect::<String>())
+            .filter(|t| !t.is_empty())
+            .or_else(|| {
+                std::path::Path::new(&payload.file_name)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.trim().chars().take(200).collect::<String>())
+                    .filter(|s| !s.is_empty())
+            })
+            .unwrap_or_else(|| "Recording".to_string()),
+        source_type: SourceType::Media,
+        meeting_date: intake::parse_meeting_date(payload.meeting_date.as_deref())?,
+        timezone: payload.timezone.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "Asia/Jakarta".to_string()),
+        attendee_ids: intake::member_ids(&state.pool, project_id, &requested).await?,
+    };
+    let (cfg, _) = pipeline(&state.config);
+    let response = uploads::create_media_job(
+        &state.pool,
+        &state.realtime,
+        cfg,
+        new,
+        &payload.file_name,
+        payload.content_type.as_deref(),
+        payload.size_bytes,
+    )
+    .await?;
+    Ok(Json(response))
+}
+
+/// The browser finished uploading: the file is checked and the job queued.
+pub async fn complete_upload(
+    State(state): State<AppState>,
+    CurrentUser(user, _): CurrentUser,
+    Path(job_id): Path<SafeId>,
+) -> Result<Json<IntakeResponse>, AppError> {
+    let (project_id, _) = member_job(&state, &user, job_id.0).await?;
+    let (cfg, _) = pipeline(&state.config);
+    Ok(Json(uploads::complete_upload(&state.pool, &state.realtime, cfg, project_id, job_id.0).await?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LocalUploadQuery {
+    pub key: String,
+    pub expires: i64,
+    pub sig: String,
+}
+
+/// Receives an upload for the development store, streaming it to disk.
+pub async fn local_upload(
+    State(state): State<AppState>,
+    Query(query): Query<LocalUploadQuery>,
+    body: Body,
+) -> Result<StatusCode, AppError> {
+    let (cfg, _) = pipeline(&state.config);
+    let Some(MediaStore::Local(store)) = cfg.media_store.as_ref() else {
+        return Err(AppError::NotFound("No local upload store".to_string()));
+    };
+    if !store.verify(&query.key, query.expires, &query.sig, chrono::Utc::now()) {
+        return Err(AppError::Forbidden("The upload link is invalid or expired".to_string()));
+    }
+    store
+        .receive(&query.key, body.into_data_stream(), cfg.max_upload_mb * 1024 * 1024)
+        .await
+        .map_err(AppError::BadRequest)?;
+    Ok(StatusCode::OK)
 }
 
 pub async fn list_jobs(

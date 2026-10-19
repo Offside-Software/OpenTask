@@ -27,6 +27,9 @@ pub struct PipelineConfig {
     pub asr_audio_sec_per_day: u32,
     pub asr_prompt_max_tokens: u32,
     pub cf_asr_model: &'static str,
+    pub cf_account_id: Option<String>,
+    pub cf_api_token: Option<String>,
+    pub cf_api_base: String,
     pub asr_language: Option<String>,
     pub asr_part_secs: u32,
     pub asr_bitrate: &'static str,
@@ -35,10 +38,15 @@ pub struct PipelineConfig {
     pub max_audio_minutes: u32,
     pub max_download_mb: u64,
 
+    // Recording uploads
+    pub media_store: Option<super::storage::MediaStore>,
+    pub max_upload_mb: u64,
+    pub upload_url_minutes: u64,
+    pub upload_max_wait_hours: i64,
+
     // Recall bots
     pub recall_poll_secs: u64,
     pub recall_max_wait_hours: i64,
-    /// How long after Recall reports `done` a bot without audio fails its job.
     pub recall_no_audio_grace_mins: i64,
 
     // Gate
@@ -93,6 +101,10 @@ impl PipelineConfig {
             asr_audio_sec_per_day: 28_800,
             asr_prompt_max_tokens: 224,
             cf_asr_model: "@cf/openai/whisper-large-v3-turbo",
+            cf_account_id: get_clean_env("CLOUDFLARE_ACCOUNT_ID"),
+            cf_api_token: get_clean_env("CLOUDFLARE_API_TOKEN"),
+            cf_api_base: get_clean_env("CLOUDFLARE_API_BASE_URL")
+                .unwrap_or_else(|| "https://api.cloudflare.com/client/v4".to_string()),
             // Indonesian by default; MEETING_ASR_LANGUAGE=auto to detect.
             asr_language: match get_clean_env("MEETING_ASR_LANGUAGE").map(|l| l.to_ascii_lowercase()) {
                 Some(l) if l == "auto" => None,
@@ -105,6 +117,11 @@ impl PipelineConfig {
             ffprobe_path: get_clean_env("FFPROBE_PATH").unwrap_or_else(|| "ffprobe".to_string()),
             max_audio_minutes: 240,
             max_download_mb: 1_024,
+
+            media_store: super::storage::MediaStore::from_env(),
+            max_upload_mb: 1_024,
+            upload_url_minutes: 60,
+            upload_max_wait_hours: 6,
 
             recall_poll_secs: 60,
             recall_max_wait_hours: 12,
