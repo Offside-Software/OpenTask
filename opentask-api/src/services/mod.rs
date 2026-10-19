@@ -1,6 +1,7 @@
 pub mod gemini;
 pub mod github;
 pub mod id_generator;
+pub mod meeting_pipeline;
 pub mod notifications;
 pub mod realtime;
 pub mod pr_evaluator;
