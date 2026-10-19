@@ -6,10 +6,9 @@ import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
 import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
-import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Trash2, Loader2, RefreshCw, Sparkles, Search, X, Cpu, Filter } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Loader2, RefreshCw, Sparkles, Search, X, Cpu, Filter } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
-import { MeetingAccordion } from '../components/dashboard/MeetingAccordion';
 import { MeetingIntelligenceTab } from '../components/dashboard/MeetingIntelligenceTab';
 import { KanbanCard } from '../components/kanban/KanbanCard';
 import { KanbanColumn } from '../components/kanban/KanbanColumn';
@@ -18,7 +17,6 @@ import { TaskDetailModal } from '../components/modals/TaskDetailModal';
 import { ConfirmModal } from '../components/modals/ConfirmModal';
 import { BucketSettingsModal } from '../components/modals/BucketSettingsModal';
 import { McpConfigModal } from '../components/modals/McpConfigModal';
-import { SurfaceCard } from '../design-system/SurfaceCard';
 import { TaskFormModal } from '../components/modals/TaskFormModal';
 import { MeetingFormModal } from '../components/modals/MeetingFormModal';
 import { LoadingScreen } from '../components/ui/LoadingScreen';
@@ -240,6 +238,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
     debounceMs: 50,
   });
 
+  const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting, refreshMeetings, refreshMeeting, removeMeetingLocally } = useMeetings(projectId);
+
   const handleProjectEvent = useCallback((event: ProjectEvent) => {
     if (event.entity === 'task' || event.entity === 'bucket') {
       if (hasPendingReorders()) {
@@ -255,17 +255,24 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       projectService.getProjectById(projectId)
         .then(setProject)
         .catch(error => console.error('Failed to refresh project after realtime event:', error));
-    } else if (event.entity === 'meeting' || event.entity === 'meeting_job') {
+    } else if (event.entity === 'meeting') {
+      // Swap the one meeting in place so open meeting cards keep their state.
+      if (event.action === 'deleted' && event.entity_id) removeMeetingLocally(event.entity_id);
+      else if (event.entity_id) void refreshMeeting(event.entity_id);
+      else void refreshMeetings();
+      setMeetingEventKey(k => k + 1);
+    } else if (event.entity === 'meeting_job') {
       setMeetingEventKey(k => k + 1);
     }
-  }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders]);
+    // Drafts are tasks: a move on the board can finish or reopen a meeting's review.
+    if (event.entity === 'task') setMeetingEventKey(k => k + 1);
+  }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally]);
 
   useProjectRealtime(projectId, { onEvent: handleProjectEvent });
 
   // Mutation hooks
   const { createBucket, updateBucket, deleteBucket } = useBuckets(projectId);
   const { createTask, updateTask, deleteTask } = useTasks(projectId);
-  const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting, refreshMeetings } = useMeetings(projectId);
 
   // Auto-scrolling during drag operations (vertical on <main>, horizontal on board)
   const boardScrollRef = React.useRef<HTMLDivElement>(null);
@@ -1134,37 +1141,12 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                 next.delete('meetingJob');
                 return next;
               }, { replace: true })}
+              meetings={meetings}
+              meetingsLoading={meetingsLoading}
+              onMeetingChanged={refreshMeeting}
               onMeetingsChanged={refreshMeetings}
+              onDeleteMeeting={deleteMeeting}
             />
-
-            <SurfaceCard
-              title="Historical Meetings"
-              subtitle={`${meetings.length} Past Sessions`}
-              icon={Video}
-              rightElement={null}
-            >
-              {meetingsLoading ? (
-                <div className="text-slate-500 text-[13px] text-center py-8">Loading meetings...</div>
-              ) : meetings.length === 0 ? (
-                <div className="text-slate-500 text-[13px] text-center py-12 border border-dashed border-[#374151] rounded-xl">
-                  No meeting history.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {meetings.map((mtg, idx) => (
-                    <div key={mtg.id} className="relative group/mtg">
-                      <MeetingAccordion meeting={mtg} isDefaultExpanded={idx === 0} />
-                      <button
-                        onClick={() => deleteMeeting(mtg.id!)}
-                        className="absolute top-3 right-10 opacity-0 group-hover/mtg:opacity-100 p-1.5 rounded-none bg-black border border-neutral-700 text-neutral-400 hover:text-white hover:bg-[#EF4444] hover:border-black transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000]"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SurfaceCard>
           </div>
         )}
 

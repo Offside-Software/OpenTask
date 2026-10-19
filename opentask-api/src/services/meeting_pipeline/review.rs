@@ -118,6 +118,22 @@ pub async fn transcript(pool: &PgPool, job_id: i64) -> Result<(Option<String>, V
     Ok((row.0, row.1 .0))
 }
 
+fn strip_review_lines(description: &str) -> &str {
+    let mut rest = description.trim_end();
+    loop {
+        let (head, last) = match rest.rfind('\n') {
+            Some(i) => (&rest[..i], &rest[i + 1..]),
+            None => ("", rest),
+        };
+        let line = last.trim();
+        if line.starts_with("Due:") || line.starts_with("Priority:") {
+            rest = head.trim_end();
+        } else {
+            return rest;
+        }
+    }
+}
+
 /// `Due date` and `Priority` lines appended to the description.
 pub fn compose_description(
     description: Option<&str>,
@@ -125,6 +141,7 @@ pub fn compose_description(
     due_text: Option<&str>,
     priority: Option<&str>,
 ) -> Option<String> {
+    let description = description.map(strip_review_lines);
     let mut lines = Vec::new();
     match (due_date, due_text.filter(|t| !t.trim().is_empty())) {
         (Some(date), Some(text)) => lines.push(format!("Due: {date} (\u{201c}{}\u{201d})", text.trim())),
@@ -173,10 +190,49 @@ async fn lock_reviewable_job(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, job
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Meeting job {job_id} not found")))?;
-    if row.0 != JobStatus::DraftsReady {
+    if !matches!(row.0, JobStatus::DraftsReady | JobStatus::Reviewed) {
         return Err(AppError::Conflict(format!("This job is {}, not waiting for review", row.0)));
     }
     Ok(row.1)
+}
+
+pub async fn sync_review_status(pool: &PgPool, project_id: Option<i64>, job_id: Option<i64>) -> Result<Vec<i64>, sqlx::Error> {
+    crate::db::query_scalar(
+        r#"
+        WITH reviewable AS (
+            SELECT j.id,
+                   EXISTS (
+                       SELECT 1 FROM opentask.task_extraction_meta x
+                       JOIN opentask.tasks t ON t.id = x.task_id
+                       JOIN opentask.buckets b ON b.id = t.bucket_id
+                       WHERE x.job_id = j.id AND b.state = 'DRAFT'
+                   ) AS has_pending
+            FROM opentask.meeting_jobs j
+            JOIN opentask.meetings m ON m.id = j.meeting_id
+            WHERE j.status IN ('DRAFTS_READY', 'REVIEWED')
+              AND ($1::bigint IS NULL OR m.project_id = $1)
+              AND ($2::bigint IS NULL OR j.id = $2)
+        ),
+        changed AS (
+            UPDATE opentask.meeting_jobs j
+            SET status = CASE WHEN r.has_pending THEN 'DRAFTS_READY' ELSE 'REVIEWED' END
+            FROM reviewable r
+            WHERE j.id = r.id AND j.status <> CASE WHEN r.has_pending THEN 'DRAFTS_READY' ELSE 'REVIEWED' END
+            RETURNING j.id, j.alert_id, j.status
+        ),
+        resolved AS (
+            UPDATE opentask.alerts a SET is_resolved = TRUE, updated_at = NOW()
+            FROM changed c
+            WHERE a.id = c.alert_id AND c.status = 'REVIEWED' AND a.is_resolved IS NOT TRUE
+            RETURNING a.id
+        )
+        SELECT id FROM changed;
+        "#,
+    )
+    .bind(project_id)
+    .bind(job_id)
+    .fetch_all(pool)
+    .await
 }
 
 async fn lock_draft(
@@ -213,8 +269,7 @@ async fn next_order(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, bucket_id: i
         .await
 }
 
-/// Ends the review when no draft of the job is left in AI Drafts (job REVIEWED, alert resolved).
-async fn finish_if_done(
+async fn settle_review(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     job_id: i64,
     alert_id: Option<i64>,
@@ -230,17 +285,17 @@ async fn finish_if_done(
     .bind(job_id)
     .fetch_one(&mut **tx)
     .await?;
-    if pending == 0 {
-        crate::db::query("UPDATE opentask.meeting_jobs SET status = 'REVIEWED' WHERE id = $1;")
-            .bind(job_id)
+    let status = if pending == 0 { JobStatus::Reviewed } else { JobStatus::DraftsReady };
+    crate::db::query("UPDATE opentask.meeting_jobs SET status = $2 WHERE id = $1;")
+        .bind(job_id)
+        .bind(status)
+        .execute(&mut **tx)
+        .await?;
+    if let (0, Some(alert_id)) = (pending, alert_id) {
+        crate::db::query("UPDATE opentask.alerts SET is_resolved = TRUE, updated_at = NOW() WHERE id = $1;")
+            .bind(alert_id)
             .execute(&mut **tx)
             .await?;
-        if let Some(alert_id) = alert_id {
-            crate::db::query("UPDATE opentask.alerts SET is_resolved = TRUE, updated_at = NOW() WHERE id = $1;")
-                .bind(alert_id)
-                .execute(&mut **tx)
-                .await?;
-        }
     }
     Ok(pending)
 }
@@ -360,7 +415,7 @@ pub async fn approve(
         moved.push((task_id, lead, title));
     }
 
-    let pending_drafts = finish_if_done(&mut tx, job_id, alert_id).await?;
+    let pending_drafts = settle_review(&mut tx, job_id, alert_id).await?;
     tx.commit().await?;
     let job = fetch_job(pool, job_id).await?;
     Ok(ReviewOutcome {
@@ -395,7 +450,7 @@ pub async fn reject(pool: &PgPool, job_id: i64, project_id: i64, task_ids: &[Saf
         moved.push((task_id.0, None, draft.title));
     }
 
-    let pending_drafts = finish_if_done(&mut tx, job_id, alert_id).await?;
+    let pending_drafts = settle_review(&mut tx, job_id, alert_id).await?;
     tx.commit().await?;
     let job = fetch_job(pool, job_id).await?;
     Ok(ReviewOutcome {
@@ -424,5 +479,15 @@ mod tests {
             Some("x\n\nDue: \u{201c}next sprint\u{201d}")
         );
         assert_eq!(compose_description(Some("  "), None, None, None), None);
+    }
+
+    #[test]
+    fn approving_again_does_not_repeat_due_and_priority_lines() {
+        let date = NaiveDate::from_ymd_opt(2026, 10, 24);
+        let first = compose_description(Some("Send the report"), date, Some("Jumat"), Some("high")).unwrap();
+        let again = compose_description(Some(&first), date, Some("Jumat"), Some("medium")).unwrap();
+        assert_eq!(again, "Send the report\n\nDue: 2026-10-24 (\u{201c}Jumat\u{201d})\nPriority: medium");
+        assert_eq!(compose_description(Some("Due: 2026-10-24"), None, None, None), None);
+        assert_eq!(strip_review_lines("Keep this\nDue soon means Friday"), "Keep this\nDue soon means Friday");
     }
 }

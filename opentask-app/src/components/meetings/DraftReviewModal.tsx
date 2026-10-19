@@ -448,7 +448,9 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
                 {decided.map((d) => (
                   <li key={d.task_id} className="flex items-center gap-2 font-mono text-[11px] text-neutral-400">
                     <Badge variant={d.bucket_state === "ARCHIVED" ? "outline" : "success"}>
-                      {d.bucket_state === "ARCHIVED" ? "Rejected" : "Approved"}
+                      {d.bucket_state === "ARCHIVED"
+                        ? "Rejected"
+                        : `In ${buckets.find((b) => String(b.id) === String(d.bucket_id))?.name ?? "the board"}`}
                     </Badge>
                     <span className="truncate">{d.title}</span>
                     {d.lead_assignee_id && <span>· {memberName(d.lead_assignee_id)}</span>}

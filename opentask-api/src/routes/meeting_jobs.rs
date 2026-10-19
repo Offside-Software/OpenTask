@@ -76,8 +76,10 @@ pub async fn list_jobs(
     CurrentUser(user, _): CurrentUser,
     Query(query): Query<JobListQuery>,
 ) -> Result<Json<Vec<MeetingJobSummary>>, AppError> {
-    require_project_member(&state.pool, &user, query.project_id.0).await?;
-    Ok(Json(review::list_jobs(&state.pool, query.project_id.0).await?))
+    let project_id = query.project_id.0;
+    require_project_member(&state.pool, &user, project_id).await?;
+    sync_review(&state, project_id, None).await?;
+    Ok(Json(review::list_jobs(&state.pool, project_id).await?))
 }
 
 pub async fn get_job(
@@ -85,8 +87,17 @@ pub async fn get_job(
     CurrentUser(user, _): CurrentUser,
     Path(job_id): Path<SafeId>,
 ) -> Result<Json<MeetingJobDetail>, AppError> {
-    member_job(&state, &user, job_id.0).await?;
+    let (project_id, _) = member_job(&state, &user, job_id.0).await?;
+    sync_review(&state, project_id, Some(job_id.0)).await?;
     Ok(Json(review::job_detail(&state.pool, job_id.0).await?))
+}
+
+/// Catches up on drafts moved on the board and tells the project's other viewers.
+async fn sync_review(state: &AppState, project_id: i64, job_id: Option<i64>) -> Result<(), AppError> {
+    for changed in review::sync_review_status(&state.pool, Some(project_id), job_id).await? {
+        state.realtime.publish(project_id, "meeting_job", "updated", Some(changed));
+    }
+    Ok(())
 }
 
 pub async fn get_transcript(

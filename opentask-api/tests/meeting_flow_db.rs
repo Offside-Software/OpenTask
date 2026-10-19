@@ -481,6 +481,45 @@ async fn text_job_to_review(ctx: &WorkerContext, p: &Project, llm: &LlmClient, s
     .unwrap();
     assert!(resolved);
     assert!(matches!(review::reject(pool, job_id, p.id, &[docs.task_id]).await, Err(AppError::Conflict(_))));
+
+    move_to_column(pool, p.id, report.task_id.0, "DRAFT").await;
+    assert_eq!(review::sync_review_status(pool, Some(p.id), None).await.unwrap(), vec![job_id]);
+    assert_eq!(job_status(pool, job_id).await, JobStatus::DraftsReady);
+    assert!(review::sync_review_status(pool, Some(p.id), None).await.unwrap().is_empty(), "already in line");
+    let again = ApproveDraftItem { description: None, ..approve[0].clone() };
+    let reapproved = review::approve(pool, job_id, p.id, &[again]).await.unwrap();
+    assert_eq!((reapproved.pending_drafts, reapproved.job.status), (0, JobStatus::Reviewed));
+    let description: String = sqlx::query_scalar("SELECT description FROM opentask.tasks WHERE id = $1;")
+        .bind(report.task_id.0)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    assert_eq!(description, "Untuk klien\n\nDue: 2026-10-23 (\u{201c}Jumat\u{201d})\nPriority: high");
+
+    move_to_column(pool, p.id, docs.task_id.0, "DRAFT").await;
+    assert_eq!(review::sync_review_status(pool, None, Some(job_id)).await.unwrap(), vec![job_id]);
+    let rejected_again = review::reject(pool, job_id, p.id, &[docs.task_id]).await.unwrap();
+    assert_eq!(rejected_again.job.status, JobStatus::Reviewed);
+    move_to_column(pool, p.id, docs.task_id.0, "DRAFT").await;
+    review::sync_review_status(pool, Some(p.id), None).await.unwrap();
+    move_to_column(pool, p.id, docs.task_id.0, "TODO").await;
+    assert_eq!(review::sync_review_status(pool, Some(p.id), None).await.unwrap(), vec![job_id]);
+    assert_eq!(job_status(pool, job_id).await, JobStatus::Reviewed);
+    let listed = review::list_jobs(pool, p.id).await.unwrap();
+    let listed = listed.iter().find(|s| s.job.id.0 == job_id).unwrap();
+    assert_eq!((listed.pending_drafts, listed.total_drafts), (0, 2));
+}
+
+async fn move_to_column(pool: &PgPool, project_id: i64, task_id: i64, state: &str) {
+    sqlx::query(
+        "UPDATE opentask.tasks SET bucket_id = (SELECT id FROM opentask.buckets WHERE project_id = $2 AND state = $3 ORDER BY order_idx LIMIT 1) WHERE id = $1;",
+    )
+    .bind(task_id)
+    .bind(project_id)
+    .bind(state)
+    .execute(pool)
+    .await
+    .unwrap();
 }
 
 async fn gate_no_ends_without_tasks(ctx: &WorkerContext, p: &Project, llm: &LlmClient) {

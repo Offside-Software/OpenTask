@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Meeting, MeetingSource } from "../models";
 import { meetingService } from "../services/meetingService";
 import { useToast } from "../design-system/Toast";
@@ -8,25 +8,60 @@ export const useMeetings = (projectId: string | number) => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
-  const fetchMeetings = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await meetingService.getMeetingsByProject(projectId);
-      setMeetings(data);
-      setError(null);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to fetch meetings");
-      showToast("Error loading meetings", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, showToast]);
+  const load = useCallback(
+    (isCancelled: () => boolean = () => false) =>
+      meetingService
+        .getMeetingsByProject(projectId)
+        .then((data) => {
+          if (isCancelled()) return;
+          setMeetings(data);
+          setError(null);
+          loadedRef.current = true;
+        })
+        .catch((err) => {
+          if (isCancelled()) return;
+          console.error(err);
+          setError("Failed to fetch meetings");
+          if (!loadedRef.current) showToast("Error loading meetings", "error");
+        })
+        .finally(() => {
+          if (!isCancelled()) setLoading(false);
+        }),
+    [projectId, showToast],
+  );
 
   useEffect(() => {
-    fetchMeetings();
-  }, [fetchMeetings]);
+    let cancelled = false;
+    void load(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  const fetchMeetings = useCallback(() => load(), [load]);
+
+  /** Re-reads one meeting and swaps it in; a meeting not in the list yet goes on top. */
+  const refreshMeeting = useCallback(async (id: string | number) => {
+    try {
+      const fresh: Meeting = await meetingService.getMeeting(id);
+      setMeetings((prev) => {
+        const index = prev.findIndex((m) => String(m.id) === String(id));
+        if (index === -1) return [fresh, ...prev];
+        const next = prev.slice();
+        next[index] = fresh;
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      setMeetings((prev) => prev.filter((m) => String(m.id) !== String(id)));
+    }
+  }, []);
+
+  const removeMeetingLocally = useCallback((id: string | number) => {
+    setMeetings((prev) => prev.filter((m) => String(m.id) !== String(id)));
+  }, []);
 
   const createMeeting = useCallback(
     async (data: {
@@ -67,5 +102,14 @@ export const useMeetings = (projectId: string | number) => {
     [showToast],
   );
 
-  return { meetings, loading, error, createMeeting, deleteMeeting, refreshMeetings: fetchMeetings };
+  return {
+    meetings,
+    loading,
+    error,
+    createMeeting,
+    deleteMeeting,
+    refreshMeetings: fetchMeetings,
+    refreshMeeting,
+    removeMeetingLocally,
+  };
 };
