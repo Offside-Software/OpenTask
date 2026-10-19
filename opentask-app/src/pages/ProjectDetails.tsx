@@ -117,6 +117,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [isRefreshingTasks, setIsRefreshingTasks] = useState(false);
   const [projectNotFound, setProjectNotFound] = useState(false);
+  const [meetingEventKey, setMeetingEventKey] = useState(0);
+  const meetingJobParam = searchParams.get('meetingJob');
   const { showToast } = useToast();
 
   React.useEffect(() => {
@@ -253,6 +255,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       projectService.getProjectById(projectId)
         .then(setProject)
         .catch(error => console.error('Failed to refresh project after realtime event:', error));
+    } else if (event.entity === 'meeting' || event.entity === 'meeting_job') {
+      setMeetingEventKey(k => k + 1);
     }
   }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders]);
 
@@ -261,7 +265,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   // Mutation hooks
   const { createBucket, updateBucket, deleteBucket } = useBuckets(projectId);
   const { createTask, updateTask, deleteTask } = useTasks(projectId);
-  const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting } = useMeetings(projectId);
+  const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting, refreshMeetings } = useMeetings(projectId);
 
   // Auto-scrolling during drag operations (vertical on <main>, horizontal on board)
   const boardScrollRef = React.useRef<HTMLDivElement>(null);
@@ -1121,7 +1125,16 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
           <div className="space-y-6">
             <MeetingIntelligenceTab
               projectId={projectId}
-              onMeetingCreated={createMeeting}
+              members={members}
+              buckets={buckets}
+              refreshKey={meetingEventKey}
+              initialJobId={meetingJobParam}
+              onReviewClosed={() => setSearchParams(prev => {
+                const next = new URLSearchParams(prev);
+                next.delete('meetingJob');
+                return next;
+              }, { replace: true })}
+              onMeetingsChanged={refreshMeetings}
             />
 
             <SurfaceCard

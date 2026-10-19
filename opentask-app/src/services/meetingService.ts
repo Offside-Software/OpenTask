@@ -14,19 +14,7 @@ export const meetingService = {
     });
   },
 
-  analyzeMeeting: async (
-    file: File,
-  ): Promise<{ status: string; analysis?: string }> => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    return await apiFetch<{ status: string; analysis?: string }>(
-      "/analyze-meeting",
-      {
-        method: "POST",
-        body: formData,
-        headers: {},
-      },
-    );
+  deleteMeeting: async (meetingId: string | number): Promise<void> => {
+    await apiFetch(`/meetings/${meetingId}`, { method: "DELETE" });
   },
 };

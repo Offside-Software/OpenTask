@@ -56,11 +56,16 @@ export const useMeetings = (projectId: string | number) => {
 
   const deleteMeeting = useCallback(
     async (id: string | number) => {
-      setMeetings((prev) => prev.filter((m) => String(m.id) !== String(id)));
-      showToast("Meeting removed", "info");
+      try {
+        await meetingService.deleteMeeting(id);
+        setMeetings((prev) => prev.filter((m) => String(m.id) !== String(id)));
+        showToast("Meeting removed", "info");
+      } catch (err) {
+        showToast((err as Error).message || "Failed to delete meeting", "error");
+      }
     },
     [showToast],
   );
 
-  return { meetings, loading, error, createMeeting, deleteMeeting };
+  return { meetings, loading, error, createMeeting, deleteMeeting, refreshMeetings: fetchMeetings };
 };

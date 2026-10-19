@@ -33,6 +33,8 @@ pub struct Config {
     pub meeting_pipeline_enabled: bool,
     pub groq_api_key: Option<String>,
     pub recall_region: String,
+    pub recall_base_url: String,
+    pub recall_webhook_secret: Option<String>,
 
     // Web Push (VAPID)
     pub vapid_public_key: String,
@@ -183,7 +185,10 @@ impl Config {
             telegram_bot_token: get_clean_env("TELEGRAM_BOT_TOKEN"),
             meeting_pipeline_enabled,
             groq_api_key,
+            recall_base_url: get_clean_env("RECALL_BASE_URL")
+                .unwrap_or_else(|| format!("https://{recall_region}.recall.ai")),
             recall_region,
+            recall_webhook_secret: get_clean_env("RECALL_WEBHOOK_SECRET"),
             vapid_public_key: get_clean_env("VAPID_PUBLIC_KEY").unwrap_or_else(|| {
                 "BFNGNl-sWQwDl1GTuh9-iM6bmHSVdosX8T7ax7hqLTPYzjM_G1DHrS0vwO1JRC75x9cOjvgybHK-19GbTWlrSN8".to_string()
             }),

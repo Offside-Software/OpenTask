@@ -9,6 +9,7 @@ pub enum GroqTier {
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
     pub groq_tier: GroqTier,
+    pub groq_base_url: String,
 
     // Worker
     pub lease_minutes: i32,
@@ -26,6 +27,19 @@ pub struct PipelineConfig {
     pub asr_audio_sec_per_day: u32,
     pub asr_prompt_max_tokens: u32,
     pub cf_asr_model: &'static str,
+    pub asr_language: Option<String>,
+    pub asr_part_secs: u32,
+    pub asr_bitrate: &'static str,
+    pub ffmpeg_path: String,
+    pub ffprobe_path: String,
+    pub max_audio_minutes: u32,
+    pub max_download_mb: u64,
+
+    // Recall bots
+    pub recall_poll_secs: u64,
+    pub recall_max_wait_hours: i64,
+    /// How long after Recall reports `done` a bot without audio fails its job.
+    pub recall_no_audio_grace_mins: i64,
 
     // Gate
     pub gate_model: &'static str,
@@ -60,6 +74,7 @@ impl PipelineConfig {
 
         Self {
             groq_tier,
+            groq_base_url: get_clean_env("GROQ_BASE_URL").unwrap_or_else(|| super::llm::GROQ_BASE_URL.to_string()),
 
             lease_minutes: 10,
             max_attempts: 8,
@@ -78,9 +93,25 @@ impl PipelineConfig {
             asr_audio_sec_per_day: 28_800,
             asr_prompt_max_tokens: 224,
             cf_asr_model: "@cf/openai/whisper-large-v3-turbo",
+            // Indonesian by default; MEETING_ASR_LANGUAGE=auto to detect.
+            asr_language: match get_clean_env("MEETING_ASR_LANGUAGE").map(|l| l.to_ascii_lowercase()) {
+                Some(l) if l == "auto" => None,
+                Some(l) => Some(l),
+                None => Some("id".to_string()),
+            },
+            asr_part_secs: 1_200,
+            asr_bitrate: "24k",
+            ffmpeg_path: get_clean_env("FFMPEG_PATH").unwrap_or_else(|| "ffmpeg".to_string()),
+            ffprobe_path: get_clean_env("FFPROBE_PATH").unwrap_or_else(|| "ffprobe".to_string()),
+            max_audio_minutes: 240,
+            max_download_mb: 1_024,
 
-            gate_model: "llama-3.1-8b-instant",
-            gate_fallback_model: "openai/gpt-oss-20b",
+            recall_poll_secs: 60,
+            recall_max_wait_hours: 12,
+            recall_no_audio_grace_mins: 5,
+
+            gate_model: "openai/gpt-oss-20b",
+            gate_fallback_model: "openai/gpt-oss-120b",
             gate_head_chars: 7_500,
             gate_tail_chars: 1_500,
 
@@ -92,7 +123,7 @@ impl PipelineConfig {
             extract_dev_tpm: 250_000,
             chunk_tokens: 4_000,
             overlap_tokens: 300,
-            max_output_tokens: 1_500,
+            max_output_tokens: 2_000,
             tpm_safety_margin: 0.15,
             summary_model: "openai/gpt-oss-20b",
 

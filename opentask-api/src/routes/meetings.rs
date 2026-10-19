@@ -1,32 +1,26 @@
 use axum::{
+    body::Bytes,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
 };
-use reqwest::Client;
-use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::PgPool;
 
 use crate::error::AppError;
 use crate::extractors::auth::CurrentUser;
 use crate::models::meeting::{
-    AnalyzeMeetingRequest, CreateMeetingPayload, DatabaseMeeting, JobStatus, MeetingDetailResponse, MeetingJob,
-    MeetingJobResponse, MeetingStatus, SourceType, UpdateMeetingPayload, MEETING_COLUMNS, MEETING_JOB_COLUMNS,
+    CreateMeetingPayload, DatabaseMeeting, IntakeResponse, InviteBotPayload, JobStatus,
+    MeetingDetailResponse, MeetingJob, MeetingJobResponse, MeetingStatus, SourceType, UpdateMeetingPayload,
+    MEETING_COLUMNS, MEETING_JOB_COLUMNS,
 };
 use crate::models::safe_id::SafeId;
 use crate::models::user::GitHubUserResponse;
 use crate::routes::auth::AppState;
-use crate::services::gemini::{generate_content, resolve_gemini_key};
 use crate::services::id_generator::next_id;
-
-#[derive(Debug, Deserialize)]
-pub struct InviteBotRequest {
-    pub meeting_url: String,
-    pub bot_name: Option<String>,
-    pub project_id: Option<SafeId>,
-}
+use crate::services::meeting_pipeline::intake::{self, NewMeeting};
+use crate::services::meeting_pipeline::{pipeline, recall};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -36,7 +30,6 @@ pub fn router() -> Router<AppState> {
             get(get_meeting).put(update_meeting).delete(delete_meeting),
         )
         .route("/meetings/project/{project_id}", get(list_project_meetings))
-        .route("/analyze-meeting", post(analyze_meeting))
         .route("/invite-bot", post(invite_bot))
         .route("/webhooks/recall", post(handle_recall_webhook))
 }
@@ -286,86 +279,68 @@ pub async fn delete_meeting_and_drafts(pool: &PgPool, meeting_id: i64) -> Result
     Ok(deleted_draft_ids)
 }
 
-pub async fn analyze_meeting(
-    State(state): State<AppState>,
-    CurrentUser(user, _): CurrentUser,
-    Json(payload): Json<AnalyzeMeetingRequest>,
-) -> Result<Json<Value>, AppError> {
-    let pid = payload
-        .project_id
-        .map(|p| p.0)
-        .ok_or_else(|| AppError::BadRequest("project_id is required".to_string()))?;
-    require_project_member(&state.pool, &user, pid).await?;
-
-    let key = resolve_gemini_key(&state.pool, Some(pid), None, Some(&state.config.gemini_api_key))
-        .await
-        .ok_or_else(|| AppError::BadRequest("No valid Google Gemini API key configured".to_string()))?;
-
-    let prompt = format!(
-        "Analyze this meeting transcript and extract structured MOM (Minutes of Meeting).\n\n\
-         Transcript:\n{}\n\n\
-         Respond with JSON strictly in this format:\n\
-         {{\n\
-           \"mom_summary\": \"High-level executive summary\",\n\
-           \"key_decisions\": [\"decision 1\", \"decision 2\"],\n\
-           \"action_items\": [\n\
-             {{\"title\": \"Task Title\", \"description\": \"Details\", \"type\": \"CODE|DESIGN|REQUIREMENT\", \"weight\": 1-8}}\n\
-           ]\n\
-         }}",
-        payload.transcript
-    );
-
-    let raw = generate_content(&key, crate::services::gemini::DEFAULT_TEXT_MODEL, None, &prompt).await?;
-    let clean = raw.trim().trim_start_matches("```json").trim_end_matches("```").trim();
-    let parsed: Value = serde_json::from_str(clean).unwrap_or(json!({
-        "mom_summary": raw,
-        "key_decisions": [],
-        "action_items": []
-    }));
-
-    Ok(Json(parsed))
-}
-
 pub async fn invite_bot(
     State(state): State<AppState>,
     CurrentUser(user, _): CurrentUser,
-    Json(payload): Json<InviteBotRequest>,
-) -> Result<Json<Value>, AppError> {
-    let project_id = payload
-        .project_id
-        .map(|p| p.0)
-        .ok_or_else(|| AppError::BadRequest("project_id is required".to_string()))?;
-    require_project_member(&state.pool, &user, project_id).await?;
-
-    let recall_key = state
-        .config
-        .recall_api_key
-        .as_deref()
-        .ok_or_else(|| AppError::ServiceUnavailable("RECALL_API_KEY is not configured".to_string()))?;
-
-    let client = Client::new();
-    let bot_name = payload.bot_name.unwrap_or_else(|| "OpenTask Notetaker".to_string());
-
-    let resp = client
-        .post(format!("https://{}.recall.ai/api/v1/bot/", state.config.recall_region))
-        .header("Authorization", format!("Token {recall_key}"))
-        .json(&json!({
-            "meeting_url": payload.meeting_url,
-            "bot_name": bot_name,
-        }))
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    let data: Value = resp.json().await.unwrap_or(Value::Null);
-    Ok(Json(data))
+    Json(payload): Json<InviteBotPayload>,
+) -> Result<Json<IntakeResponse>, AppError> {
+    let project_id = payload.project_id.0;
+    let user_id = require_project_member(&state.pool, &user, project_id).await?;
+    let requested: Vec<i64> = payload.attendee_ids.iter().map(|a| a.0).collect();
+    let new = NewMeeting {
+        project_id,
+        created_by: user_id,
+        title: payload
+            .title
+            .map(|t| t.trim().chars().take(200).collect::<String>())
+            .filter(|t| !t.is_empty())
+            .unwrap_or_else(|| "Live meeting".to_string()),
+        source_type: SourceType::RecallBot,
+        meeting_date: intake::parse_meeting_date(payload.meeting_date.as_deref())?,
+        timezone: payload.timezone.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "Asia/Jakarta".to_string()),
+        attendee_ids: intake::member_ids(&state.pool, project_id, &requested).await?,
+    };
+    let bot_name = payload
+        .bot_name
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or_else(|| "OpenTask Notetaker".to_string());
+    let response =
+        intake::create_recall_job(&state.pool, &state.config, &state.realtime, new, &payload.meeting_url, &bot_name)
+            .await?;
+    Ok(Json(response))
 }
 
+/// Recall bot polls to check whether the job is done
 pub async fn handle_recall_webhook(
-    State(_state): State<AppState>,
-    Json(payload): Json<Value>,
-) -> Json<Value> {
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, AppError> {
+    let secret = state
+        .config
+        .recall_webhook_secret
+        .as_deref()
+        .ok_or_else(|| AppError::Unauthorized("RECALL_WEBHOOK_SECRET is not configured".to_string()))?;
+    if !recall::verify_webhook(secret, &headers, &body, chrono::Utc::now().timestamp()) {
+        return Err(AppError::Unauthorized("Invalid webhook signature".to_string()));
+    }
+    let payload: Value =
+        serde_json::from_slice(&body).map_err(|_| AppError::BadRequest("Invalid JSON".to_string()))?;
     let event = payload["event"].as_str().unwrap_or("");
-    tracing::info!("Received Recall.ai webhook: {}", event);
-    Json(json!({ "status": "received" }))
+    let bot_id = payload["data"]["bot"]["id"].as_str().unwrap_or("").to_string();
+    tracing::info!("[Meeting Pipeline] Recall webhook {event} for bot {bot_id}");
+    if bot_id.is_empty() {
+        return Ok(Json(json!({ "status": "ignored" })));
+    }
+
+    if matches!(event, "bot.done" | "bot.fatal" | "recording.done" | "recording.failed") {
+        let (pool, config, realtime) = (state.pool.clone(), state.config.clone(), state.realtime.clone());
+        let cfg = &pipeline(&state.config).0;
+        tokio::spawn(async move {
+            if let Err(e) = intake::check_recall_bot(&pool, &config, &realtime, &bot_id, cfg).await {
+                tracing::warn!("[Meeting Pipeline] Could not check Recall bot {bot_id}: {e}");
+            }
+        });
+    }
+    Ok(Json(json!({ "status": "ok" })))
 }

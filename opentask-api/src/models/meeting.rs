@@ -221,7 +221,7 @@ pub struct DatabaseMeeting {
 
 /// Columns of `opentask.meeting_jobs`, in `MeetingJob` order.
 pub const MEETING_JOB_COLUMNS: &str = "id, meeting_id, source_type, status, meeting_date, timezone, \
-    attendee_ids, r2_keys, duration_sec, gate, attempts, locked_until, next_attempt_at, last_error";
+    attendee_ids, r2_keys, duration_sec, gate, attempts, locked_until, next_attempt_at, last_error, alert_id";
 
 /// A `meeting_jobs` row. Never sent to the frontend as is: use `MeetingJobResponse`.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -240,6 +240,8 @@ pub struct MeetingJob {
     pub locked_until: Option<DateTime<Utc>>,
     pub next_attempt_at: Option<DateTime<Utc>>,
     pub last_error: Option<String>,
+    /// The DRAFT_APPROVAL alert raised for this job.
+    pub alert_id: Option<SafeId>,
 }
 
 /// Front end payload of meeting jobs
@@ -256,11 +258,16 @@ pub struct MeetingJobResponse {
     pub gate: Option<GateResult>,
     pub attempts: i32,
     pub next_attempt_at: Option<DateTime<Utc>>,
+    pub failure_reason: Option<String>,
 }
 
 impl From<MeetingJob> for MeetingJobResponse {
     fn from(job: MeetingJob) -> Self {
+        let failure_reason = (job.status == JobStatus::Failed && job.source_type == SourceType::RecallBot && job.attempts == 0)
+            .then(|| job.last_error.clone())
+            .flatten();
         Self {
+            failure_reason,
             id: job.id,
             meeting_id: job.meeting_id,
             source_type: job.source_type,
@@ -335,12 +342,113 @@ pub struct MeetingDetailResponse {
     pub jobs: Vec<MeetingJobResponse>,
 }
 
+/// `POST /meeting-jobs/text`: notes or a transcript the browser already turned into text.
 #[derive(Debug, Clone, Deserialize)]
-pub struct AnalyzeMeetingRequest {
-    pub transcript: String,
+pub struct CreateTextJobPayload {
+    pub project_id: SafeId,
     pub title: Option<String>,
-    pub project_id: Option<SafeId>,
+    pub meeting_date: Option<String>,
+    pub timezone: Option<String>,
+    #[serde(default)]
+    pub attendee_ids: Vec<SafeId>,
+    pub text: String,
 }
+
+/// `POST /invite-bot`: send a Recall bot to a live meeting.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InviteBotPayload {
+    pub project_id: SafeId,
+    pub meeting_url: String,
+    pub title: Option<String>,
+    pub meeting_date: Option<String>,
+    pub timezone: Option<String>,
+    #[serde(default)]
+    pub attendee_ids: Vec<SafeId>,
+    pub bot_name: Option<String>,
+}
+
+/// Intake endpoints return.
+#[derive(Debug, Clone, Serialize)]
+pub struct IntakeResponse {
+    pub meeting: DatabaseMeeting,
+    pub job: MeetingJobResponse,
+}
+
+/// Project's job.
+#[derive(Debug, Clone, Serialize)]
+pub struct MeetingJobSummary {
+    #[serde(flatten)]
+    pub job: MeetingJobResponse,
+    pub meeting_title: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub pending_drafts: i64,
+    pub total_drafts: i64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct DraftTaskView {
+    pub task_id: SafeId,
+    pub bucket_id: Option<SafeId>,
+    pub bucket_state: Option<String>,
+    pub title: String,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub task_type: Option<String>,
+    pub weight: Option<i32>,
+    pub lead_assignee_id: Option<SafeId>,
+    pub assignee_ids: Vec<SafeId>,
+    pub evidence_quote: String,
+    pub evidence_verified: bool,
+    pub evidence_segment: Option<i32>,
+    pub evidence_start_sec: Option<i32>,
+    pub confidence: Confidence,
+    pub assignee_hint: Option<String>,
+    pub resolved_user_id: Option<SafeId>,
+    pub due_text: Option<String>,
+    pub due_date: Option<NaiveDate>,
+    pub priority: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MeetingJobDetail {
+    pub job: MeetingJobResponse,
+    pub meeting: DatabaseMeeting,
+    pub drafts: Vec<DraftTaskView>,
+}
+
+/// One reviewed draft. Left-out fields keep the draft's values.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApproveDraftItem {
+    pub task_id: SafeId,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub task_type: Option<String>,
+    pub weight: Option<i32>,
+    pub bucket_id: Option<SafeId>,
+    #[serde(default)]
+    pub assignee_ids: Vec<SafeId>,
+    pub due_date: Option<String>,
+    pub priority: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApproveDraftsPayload {
+    pub items: Vec<ApproveDraftItem>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RejectDraftsPayload {
+    pub task_ids: Vec<SafeId>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ReviewResult {
+    pub job: MeetingJobResponse,
+    pub moved_task_ids: Vec<SafeId>,
+    pub pending_drafts: i64,
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -419,6 +527,7 @@ mod tests {
             locked_until: None,
             next_attempt_at: None,
             last_error: Some("provider said: secret detail".to_string()),
+            alert_id: None,
         };
 
         let value = serde_json::to_value(MeetingJobResponse::from(job)).unwrap();
@@ -431,6 +540,33 @@ mod tests {
         assert!(value.get("last_error").is_none());
         assert!(value.get("r2_keys").is_none());
         assert!(value.get("locked_until").is_none());
+        assert!(value["failure_reason"].is_null());
+    }
+
+    #[test]
+    fn job_response_shows_only_intake_failure_reasons() {
+        let job = |source_type, attempts| MeetingJob {
+            id: SafeId(1),
+            meeting_id: SafeId(2),
+            source_type,
+            status: JobStatus::Failed,
+            meeting_date: Utc::now(),
+            timezone: "Asia/Jakarta".to_string(),
+            attendee_ids: vec![],
+            r2_keys: Json(vec![]),
+            duration_sec: None,
+            gate: None,
+            attempts,
+            locked_until: None,
+            next_attempt_at: None,
+            last_error: Some("The bot left without recording anything.".to_string()),
+            alert_id: None,
+        };
+        let shown = MeetingJobResponse::from(job(SourceType::RecallBot, 0));
+        assert_eq!(shown.failure_reason.as_deref(), Some("The bot left without recording anything."));
+        // Failed in the worker (claimed at least once), or not a bot job: kept internal.
+        assert_eq!(MeetingJobResponse::from(job(SourceType::RecallBot, 3)).failure_reason, None);
+        assert_eq!(MeetingJobResponse::from(job(SourceType::Text, 0)).failure_reason, None);
     }
 
     #[test]

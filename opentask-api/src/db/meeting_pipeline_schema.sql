@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS opentask.meeting_jobs (
     next_attempt_at TIMESTAMPTZ,                         -- retry or rate-limit delay
     last_error      TEXT
 );
+-- The DRAFT_APPROVAL alert raised for this job, resolved when the review finishes.
+ALTER TABLE opentask.meeting_jobs ADD COLUMN IF NOT EXISTS alert_id BIGINT;
 CREATE INDEX IF NOT EXISTS idx_meeting_jobs_meeting_id ON opentask.meeting_jobs(meeting_id);
 CREATE INDEX IF NOT EXISTS idx_meeting_jobs_claim
     ON opentask.meeting_jobs(status, next_attempt_at)
@@ -53,6 +55,8 @@ CREATE TABLE IF NOT EXISTS opentask.meeting_transcripts (
     extraction_checkpoint JSONB,
     created_at            TIMESTAMPTZ DEFAULT NOW()
 );
+-- Per-part Whisper results while a recording is transcribed, for resume.
+ALTER TABLE opentask.meeting_transcripts ADD COLUMN IF NOT EXISTS asr_checkpoint JSONB;
 
 -- Evidence and the as-extracted snapshot for each task the pipeline created.
 CREATE TABLE IF NOT EXISTS opentask.task_extraction_meta (

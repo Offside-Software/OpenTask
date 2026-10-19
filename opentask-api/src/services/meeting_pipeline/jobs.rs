@@ -32,7 +32,7 @@ pub async fn claim_next_job(pool: &PgPool, lease_minutes: i32) -> Result<Option<
           AND m.id = j.meeting_id
         RETURNING j.id, j.meeting_id, j.source_type, j.status, j.meeting_date, j.timezone, j.attendee_ids,
                   j.r2_keys, j.duration_sec, j.gate, j.attempts, j.locked_until, j.next_attempt_at,
-                  j.last_error, m.project_id;
+                  j.last_error, j.alert_id, m.project_id;
         "#
     )
     .bind(lease_minutes)

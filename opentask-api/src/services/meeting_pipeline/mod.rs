@@ -1,6 +1,20 @@
+pub mod asr;
 pub mod config;
+pub mod drafts;
+pub mod extract;
+pub mod gate;
+pub mod intake;
 pub mod jobs;
+pub mod llm;
+pub mod media;
+pub mod postprocess;
+pub mod prompts;
+pub mod recall;
+pub mod review;
+pub mod steps;
+pub mod transcript;
 
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use chrono::Utc;
@@ -12,12 +26,26 @@ use crate::models::meeting::{JobStatus, SourceType};
 use crate::services::realtime::RealtimeHub;
 use config::PipelineConfig;
 use jobs::ClaimedJob;
+use llm::LlmClient;
 
 static WAKE: Notify = Notify::const_new();
+static PIPELINE: OnceLock<(PipelineConfig, Option<LlmClient>)> = OnceLock::new();
 
-/// Tells the worker a job may be ready. 
+/// Tells the worker a job may be ready.
 pub fn wake_worker() {
     WAKE.notify_one();
+}
+
+/// Pipeline settings and the Groq client
+pub fn pipeline(config: &Config) -> &'static (PipelineConfig, Option<LlmClient>) {
+    PIPELINE.get_or_init(|| {
+        let cfg = PipelineConfig::from_env();
+        let llm = config
+            .groq_api_key
+            .as_deref()
+            .map(|key| LlmClient::new(&cfg.groq_base_url, key));
+        (cfg, llm)
+    })
 }
 
 /// Shared state for one worker loop.
@@ -26,15 +54,22 @@ pub struct WorkerContext {
     pub config: Config,
     pub realtime: RealtimeHub,
     pub cfg: PipelineConfig,
+    pub llm: Option<LlmClient>,
 }
 
 pub fn spawn_worker(pool: PgPool, config: Config, realtime: RealtimeHub) {
-    let ctx = WorkerContext {
-        pool,
-        config,
-        realtime,
-        cfg: PipelineConfig::from_env(),
-    };
+    let (cfg, llm) = pipeline(&config).clone();
+    let poll_every = Duration::from_secs(cfg.recall_poll_secs);
+    let (poll_pool, poll_config, poll_realtime, poll_cfg) = (pool.clone(), config.clone(), realtime.clone(), cfg.clone());
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(poll_every);
+        loop {
+            interval.tick().await;
+            intake::poll_recall_bots(&poll_pool, &poll_config, &poll_realtime, &poll_cfg).await;
+        }
+    });
+
+    let ctx = WorkerContext { pool, config, realtime, cfg, llm };
     tokio::spawn(async move { run_worker(ctx).await });
 }
 
@@ -43,18 +78,26 @@ async fn run_worker(ctx: WorkerContext) {
     let idle = Duration::from_secs(ctx.cfg.idle_poll_secs);
 
     loop {
-        match jobs::claim_next_job(&ctx.pool, ctx.cfg.lease_minutes).await {
-            Ok(Some(claimed)) => run_job(&ctx, claimed).await,
-            Ok(None) => {
-                tokio::select! {
-                    _ = WAKE.notified() => {}
-                    _ = tokio::time::sleep(idle) => {}
-                }
+        if !run_next_job(&ctx).await {
+            tokio::select! {
+                _ = WAKE.notified() => {}
+                _ = tokio::time::sleep(idle) => {}
             }
-            Err(e) => {
-                tracing::warn!("[Meeting Pipeline] Could not claim a job: {e}");
-                tokio::time::sleep(idle).await;
-            }
+        }
+    }
+}
+
+/// Claims and runs one job. `false` when there was nothing to run (or the claim failed).
+pub async fn run_next_job(ctx: &WorkerContext) -> bool {
+    match jobs::claim_next_job(&ctx.pool, ctx.cfg.lease_minutes).await {
+        Ok(Some(claimed)) => {
+            run_job(ctx, claimed).await;
+            true
+        }
+        Ok(None) => false,
+        Err(e) => {
+            tracing::warn!("[Meeting Pipeline] Could not claim a job: {e}");
+            false
         }
     }
 }
@@ -66,6 +109,7 @@ pub enum StepOutcome {
         until: chrono::DateTime<Utc>,
         reason: String,
     },
+    Finished,
 }
 
 /// Determine whether the step is worth to retry
@@ -121,6 +165,7 @@ async fn run_job(ctx: &WorkerContext, mut claimed: ClaimedJob) {
                     }
                 }
             }
+            Ok(StepOutcome::Finished) => return,
             Ok(StepOutcome::Defer { until, reason }) => {
                 tracing::info!("[Meeting Pipeline] Job {job_id}: deferred until {until}: {reason}");
                 if let Err(e) = jobs::release_until(&ctx.pool, job_id, until, &reason, false).await {
@@ -153,17 +198,20 @@ async fn fail(ctx: &WorkerContext, claimed: &ClaimedJob, reason: &str) {
     }
 }
 
-async fn run_step(_ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutcome, StepError> {
+async fn run_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutcome, StepError> {
     match claimed.job.status {
         JobStatus::Queued => first_step(claimed.job.source_type).map(StepOutcome::Next),
-        status => Err(StepError::Fatal(format!("the {status} step is not implemented yet"))),
+        JobStatus::Transcribing => asr::transcribe_step(ctx, claimed).await,
+        JobStatus::Extracting => steps::extract_step(ctx, claimed).await,
+        JobStatus::Gating => Err(StepError::Fatal("audio and video uploads are not supported yet".to_string())),
+        status => Err(StepError::Fatal(format!("a {status} job has nothing to run"))),
     }
 }
 
 pub fn first_step(source_type: SourceType) -> Result<JobStatus, StepError> {
     match source_type {
-        SourceType::Media => Ok(JobStatus::Transcribing),
-        SourceType::RecallBot | SourceType::Text => Ok(JobStatus::Extracting),
+        SourceType::Media | SourceType::RecallBot => Ok(JobStatus::Transcribing),
+        SourceType::Text => Ok(JobStatus::Extracting),
         SourceType::Manual => Err(StepError::Fatal("manual meetings have nothing to process".to_string())),
     }
 }
@@ -175,7 +223,7 @@ mod tests {
     #[test]
     fn queued_jobs_start_at_the_right_step() {
         assert_eq!(first_step(SourceType::Media), Ok(JobStatus::Transcribing));
-        assert_eq!(first_step(SourceType::RecallBot), Ok(JobStatus::Extracting));
+        assert_eq!(first_step(SourceType::RecallBot), Ok(JobStatus::Transcribing));
         assert_eq!(first_step(SourceType::Text), Ok(JobStatus::Extracting));
         assert!(matches!(first_step(SourceType::Manual), Err(StepError::Fatal(_))));
     }
