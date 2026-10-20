@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
 import { Badge } from '../../design-system/Badge';
-import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal, Sparkles, CheckCircle2, RefreshCw, Cpu } from 'lucide-react';
+import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Sparkles, CheckCircle2, RefreshCw, Cpu } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
 import { userService } from '../../services/userService';
