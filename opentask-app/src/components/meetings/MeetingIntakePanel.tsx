@@ -14,6 +14,7 @@ interface MeetingIntakePanelProps {
   projectId: string | number;
   members: ProjectMember[];
   onSubmitted: () => void;
+  className?: string;
 }
 
 const inputClass =
@@ -27,7 +28,7 @@ const SOURCES: { id: Source; label: string; hint: string; icon: React.ElementTyp
   { id: "paste", label: "Paste text", hint: "Minutes, transcript or chat", icon: ClipboardPaste },
 ];
 
-export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectId, members, onSubmitted }) => {
+export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectId, members, onSubmitted, className }) => {
   const { showToast } = useToast();
   const [source, setSource] = useState<Source>("file");
   const [title, setTitle] = useState("");
@@ -122,7 +123,7 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
   const busy = stage !== "idle";
 
   return (
-    <SurfaceCard title="Meeting Intelligence" subtitle="Turn meetings into reviewed tasks" icon={Sparkles}>
+    <SurfaceCard className={className} title="Meeting Intelligence" subtitle="Turn meetings into reviewed tasks" icon={Sparkles}>
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2" role="radiogroup" aria-label="Meeting source">
           {SOURCES.map(({ id, label, hint, icon: Icon }) => (

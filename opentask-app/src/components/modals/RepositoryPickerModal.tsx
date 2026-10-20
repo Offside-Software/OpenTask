@@ -96,7 +96,7 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
                                 href={installUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2.5 py-1 bg-black text-[#FFE600] border border-neutral-700 hover:border-[#FFE600] font-mono text-[11px] font-black uppercase tracking-wider transition-all shadow-[1.5px_1.5px_0px_0px_#000000]"
+                                className="flex items-center gap-1 px-2.5 py-1 bg-[#00FF66] dark:bg-black dark:text-[#FFE600] border border-neutral-700 hover:border-[#FFE600] font-mono text-[11px] font-black uppercase tracking-wider transition-all shadow-[1.5px_1.5px_0px_0px_#000000]"
                                 title="Install GitHub App on your account or organization"
                             >
                                 <Plus size={11} strokeWidth={3} /> Install on GitHub
@@ -199,7 +199,7 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
                                 {selected.map(url => {
                                     const name = url.replace('https://github.com/', '');
                                     return (
-                                        <div key={url} className="flex items-center justify-between px-3 py-2 bg-[#0B0E14] border-2 border-[#FFE600] rounded-none shadow-[2px_2px_0px_0px_#FFE600]">
+                                        <div key={url} className="flex items-center justify-between px-3 py-2 bg-[#0B0E14] border-2 border-[#000000] rounded-none shadow-[2px_2px_0px_0px_#000000FF]">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <Github size={11} className="text-[#FFE600] shrink-0" />
                                                 <span className="text-[12px] font-bold text-white truncate">{name}</span>
@@ -217,15 +217,16 @@ export const RepositoryPickerModal: React.FC<RepositoryPickerModalProps> = ({
                             </div>
                         </div>
                     )}
+
                     {/* Local Webhook Forwarding Note */}
                     <div className="p-3 bg-[#0B0E14] border-2 border-neutral-800 rounded-none font-mono text-[11px] text-neutral-400 space-y-1">
                         <div className="flex items-center gap-1.5 text-[#FFE600] font-black uppercase">
-                            <span>⚡ Real-Time Webhook Setup (Localhost):</span>
+                            <span>Real-Time Webhook Setup (Localhost):</span>
                         </div>
                         <p>
                             To receive GitHub&apos;s real-time events on localhost, forward webhooks via Smee or ngrok:
                         </p>
-                        <div className="bg-black p-4 border border-neutral-800 text-neutral-300 font-mono text-[11px] select-all">
+                        <div className="dark:bg-black p-4 border border-neutral-800 text-neutral-300 font-mono text-[11px] select-text">
                             npx smee -u &lt;your-smee-channel-url&gt; -t http://localhost:8000/github/webhook
                         </div>
                         <p className="text-neutral-500">
