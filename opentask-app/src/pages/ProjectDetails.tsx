@@ -740,9 +740,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
   }
 
   return (
-    <div className="animate-in fade-in duration-200 flex flex-col h-full max-w-[1600px] mx-auto w-full select-none">
+    <div className={`animate-in fade-in duration-200 flex flex-col max-w-[1600px] mx-auto w-full select-none ${activeTab === 'Tasks' ? 'flex-1 min-h-0' : 'h-full'}`}>
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4 mb-4 shrink-0">
         <button
           onClick={() => navigate(-1)}
           className="w-10 h-10 rounded-none bg-[#141619] border-2 border-black flex items-center justify-center text-neutral-300 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
@@ -763,12 +763,12 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 bg-[#0E1012] p-1.5 rounded-none border-2 border-black w-fit shadow-[3px_3px_0px_0px_#000000] flex-wrap">
+      <div className="flex gap-2 mb-4 bg-[#0E1012] p-1.5 rounded-none border-2 border-black w-fit shadow-[3px_3px_0px_0px_#000000] flex-wrap shrink-0">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none transition-all duration-75 flex items-center gap-2 cursor-pointer ${activeTab === tab
+            className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none flex items-center gap-2 cursor-pointer ${activeTab === tab
               ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]'
               : 'bg-[#141619] text-neutral-400 border border-neutral-800 hover:border-white hover:text-white'
               }`}
@@ -783,7 +783,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 min-h-0">
+      <div className={`min-h-0 ${activeTab === 'Tasks' ? 'flex-1 flex flex-col' : ''}`}>
         {/* Overview */}
         {activeTab === 'Overview' && (
           roleLoading ? <div className="text-neutral-500 font-mono text-[12px] py-10 text-center">// RESOLVING PERMISSIONS...</div> :
@@ -800,8 +800,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
         {/* Tasks — Kanban */}
         {activeTab === 'Tasks' && (
-          <div className="bg-[#0C0D0E] border-2 border-neutral-700 rounded-none p-5 flex flex-col min-h-[600px] shadow-[6px_6px_0px_0px_#000000]">
-            <div className="flex justify-between items-center mb-5 pb-3 border-b-2 border-neutral-800 flex-wrap gap-3">
+          <div className="bg-[#0C0D0E] border-2 border-neutral-700 rounded-none p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-[6px_6px_0px_0px_#000000]">
+            <div className="flex justify-between items-center mb-3 pb-3 border-b-2 border-neutral-800 flex-wrap gap-2 shrink-0">
               <div>
                 <h2 className="text-[16px] font-mono font-black text-white uppercase tracking-wider">
                   <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
@@ -841,7 +841,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
             </div>
 
             {/* Task Search Bar & Assignee Filter */}
-            <div className="mb-4 flex items-center justify-between gap-3 flex-wrap bg-[#141619] p-3 border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
+            <div className="mb-3 flex items-center justify-between gap-3 flex-wrap bg-[#141619] p-2.5 sm:p-3 border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0">
               <div className="flex items-center gap-3 flex-1 min-w-[260px] flex-wrap">
                 <div className="relative flex-1 min-w-[220px] max-w-xl">
                   <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-500">
@@ -929,7 +929,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
             {tasksLoading || bucketsLoading ? (
               <div className="flex-1 flex items-center justify-center text-slate-500 text-[14px]">Loading board state...</div>
             ) : (
-              <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-4 flex-1 no-scrollbar items-start">
+              <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0 items-stretch">
                 {buckets.map(bucket => {
                   const isFiltered = Boolean(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL');
                   const colTasks = matchingTasks.filter(t => String(t.bucket_id) === String(bucket.id));
@@ -952,85 +952,96 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                       onDeleteBucket={(bId) => setBucketToDelete(bId)}
                       onEditBucket={() => setSelectedBucketForEdit(bucket)}
                     >
-                      {colTasks.map(task => {
-                        const isDeleting = deletingTaskIds.has(task.id!);
-                        if (isDeleting) {
-                          return (
-                            <div
-                              key={task.id}
-                              className="border-2 border-dashed border-[#EF4444] bg-[#161214] rounded-none p-3.5 animate-pulse select-none"
-                            >
-                              <div className="flex items-center justify-between gap-2 mb-2">
-                                <div className="flex items-center gap-2">
-                                  <Loader2 size={13} className="animate-spin text-[#EF4444]" />
-                                  <span className="font-mono text-[10px] text-[#EF4444] font-black uppercase tracking-wider">
-                                    REMOVING TASK...
+                      <div className="flex flex-col gap-3">
+                        {colTasks.map(task => {
+                          const isDeleting = deletingTaskIds.has(task.id!);
+                          if (isDeleting) {
+                            return (
+                              <div
+                                key={task.id}
+                                className="border-2 border-dashed border-[#EF4444] bg-[#161214] rounded-none p-3.5 animate-pulse select-none"
+                              >
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Loader2 size={13} className="animate-spin text-[#EF4444]" />
+                                    <span className="font-mono text-[10px] text-[#EF4444] font-black uppercase tracking-wider">
+                                      REMOVING TASK...
+                                    </span>
+                                  </div>
+                                  <span className="font-mono text-[10px] text-neutral-500 font-bold">
+                                    #{String(task.id).slice(-4)}
                                   </span>
                                 </div>
-                                <span className="font-mono text-[10px] text-neutral-500 font-bold">
-                                  #{String(task.id).slice(-4)}
-                                </span>
+                                <div className="font-mono text-[12px] text-neutral-400 font-bold uppercase truncate line-through">
+                                  {task.title}
+                                </div>
                               </div>
-                              <div className="font-mono text-[12px] text-neutral-400 font-bold uppercase truncate line-through">
-                                {task.title}
-                              </div>
-                            </div>
+                            );
+                          }
+
+                          const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
+                          const rawAssigneeIds = (task.assignee_ids && task.assignee_ids.length > 0)
+                            ? task.assignee_ids.map(String)
+                            : (task.lead_assignee_id ? [String(task.lead_assignee_id)] : []);
+                          const cardAssignees = rawAssigneeIds.map(uid => {
+                            const m = members.find(mem => String(mem.user_id) === uid);
+                            return {
+                              userId: uid,
+                              name: m?.gh_username || m?.display_name || `Member #${uid}`,
+                              avatarUrl: m?.avatar_url || (m?.gh_username ? `https://github.com/${m.gh_username}.png?size=64` : undefined),
+                            };
+                          });
+
+                          const assignedMember = task.lead_assignee_id ? members.find(m => String(m.user_id) === String(task.lead_assignee_id)) : undefined;
+                          const assigneeName = assignedMember?.gh_username || assignedMember?.display_name || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
+                          const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
+
+                          return (
+                            <KanbanCard
+                              key={task.id}
+                              id={task.id!}
+                              title={task.title}
+                              type={task.type}
+                              weight={task.weight}
+                              assignee={assigneeName}
+                              assigneeAvatar={assigneeAvatar}
+                              assignees={cardAssignees}
+                              pr={!!task.prUrl}
+                              repoUrl={task.repo_url}
+                              description={task.description}
+                              warnStagnant={task.warnStagnant}
+                              isSuggested={task.isSuggested}
+                              isCompleted={isTaskCompleted}
+                              onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
+                              onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
+                              onClick={() => handleOpenTask(task)}
+                              onDelete={() => setTaskToDelete(task.id!)}
+                              onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
+                            />
                           );
-                        }
+                        })}
 
-                        const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
-                        const rawAssigneeIds = (task.assignee_ids && task.assignee_ids.length > 0)
-                          ? task.assignee_ids.map(String)
-                          : (task.lead_assignee_id ? [String(task.lead_assignee_id)] : []);
-                        const cardAssignees = rawAssigneeIds.map(uid => {
-                          const m = members.find(mem => String(mem.user_id) === uid);
-                          return {
-                            userId: uid,
-                            name: m?.gh_username || m?.display_name || `Member #${uid}`,
-                            avatarUrl: m?.avatar_url || (m?.gh_username ? `https://github.com/${m.gh_username}.png?size=64` : undefined),
-                          };
-                        });
-                        const assignedMember = task.lead_assignee_id ? members.find(m => String(m.user_id) === String(task.lead_assignee_id)) : undefined;
-                        const assigneeName = assignedMember?.gh_username || assignedMember?.display_name || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
-                        const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
-
-                        return (
-                          <KanbanCard
-                            key={task.id}
-                            id={task.id!}
-                            title={task.title}
-                            type={task.type}
-                            weight={task.weight}
-                            assignee={assigneeName}
-                            assigneeAvatar={assigneeAvatar}
-                            assignees={cardAssignees}
-                            pr={!!task.prUrl}
-                            repoUrl={task.repo_url}
-                            description={task.description}
-                            warnStagnant={task.warnStagnant}
-                            isSuggested={task.isSuggested}
-                            isCompleted={isTaskCompleted}
-                            onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
-                            onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
-                            onClick={() => handleOpenTask(task)}
-                            onDelete={() => setTaskToDelete(task.id!)}
-                            onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
-                          />
-                        );
-                      })}
-
-                      {/* In-flight new task creation ghost card */}
-                      {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
-                        <div className="border-2 border-dashed border-[#FFE600] bg-[#141619] rounded-none p-3 animate-pulse">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Loader2 size={13} className="animate-spin text-[#FFE600]" />
-                            <span className="font-mono text-[10px] text-[#FFE600] font-black uppercase tracking-wider">CREATING TASK...</span>
+                        {/* In-flight new task creation ghost card */}
+                        {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
+                          <div className="border-2 border-dashed border-[#FFE600] bg-[#141619] rounded-none p-3 animate-pulse">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Loader2 size={13} className="animate-spin text-[#FFE600]" />
+                              <span className="font-mono text-[10px] text-[#FFE600] font-black uppercase tracking-wider">CREATING TASK...</span>
+                            </div>
+                            <div className="font-mono text-[12px] text-white font-bold uppercase truncate">
+                              {creatingTaskTitle || '// NEW TASK'}
+                            </div>
                           </div>
-                          <div className="font-mono text-[12px] text-white font-bold uppercase truncate">
-                            {creatingTaskTitle || '// NEW TASK'}
-                          </div>
-                        </div>
-                      )}
+                        )}
+
+                        <button
+                          onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
+                          className="w-full py-2.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-black border-2 border-dashed border-neutral-700 hover:border-black hover:bg-[#FFE600] rounded-none transition-all duration-75 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                        >
+                          <Plus size={14} strokeWidth={3} /> Add Task
+                        </button>
+
+                      </div>
                     </KanbanColumn>
 
                   );
@@ -1038,7 +1049,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
                 {/* In-Flight Creating Column Indicator */}
                 {isCreatingBucketSubmitting && (
-                  <div className="min-w-[316px] w-[316px] border-2 border-dashed border-[#FFE600] bg-[#141619] p-5 rounded-none flex flex-col justify-center items-center shadow-[4px_4px_0px_0px_#000000] animate-pulse">
+                  <div className="min-w-[316px] w-[316px] shrink-0 border-2 border-dashed border-[#FFE600] bg-[#141619] p-5 rounded-none flex flex-col justify-center items-center shadow-[4px_4px_0px_0px_#000000] animate-pulse h-full">
                     <div className="flex items-center gap-2 text-[#FFE600] font-mono text-[12px] font-black uppercase mb-2">
                       <Loader2 size={16} className="animate-spin text-[#FFE600]" />
                       <span>CREATING COLUMN...</span>
@@ -1053,7 +1064,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                 )}
 
                 {/* Add New Bucket Column */}
-                <div className="min-w-[280px] w-[280px]">
+                <div className="min-w-[280px] w-[280px] shrink-0">
                   {!isCreatingBucket ? (
                     <button
                       onClick={() => setIsCreatingBucket(true)}
@@ -1124,6 +1135,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                 </div>
               </div>
             )}
+
+
           </div>
         )}
 

@@ -37,8 +37,8 @@ function AppShell() {
       {/* Global Telemetry & Network Status Badge */}
       <NetworkBadge />
 
-      <main className="flex-1 overflow-y-auto no-scrollbar bg-dots">
-        <div className="px-4 pt-8 pb-12">
+      <main className="flex-1 overflow-y-auto no-scrollbar bg-dots flex flex-col">
+        <div className="px-4 pt-4 sm:pt-6 pb-6 flex-1 flex flex-col min-h-0">
           <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />

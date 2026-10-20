@@ -325,7 +325,7 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                 </button>
               </div>
 
-              <pre className="font-mono text-[12px] text-neutral-200 overflow-x-auto p-3 bg-[#F0F0EB] dark:bg-black border border-neutral-800 leading-relaxed">
+              <pre className="font-mono text-[12px] text-neutral-200 overflow-x-auto p-3 bg-[#F0F0EB] dark:bg-black border border-neutral-800 leading-relaxed select-text">
                 {activeTab === 'antigravity' && antigravityConfig}
                 {activeTab === 'cursor' && cursorConfig}
                 {activeTab === 'vscode' && vscodeClineConfig}

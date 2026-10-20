@@ -10,8 +10,10 @@ import { JOB_STATUS_LABEL, JOB_STATUS_VARIANT, SOURCE_LABEL, describeJob, isJobA
 interface MeetingJobsPanelProps {
   jobs: MeetingJobSummary[];
   loading: boolean;
+  isRefreshing: boolean,
   onRefresh: () => void;
   onReview: (jobId: string) => void;
+  className?: string;
 }
 
 const SourceIcon: React.FC<{ source: string }> = ({ source }) => {
@@ -67,8 +69,9 @@ const JobRow: React.FC<{ job: MeetingJobSummary; onReview: (jobId: string) => vo
   );
 };
 
-export const MeetingJobsPanel: React.FC<MeetingJobsPanelProps> = ({ jobs, loading, onRefresh, onReview }) => {
+export const MeetingJobsPanel: React.FC<MeetingJobsPanelProps> = ({ jobs, loading, isRefreshing, onRefresh, onReview, className }) => {
   const [showHistory, setShowHistory] = useState(false);
+  
   const current = jobs.filter(isCurrent);
   const history = jobs.filter((j) => !isCurrent(j));
   const needsReview = current.filter((j) => j.status === "DRAFTS_READY").length;
@@ -85,24 +88,29 @@ export const MeetingJobsPanel: React.FC<MeetingJobsPanelProps> = ({ jobs, loadin
 
   return (
     <SurfaceCard
+      className={className}
       title={showHistory ? "Job History" : "Meeting Jobs"}
       subtitle={subtitle}
       icon={showHistory ? History : ListChecks}
       rightElement={
         <div className="flex items-center gap-2">
-          <Button
-            variant={showHistory ? "primary" : "outline"}
-            size="sm"
+          <button
+            className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
             onClick={() => setShowHistory((v) => !v)}
             aria-pressed={showHistory}
             title={showHistory ? "Back to the jobs in progress" : "Show completed and failed jobs"}
           >
             <History size={13} strokeWidth={2.5} />
             {showHistory ? "Current" : `History (${history.length})`}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onRefresh} aria-label="Refresh meeting jobs" title="Refresh">
-            <RefreshCw size={13} strokeWidth={2.5} />
-          </Button>
+          </button>
+          <button 
+            className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+            onClick={onRefresh}
+            aria-label="Refresh meeting jobs"
+            title="Refresh">
+            <RefreshCw size={13} strokeWidth={2.5} className={isRefreshing ? "animate-spin text-black" : "text-[#FFE600]"} />
+            <span>{isRefreshing ? 'SYNCING...' : 'REFRESH HISTORY'}</span>
+          </button>
         </div>
       }
     >

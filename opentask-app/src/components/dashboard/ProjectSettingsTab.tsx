@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
 import { Badge } from '../../design-system/Badge';
-import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Terminal, Sparkles, CheckCircle2, RefreshCw, Cpu } from 'lucide-react';
+import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Sparkles, CheckCircle2, RefreshCw, Cpu } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
 import { userService } from '../../services/userService';
@@ -476,558 +476,545 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
 
     return (
         <div className="space-y-6 select-none font-mono">
-            {/* General Settings */}
-            <SurfaceCard title="Project Details" subtitle="Update basic project information" icon={Settings} rightElement={null}>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// PROJECT TITLE</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// DESCRIPTION</label>
-                        <textarea
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none min-h-[100px] shadow-[2px_2px_0px_0px_#000000]"
-                        />
-                    </div>
-
-                    <button
-                        onClick={handleUpdateProject}
-                        disabled={!isProjectDirty || !name.trim()}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
-                    >
-                        <Save size={14} strokeWidth={2.5} /> Save Changes
-                    </button>
-                </div>
-            </SurfaceCard>
-
-            {/* Connected Repositories */}
-            <SurfaceCard title="Connected Repositories" subtitle={`${repoUrls.length} repo${repoUrls.length !== 1 ? 's' : ''} linked`} icon={GitBranch} rightElement={null}>
-                <div className="space-y-4">
-                    {repoUrls.length === 0 ? (
-                        <div className="py-6 text-center border-2 border-dashed border-neutral-700 rounded-none">
-                            <Github size={24} className="text-neutral-600 mx-auto mb-2" />
-                            <p className="text-neutral-500 font-mono text-[11px] uppercase">// NO REPOSITORIES CONNECTED</p>
-                            <p className="text-neutral-600 font-mono text-[10px] mt-1">Connect repos to enable AI code review</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {repoUrls.map((url) => {
-                                const repoName = url.replace('https://github.com/', '');
-                                const [orgName, repoShortName] = repoName.split('/');
-                                return (
-                                    <div key={url} className="flex items-center justify-between p-3 bg-[#121417] border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className="p-1.5 bg-[#FFE600] border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000]">
-                                                <Github size={12} strokeWidth={2.5} className="text-black" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="text-[13px] font-bold text-white font-mono uppercase truncate">{repoShortName || repoName}</div>
-                                                <div className="text-[12px] text-white font-mono">{orgName}</div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-[#FFE600] transition-colors">
-                                                <ExternalLink size={13} strokeWidth={2} />
-                                            </a>
-                                            <button
-                                                onClick={() => handleRemoveRepo(url)}
-                                                className="text-neutral-500 hover:text-[#EF4444] transition-colors cursor-pointer"
-                                            >
-                                                <Trash2 size={13} strokeWidth={2} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    <button
-                        onClick={() => setIsRepoPicker(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                    >
-                        <Github size={13} strokeWidth={2.5} /> Connect Repository
-                    </button>
-                </div>
-            </SurfaceCard>
-
-            {/* Custom Integrated AI (BYOT Gemini Key) */}
-            <SurfaceCard
-                title="Custom Integrated AI"
-                subtitle="BRING YOUR OWN GEMINI KEY FOR PR REVIEWS, MEETINGS & TASK EVALUATIONS"
-                icon={Sparkles}
-                rightElement={
-                    hasCustomAiKey ? (
-                        <Badge variant="success">
-                            <CheckCircle2 size={11} className="mr-1 inline" /> CUSTOM TOKEN ACTIVE
-                        </Badge>
-                    ) : (
-                        <Badge variant="default">
-                            SYSTEM DEFAULT KEY
-                        </Badge>
-                    )
-                }
-            >
-                <div className="space-y-5">
-                    <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
-                        Configure a custom Google Gemini API key for this project. When active, all internal AI operations (automated PR code reviews, meeting analysis, task estimation) will utilize your token and quotas instead of the shared system token.
-                    </p>
-
-                    {hasCustomAiKey && !isReplacingKey ? (
-                        <div className="p-4 bg-[#121417] border-2 border-black rounded-none flex items-center justify-between gap-4 shadow-[3px_3px_0px_0px_#000000] flex-wrap">
-                            <div className="flex items-center gap-3.5 min-w-0">
-                                <div className="p-2 bg-[#00FF66] text-black border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000] shrink-0">
-                                    <CheckCircle2 size={16} strokeWidth={2.5} />
-                                </div>
-                                <div className="min-w-0 font-mono">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-[#00FF66] bg-black px-1.5 py-0.5 border border-neutral-700">
-                                            // ACTIVE PROJECT KEY
-                                        </span>
-                                    </div>
-                                    <div className="text-[14px] font-bold text-white tracking-widest mt-1 truncate">
-                                        {displayMaskedAiKey}
-                                    </div>
-                                    <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
-                                        Dedicated quotas active for PR reviews, MoM parser, and task automation.
-                                    </p>
-                                </div>
-                            </div>
-                            {isManager && (
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsReplacingKey(true);
-                                            setCustomAiInput('');
-                                            setAiKeyTestResult(null);
-                                        }}
-                                        className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <RefreshCw size={12} strokeWidth={2.5} />
-                                        <span>REPLACE KEY</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
-                                        className="px-3.5 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <Trash2 size={12} />
-                                        <span>REMOVE</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="block text-[11px] font-bold uppercase text-neutral-400 font-mono">
-                                        // {isReplacingKey ? "ENTER REPLACEMENT GEMINI API KEY" : "ENTER GOOGLE GEMINI API KEY"}
-                                    </label>
-                                    <a
-                                        href="https://aistudio.google.com/app/apikey"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#FFE600] hover:underline"
-                                    >
-                                        <span>GET FREE KEY (AI STUDIO)</span>
-                                        <ExternalLink size={11} />
-                                    </a>
-                                </div>
-
-                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                                    <div className="relative flex-1 min-w-[280px]">
-                                        <input
-                                            type={showCustomAiKey ? "text" : "password"}
-                                            value={customAiInput}
-                                            onChange={(e) => {
-                                                setCustomAiInput(e.target.value);
-                                                setAiKeyTestResult(null);
-                                            }}
-                                            placeholder={isReplacingKey ? "Enter new API key (AIzaSy...)" : "AIzaSy..."}
-                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-white tracking-wider focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowCustomAiKey(!showCustomAiKey)}
-                                        className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title={showCustomAiKey ? "Hide Key" : "Reveal Key"}
-                                    >
-                                        {showCustomAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        <span>{showCustomAiKey ? "HIDE" : "REVEAL"}</span>
-                                    </button>
-                                    {isReplacingKey && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIsReplacingKey(false);
-                                                setCustomAiInput('');
-                                                setAiKeyTestResult(null);
-                                            }}
-                                            className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-400 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        >
-                                            <X size={14} />
-                                            <span>CANCEL</span>
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={handleTestCustomAiKey}
-                                        disabled={aiKeyTesting || !customAiInput.trim()}
-                                        className="px-4 py-2.5 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                    >
-                                        <Bot size={14} />
-                                        <span>{aiKeyTesting ? "TESTING..." : "TEST KEY"}</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveCustomAiKey}
-                                        disabled={aiKeySaving || !customAiInput.trim()}
-                                        className="px-4 py-2.5 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                    >
-                                        <Save size={14} strokeWidth={2.5} />
-                                        <span>{aiKeySaving ? "SAVING..." : "SAVE KEY"}</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Test Feedback banner */}
-                            {aiKeyTestResult && (
-                                <div
-                                    className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${aiKeyTestResult.valid
-                                            ? "bg-[#00FF66] text-black font-bold"
-                                            : "bg-[#FF3333] text-white font-bold"
-                                        }`}
-                                >
-                                    {aiKeyTestResult.valid ? (
-                                        <>
-                                            <CheckCircle2 size={15} strokeWidth={2.5} />
-                                            <span>KEY VALID & READY! PING VERIFIED WITH MODEL: {aiKeyTestResult.model?.toUpperCase()}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <AlertTriangle size={15} strokeWidth={2.5} />
-                                            <span>VALIDATION ERROR: {aiKeyTestResult.error || "INVALID KEY"}</span>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </SurfaceCard>
-
-            {/* AI Native Agent Access Card */}
-            <SurfaceCard
-                title="AI Agent Access"
-                subtitle="PROGRAMMATIC API FOR CODE AGENTS (CURSOR, ANTIGRAVITY, CLAUDE, AIDER)"
-                icon={Bot}
-                rightElement={
-                    apiKey && (
-                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#00FF66] text-black border-2 border-black font-mono text-[10px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000]">
-                            <span className="w-2 h-2 bg-black rounded-full animate-pulse"></span>
-                            ACTIVE
-                        </span>
-                    )
-                }
-            >
-                <div className="space-y-5">
-                    <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
-                        Authorize external AI coding agents to interact directly with this project. Agents can look up tasks using copied IDs, mark tasks complete, move tasks between pipeline stages, and fetch project status summaries.
-                    </p>
-
-                    {apiKey ? (
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5 font-mono">
-                                    // PROJECT API KEY (SECRET)
-                                </label>
-                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                                    <div className="relative flex-1 min-w-[280px]">
-                                        <input
-                                            type={showApiKey ? "text" : "password"}
-                                            readOnly
-                                            value={apiKey}
-                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-[#FFE600] tracking-wider focus:outline-none shadow-[2px_2px_0px_0px_#000000] select-all"
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowApiKey(!showApiKey)}
-                                        className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title={showApiKey ? "Hide Key" : "Reveal Key"}
-                                    >
-                                        {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        <span>{showApiKey ? "HIDE" : "REVEAL"}</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyApiKey}
-                                        className="px-4 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        {copiedKey ? <Check size={14} strokeWidth={3} /> : <Copy size={14} />}
-                                        <span>{copiedKey ? "COPIED!" : "COPY KEY"}</span>
-                                    </button>
-                                </div>
-                            </div>
-                            {isManager && (
-                                <div className="flex items-center gap-3 pt-1 flex-wrap">
-                                    <button
-                                        type="button"
-                                        onClick={handleGenerateApiKey}
-                                        disabled={apiKeyLoading}
-                                        className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <Key size={13} />
-                                        <span>{apiKeyLoading ? "REGENERATING..." : "REGENERATE KEY"}</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsRevokeModalOpen(true)}
-                                        disabled={apiKeyLoading}
-                                        className="px-4 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <Trash2 size={13} />
-                                        <span>REVOKE KEY</span>
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Agent Integration Quick Reference */}
-                            <div className="p-4 bg-[#0B0E14] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] font-mono text-[11px] space-y-2.5">
-                                <div className="flex items-center gap-2 text-white font-bold uppercase tracking-wider pb-2 border-b border-neutral-800">
-                                    <Terminal size={14} className="text-[#FFE600]" />
-                                    <span>// AGENT INTEGRATION GUIDE</span>
-                                </div>
-                                <p className="text-neutral-400">
-                                    Include the header <code className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700">X-Project-Key: {apiKey.slice(0, 12)}...</code> on requests:
-                                </p>
-                                <div className="space-y-1.5 text-neutral-300">
-                                    <div><span className="text-[#00FF66] font-bold">GET</span> <code className="text-white">/api/agent/tasks/[Title](#ID)</code> <span className="text-neutral-500">// Fetch task by pasted markdown link or ID</span></div>
-                                    <div><span className="text-[#FFE600] font-bold">POST</span> <code className="text-white">/api/agent/tasks/[Title](#ID)/complete</code> <span className="text-neutral-500">// Automatically move task to COMPLETED</span></div>
-                                    <div><span className="text-[#00FF66] font-bold">GET</span> <code className="text-white">/api/agent/summary</code> <span className="text-neutral-500">// Fetch live project markdown & metrics</span></div>
-                                </div>
-                            </div>
-
-                            {/* MCP IDE Integration Box */}
-                            <div className="p-4 bg-[#141619] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                <div>
-                                    <div className="flex items-center gap-2 text-white font-mono text-[12px] font-black uppercase tracking-wider">
-                                        <Cpu size={14} className="text-[#FFE600]" />
-                                        <span>// MODEL CONTEXT PROTOCOL (MCP) INTEGRATION</span>
-                                    </div>
-                                    <p className="text-[11px] font-mono text-neutral-400 mt-1">
-                                        Expose project tasks directly to Antigravity, Cursor, VS Code (Cline/Copilot), Zed, and Claude Desktop.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsMcpModalOpen(true)}
-                                    className="px-4 py-2 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0 active:translate-x-[1px] active:translate-y-[1px] transition-all"
-                                >
-                                    <Cpu size={13} strokeWidth={2.5} />
-                                    <span>VIEW MCP CONFIGS</span>
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="p-5 bg-[#121417] border-2 border-dashed border-neutral-700 rounded-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            <div>
-                                <div className="text-white font-bold text-[13px] uppercase font-mono tracking-wider">
-                                    No API Key Generated
-                                </div>
-                                <div className="text-neutral-400 font-mono text-[11px] mt-1">
-                                    Create a secure token to enable IDE AI assistants and background agents to manage project tasks.
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleGenerateApiKey}
-                                disabled={apiKeyLoading}
-                                className="px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                            >
-                                <Key size={14} />
-                                <span>{apiKeyLoading ? "GENERATING..." : "GENERATE API KEY"}</span>
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </SurfaceCard>
-
-            {/* Member Management */}
-            <SurfaceCard title="Project Members" subtitle={`${members.length} members in project`} icon={Users} rightElement={null}>
-
-                <div className="space-y-6">
-                    {/* Existing Members Search Filter */}
-                    <div>
-                        <div className="relative mb-3">
-                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                <Search size={13} className="text-neutral-500" />
-                            </div>
+            <div className="grid grid-cols-5 gap-6">
+                {/* General Settings */}
+                <SurfaceCard className="col-span-2" title="Project Details" subtitle="Update basic project information" icon={Settings} rightElement={null}>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// PROJECT TITLE</label>
                             <input
                                 type="text"
-                                placeholder="FILTER CURRENT MEMBERS..."
-                                value={memberFilter}
-                                onChange={(e) => setMemberFilter(e.target.value)}
-                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-8 pr-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// DESCRIPTION</label>
+                            <textarea
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none min-h-[100px] shadow-[2px_2px_0px_0px_#000000]"
                             />
                         </div>
 
-                        <div className="space-y-2.5 max-h-[300px] overflow-y-auto no-scrollbar">
-                            {members
-                                .filter(m =>
-                                    (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) ||
-                                    (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) ||
-                                    (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())
-                                )
-                                .map(m => (
-                                    <div key={m.id} className="flex items-center justify-between p-3 rounded-none border-2 border-black bg-[#121417] shadow-[2px_2px_0px_0px_#000000]">
-                                        <div>
-                                            <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.display_name || m.gh_username || `User #${m.user_id}`}</div>
-                                            {editingMemberId === m.id ? (
-                                                <select
-                                                    value={editingRole}
-                                                    onChange={(e) => setEditingRole(e.target.value)}
-                                                    className="mt-1 bg-[#0B0E14] border-2 border-black rounded-none px-2 py-1 text-[11px] font-mono text-white focus:border-[#FFE600] focus:outline-none"
-                                                >
-                                                    {DEFAULT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                                                </select>
-                                            ) : (
-                                                <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
+                        <button
+                            onClick={handleUpdateProject}
+                            disabled={!isProjectDirty || !name.trim()}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+                        >
+                            <Save size={14} strokeWidth={2.5} /> Save Changes
+                        </button>
+                    </div>
+                </SurfaceCard>
+
+                {/* Member Management */}
+                <SurfaceCard className="col-span-2" title="Project Members" subtitle={`${members.length} members in project`} icon={Users} rightElement={null}>
+                    <div className="space-y-6">
+                        {/* Existing Members Search Filter */}
+                        <div>
+                            <div className="relative mb-3">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                    <Search size={13} className="text-neutral-500" />
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="FILTER CURRENT MEMBERS..."
+                                    value={memberFilter}
+                                    onChange={(e) => setMemberFilter(e.target.value)}
+                                    className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-8 pr-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                />
+                            </div>
+
+                            <div className="space-y-2.5 max-h-[204px] overflow-y-auto no-scrollbar">
+                                {members
+                                    .filter(m =>
+                                        (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) ||
+                                        (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) ||
+                                        (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())
+                                    )
+                                    .map(m => (
+                                        <div key={m.id} className="flex items-center justify-between p-3 rounded-none border-2 border-black bg-[#121417] shadow-[2px_2px_0px_0px_#000000]">
+                                            <div>
+                                                <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.display_name || m.gh_username || `User #${m.user_id}`}</div>
+                                                {editingMemberId === m.id ? (
+                                                    <select
+                                                        value={editingRole}
+                                                        onChange={(e) => setEditingRole(e.target.value)}
+                                                        className="mt-1 bg-[#0B0E14] border-2 border-black rounded-none px-2 py-1 text-[11px] font-mono text-white focus:border-[#FFE600] focus:outline-none"
+                                                    >
+                                                        {DEFAULT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                                    </select>
+                                                ) : (
+                                                    <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
+                                                )}
+                                            </div>
+
+                                            {isManager && (
+                                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                                    {editingMemberId === m.id ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSaveMember(m)}
+                                                            className="px-4 py-2 bg-[#00FF66] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleEditMember(m)}
+                                                            className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    )}
+
+                                                    {(m.role.toUpperCase() !== "MANAGER" && m.role.toUpperCase() !== "OWNER" &&
+                                                        <button
+                                                            onClick={() => m.id !== undefined && handleRemoveMember(m.id) }
+                                                            className={`p-1 rounded-none bg-black border-2 border-neutral-700 text-neutral-400 hover:text-black hover:bg-[#FF0000] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer`}>
+                                                            <X size={18} strokeWidth={3}/>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                {members.length > 0 && members.filter(m => (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())).length === 0 && (
+                                    <div className="text-center py-4 text-neutral-500 text-[11px] uppercase">
+                                        // NO MEMBERS MATCH FILTER
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {isManager && (
+                            <div className="pt-4 border-t-2 border-neutral-800">
+                                <h4 className="text-[13px] font-black uppercase tracking-wider text-white mb-4">// ADD NEW MEMBER</h4>
+                                {!selectedUser ? (
+                                    <div className="space-y-2 relative">
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                <Search size={14} className="text-neutral-400" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="SEARCH USERNAME (LOCAL OR GITHUB)..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                            />
+                                            {isSearching && (
+                                                <div className="absolute inset-y-0 right-3 flex items-center">
+                                                    <div className="w-4 h-4 rounded-none border-2 border-black border-t-[#FFE600] animate-spin"></div>
+                                                </div>
                                             )}
                                         </div>
 
-                                        {isManager && (
-                                            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                                                {editingMemberId === m.id ? (
+                                        {searchQuery.length >= 2 && searchResults.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none overflow-hidden z-10 shadow-[4px_4px_0px_0px_#000000] max-h-60 overflow-y-auto">
+                                                {searchResults.map(u => (
                                                     <button
-                                                        type="button"
-                                                        onClick={() => handleSaveMember(m)}
-                                                        className="px-4 py-2 bg-[#00FF66] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                                                        key={u.id || u.gh_username}
+                                                        onClick={() => setSelectedUser(u)}
+                                                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#FFE600] hover:text-black transition-colors text-left font-mono text-[12px] font-bold uppercase text-white cursor-pointer border-b border-neutral-800 last:border-0"
                                                     >
-                                                        Save
+                                                        <span>{u.gh_username}</span>
+                                                        {u.display_name && (
+                                                            <span className="text-[10px] text-neutral-400 opacity-80 normal-case">{u.display_name}</span>
+                                                        )}
                                                     </button>
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleEditMember(m)}
-                                                        className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                )}
+                                                ))}
+                                            </div>
+                                        )}
 
-                                                {(m.role.toUpperCase() !== "MANAGER" && m.role.toUpperCase() !== "OWNER" &&
-                                                    <button
-                                                        onClick={() => m.id !== undefined && handleRemoveMember(m.id) }
-                                                        className={`p-1 rounded-none bg-black border-2 border-neutral-700 text-neutral-400 hover:text-black hover:bg-[#FF0000] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer`}>
-                                                        <X size={18} strokeWidth={3}/>
-                                                    </button>
-                                                )}
+                                        {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none p-3 text-[12px] font-mono text-neutral-400 text-center z-10 shadow-[4px_4px_0px_0px_#000000]">
+                                                NO USERS MATCHING QUERY
                                             </div>
                                         )}
                                     </div>
-                                ))}
-                            {members.length > 0 && members.filter(m => (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.gh_username || '').toLowerCase().includes(memberFilter.toLowerCase()) || (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())).length === 0 && (
-                                <div className="text-center py-4 text-neutral-500 text-[11px] uppercase">
-                                    // NO MEMBERS MATCH FILTER
-                                </div>
-                            )}
-                        </div>
+                                ) : (
+                                    <div className="bg-[#121417] border-2 border-black rounded-none p-4 space-y-4 shadow-[3px_3px_0px_0px_#000000]">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[13px] font-bold text-white uppercase">// TARGET: {selectedUser.gh_username}</span>
+                                            <button onClick={() => setSelectedUser(null)} className="text-neutral-400 hover:text-white transition-colors cursor-pointer">
+                                                <X size={16} strokeWidth={3} />
+                                            </button>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5">// ASSIGN ROLE</label>
+                                            <select
+                                                value={selectedRole}
+                                                onChange={(e) => setSelectedRole(e.target.value)}
+                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                            >
+                                                <option value="" disabled>SELECT A ROLE...</option>
+                                                {DEFAULT_ROLES.map(r => (
+                                                    <option key={r} value={r}>{r}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex justify-end pt-2">
+                                            <button
+                                                onClick={handleAddMember}
+                                                disabled={!selectedRole}
+                                                className="flex items-center gap-2 px-5 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
+                                            >
+                                                <Plus size={14} strokeWidth={3} /> Add to Project
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
+                </SurfaceCard>
 
-                    {isManager && (
-                        <div className="pt-4 border-t-2 border-neutral-800">
-                            <h4 className="text-[13px] font-black uppercase tracking-wider text-white mb-4">// ADD NEW MEMBER</h4>
-                            {!selectedUser ? (
-                                <div className="space-y-2 relative">
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                            <Search size={14} className="text-neutral-400" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            placeholder="SEARCH USERNAME (LOCAL OR GITHUB)..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
-                                        />
-                                        {isSearching && (
-                                            <div className="absolute inset-y-0 right-3 flex items-center">
-                                                <div className="w-4 h-4 rounded-none border-2 border-black border-t-[#FFE600] animate-spin"></div>
+                {/* Connected Repositories */}
+                <SurfaceCard title="Connected Repositories" subtitle={`${repoUrls.length} repo${repoUrls.length !== 1 ? 's' : ''} linked`} icon={GitBranch} rightElement={null}>
+                    <div className="space-y-4">
+                        {repoUrls.length === 0 ? (
+                            <div className="py-6 text-center border-2 border-dashed border-neutral-700 rounded-none">
+                                <Github size={24} className="text-neutral-600 mx-auto mb-2" />
+                                <p className="text-neutral-500 font-mono text-[11px] uppercase">// NO REPOSITORIES CONNECTED</p>
+                                <p className="text-neutral-600 font-mono text-[10px] mt-1">Connect repos to enable AI code review</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {repoUrls.map((url) => {
+                                    const repoName = url.replace('https://github.com/', '');
+                                    const [orgName, repoShortName] = repoName.split('/');
+                                    return (
+                                        <div key={url} className="flex items-center justify-between p-3 bg-[#121417] border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="p-1.5 bg-[#FFE600] border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000]">
+                                                    <Github size={12} strokeWidth={2.5} className="text-black" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-[13px] font-bold text-white font-mono uppercase truncate">{repoShortName || repoName}</div>
+                                                    <div className="text-[12px] text-white font-mono">{orgName}</div>
+                                                </div>
                                             </div>
+                                            <div className="flex items-center gap-2">
+                                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-[#FFE600] transition-colors">
+                                                    <ExternalLink size={13} strokeWidth={2} />
+                                                </a>
+                                                <button
+                                                    onClick={() => handleRemoveRepo(url)}
+                                                    className="text-neutral-500 hover:text-[#EF4444] transition-colors cursor-pointer"
+                                                >
+                                                    <Trash2 size={13} strokeWidth={2} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setIsRepoPicker(true)}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                        >
+                            <Github size={13} strokeWidth={2.5} /> Connect Repository
+                        </button>
+                    </div>
+                </SurfaceCard>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+                {/* Custom Integrated AI (BYOT Gemini Key) */}
+                <SurfaceCard
+                    title="Custom Integrated AI"
+                    subtitle="BRING YOUR OWN GEMINI KEY FOR PR REVIEWS, MEETINGS & TASK EVALUATIONS"
+                    icon={Sparkles}
+                    rightElement={
+                        hasCustomAiKey ? (
+                            <Badge variant="success">
+                                <CheckCircle2 size={11} className="mr-1 inline" /> CUSTOM TOKEN ACTIVE
+                            </Badge>
+                        ) : (
+                            <Badge variant="default">
+                                SYSTEM DEFAULT KEY
+                            </Badge>
+                        )
+                    }
+                >
+                    <div className="space-y-5">
+                        <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
+                            Configure a custom Google Gemini API key for this project. When active, all internal AI operations (automated PR code reviews, meeting analysis, task estimation) will utilize your token and quotas instead of the shared system token.
+                        </p>
+
+                        {hasCustomAiKey && !isReplacingKey ? (
+                            <div className="p-4 bg-[#121417] border-2 border-black rounded-none flex items-center justify-between gap-4 shadow-[3px_3px_0px_0px_#000000] flex-wrap">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="p-2 bg-[#00FF66] text-black border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000] shrink-0">
+                                        <CheckCircle2 size={16} strokeWidth={2.5} />
+                                    </div>
+                                    <div className="min-w-0 font-mono">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-[#00FF66] bg-black px-1.5 py-0.5 border border-neutral-700">
+                                                // ACTIVE PROJECT KEY
+                                            </span>
+                                        </div>
+                                        <div className="text-[14px] font-bold text-white tracking-widest mt-1 truncate">
+                                            {displayMaskedAiKey}
+                                        </div>
+                                        <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                                            Dedicated quotas active for PR reviews, MoM parser, and task automation.
+                                        </p>
+                                    </div>
+                                </div>
+                                {isManager && (
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsReplacingKey(true);
+                                                setCustomAiInput('');
+                                                setAiKeyTestResult(null);
+                                            }}
+                                            className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <RefreshCw size={12} strokeWidth={2.5} />
+                                            <span>REPLACE KEY</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
+                                            className="px-3.5 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <Trash2 size={12} />
+                                            <span>REMOVE</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block text-[11px] font-bold uppercase text-neutral-400 font-mono">
+                                            // {isReplacingKey ? "ENTER REPLACEMENT GEMINI API KEY" : "ENTER GOOGLE GEMINI API KEY"}
+                                        </label>
+                                        <a
+                                            href="https://aistudio.google.com/app/apikey"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#FFE600] hover:underline"
+                                        >
+                                            <span>GET FREE KEY (AI STUDIO)</span>
+                                            <ExternalLink size={11} />
+                                        </a>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                        <div className="relative flex-1 min-w-[280px]">
+                                            <input
+                                                type={showCustomAiKey ? "text" : "password"}
+                                                value={customAiInput}
+                                                onChange={(e) => {
+                                                    setCustomAiInput(e.target.value);
+                                                    setAiKeyTestResult(null);
+                                                }}
+                                                placeholder={isReplacingKey ? "Enter new API key (AIzaSy...)" : "AIzaSy..."}
+                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-white tracking-wider focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCustomAiKey(!showCustomAiKey)}
+                                            className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            title={showCustomAiKey ? "Hide Key" : "Reveal Key"}
+                                        >
+                                            {showCustomAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            <span>{showCustomAiKey ? "HIDE" : "REVEAL"}</span>
+                                        </button>
+                                        {isReplacingKey && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsReplacingKey(false);
+                                                    setCustomAiInput('');
+                                                    setAiKeyTestResult(null);
+                                                }}
+                                                className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-400 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            >
+                                                <X size={14} />
+                                                <span>CANCEL</span>
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={handleTestCustomAiKey}
+                                            disabled={aiKeyTesting || !customAiInput.trim()}
+                                            className="px-4 py-2.5 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                        >
+                                            <Bot size={14} />
+                                            <span>{aiKeyTesting ? "TESTING..." : "TEST KEY"}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveCustomAiKey}
+                                            disabled={aiKeySaving || !customAiInput.trim()}
+                                            className="px-4 py-2.5 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                        >
+                                            <Save size={14} strokeWidth={2.5} />
+                                            <span>{aiKeySaving ? "SAVING..." : "SAVE KEY"}</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Test Feedback banner */}
+                                {aiKeyTestResult && (
+                                    <div
+                                        className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${aiKeyTestResult.valid
+                                                ? "bg-[#00FF66] text-black font-bold"
+                                                : "bg-[#FF3333] text-white font-bold"
+                                            }`}
+                                    >
+                                        {aiKeyTestResult.valid ? (
+                                            <>
+                                                <CheckCircle2 size={15} strokeWidth={2.5} />
+                                                <span>KEY VALID & READY! PING VERIFIED WITH MODEL: {aiKeyTestResult.model?.toUpperCase()}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <AlertTriangle size={15} strokeWidth={2.5} />
+                                                <span>VALIDATION ERROR: {aiKeyTestResult.error || "INVALID KEY"}</span>
+                                            </>
                                         )}
                                     </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </SurfaceCard>
 
-                                    {searchQuery.length >= 2 && searchResults.length > 0 && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none overflow-hidden z-10 shadow-[4px_4px_0px_0px_#000000] max-h-60 overflow-y-auto">
-                                            {searchResults.map(u => (
-                                                <button
-                                                    key={u.id || u.gh_username}
-                                                    onClick={() => setSelectedUser(u)}
-                                                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#FFE600] hover:text-black transition-colors text-left font-mono text-[12px] font-bold uppercase text-white cursor-pointer border-b border-neutral-800 last:border-0"
-                                                >
-                                                    <span>{u.gh_username}</span>
-                                                    {u.display_name && (
-                                                        <span className="text-[10px] text-neutral-400 opacity-80 normal-case">{u.display_name}</span>
-                                                    )}
-                                                </button>
-                                            ))}
+                {/* AI Native Agent Access Card */}
+                <SurfaceCard
+                    title="AI Agent Access"
+                    subtitle="PROGRAMMATIC API FOR CODE AGENTS (CURSOR, ANTIGRAVITY, CLAUDE, AIDER)"
+                    icon={Bot}
+                    rightElement={
+                        apiKey && (
+                            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#00FF66] text-black border-2 border-black font-mono text-[10px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000]">
+                                <span className="w-2 h-2 bg-black rounded-full animate-pulse"></span>
+                                ACTIVE
+                            </span>
+                        )
+                    }
+                >
+                    <div className="space-y-5">
+                        <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
+                            Authorize external AI coding agents to interact directly with this project. Agents can look up tasks using copied IDs, mark tasks complete, move tasks between pipeline stages, and fetch project status summaries.
+                        </p>
+
+                        {apiKey ? (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5 font-mono">
+                                        // PROJECT API KEY (SECRET)
+                                    </label>
+                                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                        <div className="relative flex-1 min-w-[280px]">
+                                            <input
+                                                type={showApiKey ? "text" : "password"}
+                                                readOnly
+                                                value={apiKey}
+                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-[#FFE600] tracking-wider focus:outline-none shadow-[2px_2px_0px_0px_#000000] select-all"
+                                            />
                                         </div>
-                                    )}
-
-                                    {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none p-3 text-[12px] font-mono text-neutral-400 text-center z-10 shadow-[4px_4px_0px_0px_#000000]">
-                                            NO USERS MATCHING QUERY
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="bg-[#121417] border-2 border-black rounded-none p-4 space-y-4 shadow-[3px_3px_0px_0px_#000000]">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[13px] font-bold text-white uppercase">// TARGET: {selectedUser.gh_username}</span>
-                                        <button onClick={() => setSelectedUser(null)} className="text-neutral-400 hover:text-white transition-colors cursor-pointer">
-                                            <X size={16} strokeWidth={3} />
-                                        </button>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5">// ASSIGN ROLE</label>
-                                        <select
-                                            value={selectedRole}
-                                            onChange={(e) => setSelectedRole(e.target.value)}
-                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
-                                        >
-                                            <option value="" disabled>SELECT A ROLE...</option>
-                                            {DEFAULT_ROLES.map(r => (
-                                                <option key={r} value={r}>{r}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="flex justify-end pt-2">
                                         <button
-                                            onClick={handleAddMember}
-                                            disabled={!selectedRole}
-                                            className="flex items-center gap-2 px-5 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
+                                            type="button"
+                                            onClick={() => setShowApiKey(!showApiKey)}
+                                            className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            title={showApiKey ? "Hide Key" : "Reveal Key"}
                                         >
-                                            <Plus size={14} strokeWidth={3} /> Add to Project
+                                            {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            <span>{showApiKey ? "HIDE" : "REVEAL"}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyApiKey}
+                                            className="px-4 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            {copiedKey ? <Check size={14} strokeWidth={3} /> : <Copy size={14} />}
+                                            <span>{copiedKey ? "COPIED!" : "COPY KEY"}</span>
                                         </button>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </SurfaceCard>
+                                {isManager && (
+                                    <div className="flex items-center gap-3 pt-1 flex-wrap">
+                                        <button
+                                            type="button"
+                                            onClick={handleGenerateApiKey}
+                                            disabled={apiKeyLoading}
+                                            className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <Key size={13} />
+                                            <span>{apiKeyLoading ? "REGENERATING..." : "REGENERATE KEY"}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsRevokeModalOpen(true)}
+                                            disabled={apiKeyLoading}
+                                            className="px-4 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <Trash2 size={13} />
+                                            <span>REVOKE KEY</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* MCP IDE Integration Box */}
+                                <div className="p-4 bg-[#141619] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <div>
+                                        <div className="flex items-center gap-2 text-white font-mono text-[12px] font-black uppercase tracking-wider">
+                                            <Cpu size={14} className="text-[#FFE600]" />
+                                            <span>// MODEL CONTEXT PROTOCOL (MCP) INTEGRATION</span>
+                                        </div>
+                                        <p className="text-[11px] font-mono text-neutral-400 mt-1">
+                                            Expose project tasks directly to Antigravity, Cursor, VS Code (Cline/Copilot), Zed, and Claude Desktop.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMcpModalOpen(true)}
+                                        className="px-4 py-2 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0 active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                                    >
+                                        <Cpu size={13} strokeWidth={2.5} />
+                                        <span>VIEW MCP CONFIGS</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-5 bg-[#121417] border-2 border-dashed border-neutral-700 rounded-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                <div>
+                                    <div className="text-white font-bold text-[13px] uppercase font-mono tracking-wider">
+                                        No API Key Generated
+                                    </div>
+                                    <div className="text-neutral-400 font-mono text-[11px] mt-1">
+                                        Create a secure token to enable IDE AI assistants and background agents to manage project tasks.
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateApiKey}
+                                    disabled={apiKeyLoading}
+                                    className="px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                >
+                                    <Key size={14} />
+                                    <span>{apiKeyLoading ? "GENERATING..." : "GENERATE API KEY"}</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </SurfaceCard>
+            </div>
 
             {/* GitHub-style Danger Zone */}
             {isManager && (

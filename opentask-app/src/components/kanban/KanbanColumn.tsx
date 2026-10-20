@@ -86,14 +86,13 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`group min-w-[316px] w-[316px] border-2 rounded-none flex flex-col max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${
-        isOver 
-          ? 'bg-[#1E2227] border-[#FFE600] ring-2 ring-[#FFE600]' 
+      className={`group min-w-[316px] w-[316px] shrink-0 border-2 rounded-none flex flex-col h-full max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${isOver
+          ? 'bg-[#1E2227] border-[#FFE600] ring-2 ring-[#FFE600]'
           : 'bg-[#0E1012] border-neutral-700'
-      }`}
+        }`}
     >
       {/* Column Header */}
-      <div className="p-3.5 border-b-2 border-neutral-700 bg-[#141619] select-none">
+      <div className="p-3.5 border-b-2 border-neutral-700 bg-[#141619] select-none shrink-0">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2 min-w-0 pr-2">
             <div className={`w-2.5 h-2.5 rounded-none border border-black shrink-0 ${colorClass}`} />
@@ -120,11 +119,11 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               </button>
             )}
             {onDeleteBucket && (
-              <TrashButton 
+              <TrashButton
                 onClick={() => {
                   onDeleteBucket(id)
                 }}
-                ></TrashButton>
+              ></TrashButton>
             )}
           </div>
         </div>
@@ -136,29 +135,31 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
         )}
 
         <div className="flex items-center gap-2">
-          <Badge 
-            variant={statusText === 'RUNNING' ? 'success' : statusText === 'PAUSED' ? 'warning' : 'default'} 
+          <Badge
+            variant={statusText === 'RUNNING' ? 'success' : statusText === 'PAUSED' ? 'warning' : 'default'}
             className="!text-[9px] !py-0.5"
           >
             <CheckCircle2 size={10} strokeWidth={2.5} /> {statusText}
           </Badge>
           <button onClick={() => onAddTask && onAddTask(id)}
             className='bg-black hover:bg-[#00FF00] text-[#FFE600] border border-neutral-700 shadow-[1.5px_1.5px_0px_0px_#000000] flex items-center px-1.5 py-0.5 hover:text-black font-mono text-[10px] font-bold uppercase tracking-wider gap-1.5'
-            >
-              <Plus size={12} strokeWidth={3}/> Add Task
+          >
+            <Plus size={12} strokeWidth={3} /> Add Task
           </button>
         </div>
       </div>
 
       {/* Task List */}
-      <div className="p-3 overflow-y-auto space-y-3 no-scrollbar flex-1 relative min-h-[140px]">
-        {children}
+      <div className="flex flex-col gap-3 p-3 overflow-y-auto flex-1 min-h-0 relative">
+        <div>
+          {children}
+        </div>
 
         {canLoadMore && (
           <button
             onClick={() => onLoadMore && onLoadMore(id)}
             disabled={isLoadingMore}
-            className="w-full py-2.5 flex items-center justify-center gap-1.5 bg-[#141619] hover:bg-[#FFE600] text-[#FFE600] hover:text-black border-2 border-black rounded-none transition-all duration-75 font-mono text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
+            className="w-full py-2.5 flex items-center justify-center gap-1.5 bg-[#141619] hover:bg-[#FFE600] text-[#FFE600] hover:text-black border-2 border-black rounded-none transition-all duration-75 font-mono text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50 shrink-0"
             title="Load more tasks for this column"
           >
             {isLoadingMore ? (
@@ -174,13 +175,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             )}
           </button>
         )}
-
-        <button
-          onClick={() => onAddTask && onAddTask(id)}
-          className="w-full py-2.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-black border-2 border-dashed border-neutral-700 hover:border-black hover:bg-[#FFE600] rounded-none transition-all duration-75 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-        >
-          <Plus size={14} strokeWidth={3} /> Add Task
-        </button>
       </div>
     </div>
   );
