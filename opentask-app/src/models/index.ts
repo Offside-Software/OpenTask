@@ -1,5 +1,16 @@
-export type MeetingSource = "RECALL_BOT" | "MANUAL_UPLOAD" | "MANUAL";
-export type MeetingStatus = "SCHEDULED" | "PROCESSING" | "COMPLETED" | "FAILED";
+export type MeetingSource = "RECALL_BOT" | "MEDIA" | "TEXT" | "MANUAL";
+export type MeetingStatus = "PROCESSING" | "COMPLETED" | "FAILED";
+export type MeetingJobStatus =
+  | "CREATED"
+  | "QUEUED"
+  | "TRANSCRIBING"
+  | "GATING"
+  | "EXTRACTING"
+  | "DRAFTS_READY"
+  | "REVIEWED"
+  | "NO_ACTIONS"
+  | "FAILED";
+export type ExtractionConfidence = "high" | "medium" | "low";
 export type BucketState =
   | "DRAFT"
   | "PENDING"
@@ -141,20 +152,124 @@ export interface UserProjectStats {
 export interface Meeting {
   id?: number | string;
   project_id: number | string;
-  source_type: MeetingSource;
-  source_reference?: string;
+  created_by?: string | null;
+  source_type: MeetingSource | string;
   status?: MeetingStatus;
-  meeting_link?: string;
-  scheduled_at?: string;
-  recorded_at?: string;
+  recall_bot_id?: string | null;
   mom_summary?: string; // LAZY LOAD TIER
   key_decisions?: string[]; // LAZY LOAD TIER
   title?: string;
   date?: string;
   time?: string;
   duration?: string;
-  attendees?: string[];
+  attendees?: string[]; // not stored; job attendee_ids are user ids
   action_items?: { initials: string; task: string; deadline: string }[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GateResult {
+  verdict: "yes" | "no" | "unsure";
+  reason?: string | null;
+  doc_type?: string | null;
+  model?: string | null;
+  failed_open: boolean;
+}
+
+export interface MeetingJob {
+  id: string;
+  meeting_id: string;
+  source_type: MeetingSource;
+  status: MeetingJobStatus;
+  meeting_date: string;
+  timezone: string;
+  attendee_ids: string[];
+  duration_sec?: number | null;
+  gate?: GateResult | null;
+  attempts: number;
+  next_attempt_at?: string | null;
+  failure_reason?: string | null;
+}
+
+export interface MeetingJobSummary extends MeetingJob {
+  meeting_title?: string | null;
+  created_at?: string | null;
+  pending_drafts: number;
+  total_drafts: number;
+}
+
+/** A task the meeting pipeline extracted, waiting in AI Drafts for review. */
+export interface MeetingDraftTask {
+  task_id: string;
+  bucket_id?: string | null;
+  bucket_state?: string | null;
+  title: string;
+  description?: string | null;
+  type?: TaskType | null;
+  weight?: number | null;
+  lead_assignee_id?: string | null;
+  assignee_ids: string[];
+  evidence_quote: string;
+  evidence_verified: boolean;
+  evidence_segment?: number | null;
+  evidence_start_sec?: number | null;
+  confidence: ExtractionConfidence;
+  assignee_hint?: string | null;
+  resolved_user_id?: string | null;
+  due_text?: string | null;
+  due_date?: string | null;
+  priority?: string | null;
+}
+
+export interface MeetingJobDetail {
+  job: MeetingJob;
+  meeting: Meeting;
+  drafts: MeetingDraftTask[];
+}
+
+export interface MeetingUploadTarget {
+  url: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  expires_at: string;
+}
+
+export interface MeetingMediaIntake {
+  meeting: Meeting;
+  job: MeetingJob;
+  upload: MeetingUploadTarget;
+}
+
+export interface MeetingIntake {
+  meeting: Meeting;
+  job: MeetingJob;
+}
+
+export interface TranscriptSegment {
+  index: number;
+  speaker?: string | null;
+  start_sec?: number | null;
+  end_sec?: number | null;
+  text: string;
+  char_offset: number;
+}
+
+export interface ApproveDraftItem {
+  task_id: string;
+  title?: string;
+  description?: string;
+  type?: string;
+  weight?: number;
+  bucket_id?: string;
+  assignee_ids: string[];
+  due_date?: string;
+  priority?: string;
+}
+
+export interface DraftReviewResult {
+  job: MeetingJob;
+  moved_task_ids: string[];
+  pending_drafts: number;
 }
 
 export interface Task {

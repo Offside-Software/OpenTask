@@ -3,6 +3,9 @@ use std::fs;
 use std::io::Cursor;
 use std::path::Path;
 
+/// Recall.ai regions. Each is a separate deployment with its own API keys.
+pub const RECALL_REGIONS: [&str; 4] = ["us-east-1", "us-west-2", "eu-central-1", "ap-northeast-1"];
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub port: u16,
@@ -26,6 +29,13 @@ pub struct Config {
     pub recall_api_key: Option<String>,
     pub telegram_bot_token: Option<String>,
 
+    // Meeting-to-task pipeline
+    pub meeting_pipeline_enabled: bool,
+    pub groq_api_key: Option<String>,
+    pub recall_region: String,
+    pub recall_base_url: String,
+    pub recall_webhook_secret: Option<String>,
+
     // Web Push (VAPID)
     pub vapid_public_key: String,
     pub vapid_private_key: String,
@@ -36,7 +46,7 @@ fn clean_val(v: String) -> String {
     v.trim().trim_matches('"').trim_matches('\'').trim().to_string()
 }
 
-fn get_clean_env(key: &str) -> Option<String> {
+pub(crate) fn get_clean_env(key: &str) -> Option<String> {
     env::var(key).ok().map(clean_val).filter(|s| !s.is_empty())
 }
 
@@ -135,6 +145,24 @@ impl Config {
             );
         }
 
+        let meeting_pipeline_enabled = get_clean_env("MEETING_PIPELINE_ENABLED")
+            .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false);
+        let groq_api_key = get_clean_env("GROQ_API_KEY");
+
+        // Recall keys are region-specific; the legacy Python service used ap-northeast-1.
+        let recall_region = get_clean_env("RECALL_REGION").unwrap_or_else(|| "ap-northeast-1".to_string());
+        if !RECALL_REGIONS.contains(&recall_region.as_str()) {
+            tracing::warn!(
+                "RECALL_REGION={recall_region} is not a Recall region; expected one of {}",
+                RECALL_REGIONS.join(", ")
+            );
+        }
+
+        if meeting_pipeline_enabled && groq_api_key.is_none() {
+            tracing::warn!("MEETING_PIPELINE_ENABLED is set but GROQ_API_KEY is missing: meeting jobs cannot be processed");
+        }
+
         Self {
             port,
             database_url,
@@ -155,6 +183,12 @@ impl Config {
                 .unwrap_or_else(|| "opentask-local-development-secret-key-32chars".to_string()),
             recall_api_key: get_clean_env("RECALL_API_KEY"),
             telegram_bot_token: get_clean_env("TELEGRAM_BOT_TOKEN"),
+            meeting_pipeline_enabled,
+            groq_api_key,
+            recall_base_url: get_clean_env("RECALL_BASE_URL")
+                .unwrap_or_else(|| format!("https://{recall_region}.recall.ai")),
+            recall_region,
+            recall_webhook_secret: get_clean_env("RECALL_WEBHOOK_SECRET"),
             vapid_public_key: get_clean_env("VAPID_PUBLIC_KEY").unwrap_or_else(|| {
                 "BFNGNl-sWQwDl1GTuh9-iM6bmHSVdosX8T7ax7hqLTPYzjM_G1DHrS0vwO1JRC75x9cOjvgybHK-19GbTWlrSN8".to_string()
             }),

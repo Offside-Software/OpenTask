@@ -70,6 +70,16 @@ async fn main() -> anyhow::Result<()> {
         services::telegram::run_telegram_alert_dispatcher(dispatcher_pool, dispatcher_config).await;
     });
 
+    // Shared by the HTTP routes and the meeting pipeline worker
+    let realtime = services::realtime::RealtimeHub::new();
+
+    // Meeting-to-task pipeline worker (off unless MEETING_PIPELINE_ENABLED is set)
+    if config.meeting_pipeline_enabled {
+        services::meeting_pipeline::spawn_worker(pool.clone(), config.clone(), realtime.clone());
+    } else {
+        tracing::info!("[Meeting Pipeline] Worker disabled (set MEETING_PIPELINE_ENABLED=true to run it)");
+    }
+
     // 6. Setup CORS
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::AllowOrigin::mirror_request())
@@ -81,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
     let app_state = AppState {
         pool: pool.clone(),
         config: config.clone(),
-        realtime: services::realtime::RealtimeHub::new(),
+        realtime,
     };
 
     let trace_layer = tower_http::trace::TraceLayer::new_for_http()

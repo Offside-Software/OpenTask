@@ -3,6 +3,10 @@ use sqlx::PgPool;
 use std::str::FromStr;
 use std::time::Duration;
 
+/// Meeting-to-task pipeline tables and the meeting/task columns they need.
+/// Runs after the base tables exist; see the file for what it changes.
+pub const MEETING_PIPELINE_SCHEMA: &str = include_str!("meeting_pipeline_schema.sql");
+
 pub fn get_connect_options(database_url: &str) -> Result<PgConnectOptions, sqlx::Error> {
     let options = PgConnectOptions::from_str(database_url)?
         .statement_cache_capacity(0); // Essential for Supabase / PgBouncer / Supavisor poolers
@@ -187,6 +191,11 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
     )
     .execute(pool)
     .await;
+
+    // Ensure meeting pipeline tables (one implicit transaction: all or nothing)
+    if let Err(e) = sqlx::raw_sql(MEETING_PIPELINE_SCHEMA).execute(pool).await {
+        tracing::warn!("Meeting pipeline schema was not applied: {e}");
+    }
 
     let _ = sqlx::raw_sql("DEALLOCATE ALL;").execute(pool).await;
 

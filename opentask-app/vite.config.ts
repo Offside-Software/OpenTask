@@ -66,6 +66,8 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: apiBaseUrl || "http://127.0.0.1:8000",
           changeOrigin: true,
+          // Pass WebSocket upgrades through too, for the project realtime events.
+          ws: true,
           rewrite: (path) => (path.startsWith("/api/v1") ? path : path.replace(/^\/api/, "")),
           cookieDomainRewrite: "",
           followRedirects: false,

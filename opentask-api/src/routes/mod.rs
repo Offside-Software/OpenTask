@@ -7,6 +7,7 @@ pub mod buckets;
 pub mod feedback;
 pub mod github;
 pub mod mcp;
+pub mod meeting_jobs;
 pub mod meetings;
 pub mod notifications;
 pub mod pr_reviews;
@@ -33,6 +34,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(ai_keys::router())
         .merge(github::router())
         .merge(meetings::router())
+        .merge(meeting_jobs::router())
         .merge(telegram::router())
         .merge(notifications::router())
         .merge(pr_reviews::router())
