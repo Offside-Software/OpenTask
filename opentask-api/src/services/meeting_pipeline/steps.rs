@@ -3,6 +3,7 @@ use sqlx::PgPool;
 
 use super::extract::{self, Checkpoint, ChunkOutcome};
 use super::gate::run_gate;
+use super::keys;
 use super::jobs::{self, ClaimedJob};
 use super::postprocess::{self, MemberName, PostProcessInput};
 use super::prompts::ExtractContext;
@@ -75,7 +76,8 @@ pub async fn gate_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<Step
 
     let cfg = &ctx.cfg;
     let models = [cfg.gate_model, cfg.gate_fallback_model];
-    let gate = run_gate(ctx.llm.as_ref(), &models, &plain_text(&segments), cfg.gate_head_chars, cfg.gate_tail_chars).await;
+    let llm = keys::llm_for(ctx, claimed.project_id.map(|p| p.0).unwrap_or_default()).await?;
+    let gate = run_gate(llm.as_ref(), &models, &plain_text(&segments), cfg.gate_head_chars, cfg.gate_tail_chars).await;
     crate::db::query("UPDATE opentask.meeting_jobs SET gate = $2 WHERE id = $1;")
         .bind(job_id)
         .bind(serde_json::to_value(&gate).unwrap_or_default())
@@ -87,14 +89,11 @@ pub async fn gate_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<Step
 }
 
 pub async fn extract_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutcome, StepError> {
-    let llm = ctx
-        .llm
-        .as_ref()
-        .ok_or_else(|| StepError::Fatal("GROQ_API_KEY is not configured".to_string()))?;
     let job = &claimed.job;
     let job_id = job.id.0;
     let meeting_id = job.meeting_id.0;
     let project_id = claimed.project_id.map(|p| p.0).unwrap_or_default();
+    let llm = &keys::llm_for(ctx, project_id).await?.ok_or_else(|| StepError::Fatal("No Groq API key: set GROQ_API_KEY or the project's own key".to_string()))?;
     let pool = &ctx.pool;
 
     let transcript = crate::db::query_as::<_, MeetingTranscript>(

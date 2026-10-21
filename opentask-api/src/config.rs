@@ -30,7 +30,6 @@ pub struct Config {
     pub telegram_bot_token: Option<String>,
 
     // Meeting-to-task pipeline
-    pub meeting_pipeline_enabled: bool,
     pub groq_api_key: Option<String>,
     pub recall_region: String,
     pub recall_base_url: String,
@@ -145,9 +144,6 @@ impl Config {
             );
         }
 
-        let meeting_pipeline_enabled = get_clean_env("MEETING_PIPELINE_ENABLED")
-            .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
-            .unwrap_or(false);
         let groq_api_key = get_clean_env("GROQ_API_KEY");
 
         // Recall keys are region-specific; the legacy Python service used ap-northeast-1.
@@ -159,8 +155,8 @@ impl Config {
             );
         }
 
-        if meeting_pipeline_enabled && groq_api_key.is_none() {
-            tracing::warn!("MEETING_PIPELINE_ENABLED is set but GROQ_API_KEY is missing: meeting jobs cannot be processed");
+        if groq_api_key.is_none() {
+            tracing::warn!("GROQ_API_KEY is missing: meeting jobs only run for projects with their own Groq key");
         }
 
         Self {
@@ -183,7 +179,6 @@ impl Config {
                 .unwrap_or_else(|| "opentask-local-development-secret-key-32chars".to_string()),
             recall_api_key: get_clean_env("RECALL_API_KEY"),
             telegram_bot_token: get_clean_env("TELEGRAM_BOT_TOKEN"),
-            meeting_pipeline_enabled,
             groq_api_key,
             recall_base_url: get_clean_env("RECALL_BASE_URL")
                 .unwrap_or_else(|| format!("https://{recall_region}.recall.ai")),

@@ -240,6 +240,50 @@ export interface MeetingMediaIntake {
   upload: MeetingUploadTarget;
 }
 
+/** 0 means no limit. */
+export interface AiLimits {
+  rpm: number;
+  rpd: number;
+  tpm: number;
+  tpd: number;
+  audio_per_hour: number;
+  audio_per_day: number;
+}
+
+export interface ModelUsageToday {
+  model: string;
+  requests: number;
+  tokens: number;
+  audio_seconds: number;
+  limits: AiLimits;
+}
+
+/** A project's own provider key. The key itself never leaves the server. */
+export interface ProjectAiKey {
+  provider: "groq";
+  configured: boolean;
+  hint?: string | null;
+  tier?: "free" | "developer" | null;
+  updated_at?: string | null;
+  can_manage: boolean;
+}
+
+export interface MeetingHealth {
+  can_manage: boolean;
+  quota: {
+    jobs_today: number;
+    jobs_per_day: number;
+    audio_minutes_today: number;
+    audio_minutes_per_day: number;
+    /** The project uses its own key, so the quotas do not apply. */
+    exempt: boolean;
+  };
+  models: ModelUsageToday[];
+  own_models: ModelUsageToday[];
+  key: ProjectAiKey;
+  jobs: { job: MeetingJob; meeting_title?: string | null; problem?: string | null; can_retry: boolean }[];
+}
+
 export interface MeetingIntake {
   meeting: Meeting;
   job: MeetingJob;

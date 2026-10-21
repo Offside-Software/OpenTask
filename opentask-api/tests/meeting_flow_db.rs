@@ -22,12 +22,13 @@ use opentask_api::error::AppError;
 use opentask_api::models::meeting::{ApproveDraftItem, GateVerdict, JobStatus, MeetingStatus, SourceType};
 use opentask_api::models::safe_id::SafeId;
 use opentask_api::services::id_generator::next_id;
-use opentask_api::services::meeting_pipeline::config::PipelineConfig;
+use opentask_api::services::meeting_pipeline::config::{GroqTier, PipelineConfig};
 use opentask_api::services::meeting_pipeline::intake::{self, NewMeeting};
 use opentask_api::services::meeting_pipeline::llm::LlmClient;
 use opentask_api::services::meeting_pipeline::media;
 use opentask_api::services::meeting_pipeline::storage::{LocalStore, MediaStore};
-use opentask_api::services::meeting_pipeline::uploads;
+use opentask_api::services::meeting_pipeline::uploads::{self, UploadFile};
+use opentask_api::services::meeting_pipeline::{health, keys, retention};
 use opentask_api::services::meeting_pipeline::{review, run_next_job, WorkerContext};
 use opentask_api::services::realtime::RealtimeHub;
 
@@ -44,6 +45,8 @@ struct MockState {
     /// Groq Whisper answers 429 with a long Retry-After while this is set.
     whisper_rate_limited: bool,
     cf_calls: u32,
+    /// The bearer token of every chat call.
+    chat_keys: Vec<String>,
 }
 
 type Shared = Arc<Mutex<MockState>>;
@@ -88,7 +91,9 @@ fn tasks_for(record: &str) -> Value {
     json!({ "tasks": tasks })
 }
 
-async fn groq_chat(State(state): State<Shared>, Json(body): Json<Value>) -> Response {
+async fn groq_chat(State(state): State<Shared>, headers: axum::http::HeaderMap, Json(body): Json<Value>) -> Response {
+    let bearer = headers.get("authorization").and_then(|v| v.to_str().ok()).unwrap_or("").trim_start_matches("Bearer ").to_string();
+    state.lock().unwrap().chat_keys.push(bearer);
     let user = body["messages"][1]["content"].as_str().unwrap_or("").to_string();
     let kind = match body["response_format"]["type"].as_str() {
         Some("json_object") => "gate".to_string(),
@@ -124,10 +129,9 @@ async fn groq_chat(State(state): State<Shared>, Json(body): Json<Value>) -> Resp
     }
 }
 
-// ---------- mock Recall ----------
+// ---------- Mock Recall ----------
 
-/// Bot lifecycle the mock reports: still recording, done with audio, failed, or done after
-/// never being let in (no recording), `minutes_ago` minutes ago.
+/// Bot lifecycle the mock reports
 #[derive(Clone, Copy, PartialEq)]
 enum BotPhase {
     Recording,
@@ -246,6 +250,14 @@ async fn cf_whisper(State(state): State<Shared>, Path((account, model)): Path<(S
         }
     }))
     .into_response()
+}
+
+async fn groq_models(headers: axum::http::HeaderMap) -> Response {
+    let bearer = headers.get("authorization").and_then(|v| v.to_str().ok()).unwrap_or("");
+    if bearer.contains("rejected") {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": { "message": "Invalid API Key" } }))).into_response();
+    }
+    Json(json!({ "object": "list", "data": [] })).into_response()
 }
 
 /// 15 s of tone as WAV, made with ffmpeg (None when ffmpeg is not installed).
@@ -370,6 +382,7 @@ async fn meeting_flows_against_postgres() {
     let groq = serve(
         Router::new()
             .route("/chat/completions", post(groq_chat))
+            .route("/models", get(groq_models))
             .route("/audio/transcriptions", post(groq_transcribe))
             .route("/accounts/{account}/ai/run/{*model}", post(cf_whisper))
             .with_state(state.clone()),
@@ -414,10 +427,14 @@ async fn meeting_flows_against_postgres() {
         let audio = test_audio(&ctx.cfg.ffmpeg_path).expect("test audio");
         media_upload_to_drafts(&ctx, &p, &audio).await;
         media_falls_back_to_cloudflare(&ctx, &p, &state, &groq, &audio).await;
+        transcription_waits_for_tomorrow_when_minutes_run_out(&ctx, &audio).await;
     } else {
         eprintln!("skipped the Recall audio scenario: ffmpeg/ffprobe not found (set FFMPEG_PATH / FFPROBE_PATH)");
     }
     crash_mid_extraction_resumes_from_checkpoint(&ctx, &p, &llm, &state).await;
+    project_quotas_refuse_new_jobs(&ctx, &llm).await;
+    health_retention_and_retry(&ctx, &p, &llm).await;
+    project_key_is_used_and_lifts_quotas(&ctx, &state).await;
 
     let _ = std::fs::remove_dir_all(&media_dir);
     pool.close().await;
@@ -796,11 +813,7 @@ async fn media_upload_to_drafts(ctx: &WorkerContext, p: &Project, audio: &[u8]) 
         pool,
         &ctx.realtime,
         &ctx.cfg,
-        new_meeting(p, SourceType::Media, "Sprint review"),
-        "Sprint review.wav",
-        Some("audio/wav"),
-        audio.len() as u64,
-    )
+        new_meeting(p, SourceType::Media, "Sprint review"), UploadFile { name: "Sprint review.wav", content_type: Some("audio/wav"), size_bytes: audio.len() as u64, duration_sec: Some(15.0) })
     .await
     .unwrap();
     let job_id = created.job.id.0;
@@ -848,7 +861,7 @@ async fn media_falls_back_to_cloudflare(ctx: &WorkerContext, p: &Project, state:
     let cf_ctx = WorkerContext { pool: ctx.pool.clone(), config: ctx.config.clone(), realtime: ctx.realtime.clone(), cfg, llm: ctx.llm.clone() };
     let pool = &cf_ctx.pool;
 
-    let created = uploads::create_media_job(pool, &cf_ctx.realtime, &cf_ctx.cfg, new_meeting(p, SourceType::Media, "Evaluasi"), "evaluasi.wav", Some("audio/wav"), audio.len() as u64)
+    let created = uploads::create_media_job(pool, &cf_ctx.realtime, &cf_ctx.cfg, new_meeting(p, SourceType::Media, "Evaluasi"), UploadFile { name: "evaluasi.wav", content_type: Some("audio/wav"), size_bytes: audio.len() as u64, duration_sec: None })
         .await
         .unwrap();
     let job_id = created.job.id.0;
@@ -873,7 +886,7 @@ async fn media_falls_back_to_cloudflare(ctx: &WorkerContext, p: &Project, state:
 async fn abandoned_upload_fails_and_is_removed(ctx: &WorkerContext, p: &Project) {
     let pool = &ctx.pool;
     let store = ctx.cfg.media_store.as_ref().unwrap();
-    let created = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "Never finished"), "call.mp4", Some("video/mp4"), 4096)
+    let created = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "Never finished"), UploadFile { name: "call.mp4", content_type: Some("video/mp4"), size_bytes: 4096, duration_sec: None })
         .await
         .unwrap();
     let job_id = created.job.id.0;
@@ -898,8 +911,230 @@ async fn abandoned_upload_fails_and_is_removed(ctx: &WorkerContext, p: &Project)
 
     // Too big or empty never gets an upload URL.
     let too_big = (ctx.cfg.max_upload_mb + 1) * 1024 * 1024;
-    let huge = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "x"), "x.mp4", None, too_big).await;
+    let huge = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "x"), UploadFile { name: "x.mp4", content_type: None, size_bytes: too_big, duration_sec: None }).await;
     assert!(matches!(huge, Err(AppError::BadRequest(_))));
-    let empty = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "x"), "x.mp4", None, 0).await;
+    let empty = uploads::create_media_job(pool, &ctx.realtime, &ctx.cfg, new_meeting(p, SourceType::Media, "x"), UploadFile { name: "x.mp4", content_type: None, size_bytes: 0, duration_sec: None }).await;
     assert!(matches!(empty, Err(AppError::BadRequest(_))));
+}
+
+async fn add_usage_today(pool: &PgPool, project_id: i64, model: &str, tokens: i64, audio_seconds: i32) {
+    sqlx::query(
+        r#"
+        INSERT INTO opentask.ai_usage_daily (day, project_id, model, requests, tokens, audio_seconds)
+        VALUES ((NOW() AT TIME ZONE 'UTC')::date, $1, $2, 1, $3, $4)
+        ON CONFLICT (day, project_id, model, own_key) DO UPDATE
+        SET tokens = ai_usage_daily.tokens + EXCLUDED.tokens, audio_seconds = ai_usage_daily.audio_seconds + EXCLUDED.audio_seconds;
+        "#,
+    )
+    .bind(project_id)
+    .bind(model)
+    .bind(tokens)
+    .bind(audio_seconds)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn project_quotas_refuse_new_jobs(ctx: &WorkerContext, llm: &LlmClient) {
+    let pool = &ctx.pool;
+    let p = seed(pool).await;
+    let mut cfg = PipelineConfig::from_env();
+    cfg.groq_base_url = ctx.cfg.groq_base_url.clone();
+    cfg.media_store = ctx.cfg.media_store.clone();
+    cfg.project_jobs_per_day = 2;
+    cfg.project_audio_minutes_per_day = 10;
+
+    for title in ["Senin", "Selasa"] {
+        intake::create_text_job(pool, &ctx.realtime, &cfg, Some(llm), new_meeting(&p, SourceType::Text, title), &notes(""))
+            .await
+            .unwrap();
+    }
+    let third = intake::create_text_job(pool, &ctx.realtime, &cfg, Some(llm), new_meeting(&p, SourceType::Text, "Rabu"), &notes("")).await;
+    let Err(AppError::Conflict(message)) = third else { panic!("the third job of the day is refused") };
+    assert!(message.contains("2 meeting jobs"), "{message}");
+
+    // Minutes: 8 of 10 used, so a 3-minute recording is refused before anything is uploaded.
+    cfg.project_jobs_per_day = 0;
+    add_usage_today(pool, p.id, cfg.asr_model, 0, 8 * 60).await;
+    let long = uploads::create_media_job(pool, &ctx.realtime, &cfg, new_meeting(&p, SourceType::Media, "Panjang"), UploadFile { name: "a.ogg", content_type: Some("audio/ogg"), size_bytes: 1000, duration_sec: Some(180.0) }).await;
+    let Err(AppError::Conflict(message)) = long else { panic!("over the minutes quota") };
+    assert!(message.contains("2 of its 10 transcription minutes"), "{message}");
+    let short = uploads::create_media_job(pool, &ctx.realtime, &cfg, new_meeting(&p, SourceType::Media, "Pendek"), UploadFile { name: "b.ogg", content_type: Some("audio/ogg"), size_bytes: 1000, duration_sec: Some(60.0) }).await;
+    assert!(short.is_ok(), "a minute fits");
+}
+
+async fn transcription_waits_for_tomorrow_when_minutes_run_out(ctx: &WorkerContext, audio: &[u8]) {
+    let pool = &ctx.pool;
+    let p = seed(pool).await;
+    let mut cfg = PipelineConfig::from_env();
+    cfg.groq_base_url = ctx.cfg.groq_base_url.clone();
+    cfg.media_store = ctx.cfg.media_store.clone();
+    cfg.cf_account_id = None;
+    cfg.project_audio_minutes_per_day = 1;
+    let quota_ctx = WorkerContext { pool: pool.clone(), config: ctx.config.clone(), realtime: ctx.realtime.clone(), cfg, llm: ctx.llm.clone() };
+
+    // The browser did not know the length, so intake lets it through; transcription then waits.
+    let created = uploads::create_media_job(pool, &quota_ctx.realtime, &quota_ctx.cfg, new_meeting(&p, SourceType::Media, "Kuota"), UploadFile { name: "kuota.wav", content_type: Some("audio/wav"), size_bytes: audio.len() as u64, duration_sec: None })
+        .await
+        .unwrap();
+    let job_id = created.job.id.0;
+    put_upload(&quota_ctx, &upload_key(pool, job_id).await.unwrap(), audio).await;
+    uploads::complete_upload(pool, &quota_ctx.realtime, &quota_ctx.cfg, p.id, job_id).await.unwrap();
+    add_usage_today(pool, p.id, quota_ctx.cfg.asr_model, 0, 50).await;
+
+    assert!(run_next_job(&quota_ctx).await);
+    let (status, next_attempt, reason, attempts): (JobStatus, Option<chrono::DateTime<Utc>>, Option<String>, i32) =
+        sqlx::query_as("SELECT status, next_attempt_at, last_error, attempts FROM opentask.meeting_jobs WHERE id = $1;")
+            .bind(job_id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    assert_eq!(status, JobStatus::Transcribing, "deferred, not failed");
+    assert!(next_attempt.unwrap() > Utc::now() + chrono::Duration::minutes(1));
+    assert_eq!(next_attempt.unwrap().time(), chrono::NaiveTime::MIN, "waits for the next UTC day");
+    assert!(reason.unwrap().contains("transcription minutes for today are used up"));
+    assert_eq!(attempts, 0, "a quota wait is not a failed attempt");
+    assert!(!run_next_job(&quota_ctx).await, "nothing to claim until tomorrow");
+
+    // The project's members see why it waits; an owner can push it on (it waits again here).
+    let member_view = health::project_health(pool, &quota_ctx.cfg, p.id, false).await.unwrap();
+    let waiting = member_view.jobs.iter().find(|j| j.job.id.0 == job_id).unwrap();
+    assert!(waiting.problem.as_deref().unwrap().contains("used up"));
+    assert!(!waiting.can_retry);
+    assert_eq!(member_view.quota.audio_minutes_per_day, 1);
+    let owner_view = health::project_health(pool, &quota_ctx.cfg, p.id, true).await.unwrap();
+    assert!(owner_view.jobs.iter().find(|j| j.job.id.0 == job_id).unwrap().can_retry);
+    let retried = health::retry(pool, job_id).await.unwrap();
+    assert_eq!(retried.next_attempt_at, None);
+    sqlx::query("DELETE FROM opentask.meetings WHERE id = $1;").bind(created.meeting.id.0).execute(pool).await.unwrap();
+}
+
+async fn health_retention_and_retry(ctx: &WorkerContext, p: &Project, llm: &LlmClient) {
+    let pool = &ctx.pool;
+    sqlx::query("UPDATE opentask.project_member SET role = 'Owner' WHERE project_id = $1 AND user_id = $2;")
+        .bind(p.id)
+        .bind(p.owner)
+        .execute(pool)
+        .await
+        .unwrap();
+    assert!(health::is_manager(pool, p.id, p.owner).await.unwrap());
+    assert!(!health::is_manager(pool, p.id, p.budi).await.unwrap());
+
+    // A job that failed in the worker: owners see the internal error and can retry it.
+    let created = intake::create_text_job(pool, &ctx.realtime, &ctx.cfg, Some(llm), new_meeting(p, SourceType::Text, "Gagal"), &notes(""))
+        .await
+        .unwrap();
+    let job_id = created.job.id.0;
+    sqlx::query("UPDATE opentask.meeting_jobs SET status = 'FAILED', attempts = 8, last_error = 'Groq rejected the request: 400 provider detail' WHERE id = $1;")
+        .bind(job_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    let member = health::project_health(pool, &ctx.cfg, p.id, false).await.unwrap();
+    let failed = member.jobs.iter().find(|j| j.job.id.0 == job_id).unwrap();
+    assert_eq!(failed.problem, None, "worker errors stay internal for members");
+    assert!(!member.can_manage);
+    let owner = health::project_health(pool, &ctx.cfg, p.id, true).await.unwrap();
+    let failed = owner.jobs.iter().find(|j| j.job.id.0 == job_id).unwrap();
+    assert!(failed.problem.as_deref().unwrap().contains("provider detail"));
+    assert!(failed.can_retry);
+    assert!(owner.models.iter().any(|m| m.model == ctx.cfg.extract_model && m.limits.tpd > 0 || ctx.cfg.groq_tier != opentask_api::services::meeting_pipeline::config::GroqTier::Free));
+
+    let retried = health::retry(pool, job_id).await.unwrap();
+    assert_eq!((retried.status, retried.attempts), (JobStatus::Queued, 0));
+    assert!(matches!(health::retry(pool, job_id).await, Err(AppError::Conflict(_))), "a queued job has nothing to retry");
+    // Older queued jobs from other scenarios may run first.
+    for _ in 0..10 {
+        if job_status(pool, job_id).await != JobStatus::Queued || !run_next_job(ctx).await {
+            break;
+        }
+    }
+    assert_eq!(job_status(pool, job_id).await, JobStatus::DraftsReady, "the retried job ran again");
+
+    // Retention: checkpoints go once a job is done; old transcripts of finished jobs go too.
+    let checkpoints: (bool,) = sqlx::query_as(
+        "SELECT asr_checkpoint IS NULL AND extraction_checkpoint IS NULL FROM opentask.meeting_transcripts WHERE job_id = $1;",
+    )
+    .bind(job_id)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    if !checkpoints.0 {
+        assert!(retention::clear_checkpoints(pool).await.unwrap() >= 1);
+    }
+    let cleared: bool = sqlx::query_scalar("SELECT extraction_checkpoint IS NULL FROM opentask.meeting_transcripts WHERE job_id = $1;")
+        .bind(job_id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    assert!(cleared);
+
+    sqlx::query("UPDATE opentask.meeting_jobs SET status = 'REVIEWED' WHERE id = $1;").bind(job_id).execute(pool).await.unwrap();
+    sqlx::query("UPDATE opentask.meeting_transcripts SET created_at = NOW() - INTERVAL '120 days' WHERE job_id = $1;")
+        .bind(job_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    assert!(retention::delete_old_transcripts(pool, 90).await.unwrap() >= 1);
+    assert!(review::transcript(pool, job_id).await.is_err(), "the transcript is gone");
+    assert_eq!(review::job_detail(pool, job_id).await.unwrap().drafts.len(), 2, "tasks and their evidence stay");
+}
+
+async fn project_key_is_used_and_lifts_quotas(ctx: &WorkerContext, state: &Shared) {
+    let pool = &ctx.pool;
+    let p = seed(pool).await;
+    let mut cfg = PipelineConfig::from_env();
+    cfg.groq_base_url = ctx.cfg.groq_base_url.clone();
+    cfg.project_jobs_per_day = 1;
+    let project_key = "gsk_project_key_for_tests_0123abcd";
+
+    let rejected = keys::save(pool, &ctx.config, &cfg, p.id, p.owner, "gsk_rejected_key_for_tests_0000", GroqTier::Free).await;
+    assert!(matches!(rejected, Err(AppError::BadRequest(_))), "a key Groq refuses is not stored");
+    assert!(!keys::info(pool, p.id, true).await.unwrap().configured);
+
+    let saved = keys::save(pool, &ctx.config, &cfg, p.id, p.owner, project_key, GroqTier::Free).await.unwrap();
+    assert!(saved.configured);
+    assert_eq!((saved.hint.as_deref(), saved.tier.as_deref()), (Some("abcd"), Some("free")));
+    let stored: Vec<u8> = sqlx::query_scalar("SELECT key_cipher FROM opentask.project_ai_keys WHERE project_id = $1;")
+        .bind(p.id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&stored).contains("project_key"), "stored encrypted");
+
+    // Gate (inline) and extraction (worker) both use the project's key, and the quota does not apply.
+    let calls_before = state.lock().unwrap().chat_keys.len();
+    let mut job_ids = Vec::new();
+    for title in ["Satu", "Dua"] {
+        let llm = keys::llm_for_project(pool, &ctx.config, &cfg, ctx.llm.as_ref(), p.id).await.unwrap().unwrap();
+        assert!(llm.has_own_key());
+        let created = intake::create_text_job(pool, &ctx.realtime, &cfg, Some(&llm), new_meeting(&p, SourceType::Text, title), &notes(""))
+            .await
+            .expect("a project with its own key is not held to the daily quota");
+        job_ids.push(created.job.id.0);
+    }
+    for _ in 0..12 {
+        let mut pending = false;
+        for id in &job_ids {
+            pending |= job_status(pool, *id).await == JobStatus::Queued;
+        }
+        if !pending || !run_next_job(ctx).await {
+            break;
+        }
+    }
+    for id in &job_ids {
+        assert_eq!(job_status(pool, *id).await, JobStatus::DraftsReady);
+    }
+    let health = health::project_health(pool, &cfg, p.id, true).await.unwrap();
+    assert!(health.quota.exempt && health.key.configured);
+    let ours: Vec<String> = state.lock().unwrap().chat_keys[calls_before..].to_vec();
+    assert!(ours.iter().filter(|k| *k == project_key).count() >= 4, "gate and extraction of both jobs: {ours:?}");
+
+    // Without it the shared key is used again.
+    assert!(keys::remove(pool, p.id).await.unwrap());
+    assert!(keys::resolve_groq_key(pool, &ctx.config, p.id).await.unwrap().is_none());
+    let shared = keys::llm_for_project(pool, &ctx.config, &cfg, ctx.llm.as_ref(), p.id).await.unwrap().unwrap();
+    assert!(!shared.has_own_key());
+    let third = intake::create_text_job(pool, &ctx.realtime, &cfg, Some(&shared), new_meeting(&p, SourceType::Text, "Tiga"), &notes("")).await;
+    assert!(matches!(third, Err(AppError::Conflict(_))), "the quota applies again");
 }
