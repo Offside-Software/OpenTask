@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Plus, Settings2, ChevronDown, Loader2 } from 'lucide-react';
+import { CheckCircle2, Plus, Settings2, ChevronDown, Loader2, Expand } from 'lucide-react';
 import { Badge } from '../../design-system/Badge';
 import { TrashButton } from '../../design-system/TrashButton';
 
@@ -20,6 +20,8 @@ interface KanbanColumnProps {
   onAddTask?: (bucketId: number | string) => void;
   onDeleteBucket?: (bucketId: number | string) => void;
   onEditBucket?: (bucketId: number | string) => void;
+  onFocusBucket?: (bucketId: number | string) => void;
+  widthClass?: string;
   children: React.ReactNode;
 }
 
@@ -40,6 +42,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onAddTask,
   onDeleteBucket,
   onEditBucket,
+  onFocusBucket,
+  widthClass,
   children
 }) => {
   const [isOver, setIsOver] = React.useState(false);
@@ -86,9 +90,9 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`group min-w-[316px] w-[316px] shrink-0 border-2 rounded-none flex flex-col h-full max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${isOver
-          ? 'bg-[#1E2227] border-[#FFE600] ring-2 ring-[#FFE600]'
-          : 'bg-[#0E1012] border-neutral-700'
+      className={`group ${widthClass || 'min-w-[316px] w-[316px]'} shrink-0 border-2 rounded-none flex flex-col h-full max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${isOver
+        ? 'bg-[#1E2227] border-[#FFE600] ring-2 ring-[#FFE600]'
+        : 'bg-[#0E1012] border-neutral-700'
         }`}
     >
       {/* Column Header */}
@@ -109,6 +113,16 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                 ? `${taskCount}/${totalTasks}`
                 : String(taskCount).padStart(2, '0')}
             </span>
+            {onFocusBucket && (
+              <button
+                type="button"
+                onClick={() => onFocusBucket(id)}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded-none hover:bg-[#FFE600] hover:text-black text-neutral-400 border border-transparent hover:border-black transition-all cursor-pointer"
+                title="Focus bucket"
+              >
+                <Expand size={13} />
+              </button>
+            )}
             {onEditBucket && (
               <button
                 onClick={() => onEditBucket(id)}

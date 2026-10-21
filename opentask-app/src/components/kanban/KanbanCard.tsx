@@ -1,5 +1,6 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
+import { MarkdownRenderer, hasMarkdownSyntax } from '../../design-system/MarkdownRenderer';
 import { Clock, GitPullRequest, MoreHorizontal, Check, GitBranch } from 'lucide-react';
 import type { TaskType } from '../../models';
 import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
@@ -181,9 +182,20 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       </div>
 
       {description && (
-        <p className="text-[11px] font-mono text-neutral-400 line-clamp-2 leading-relaxed">
-          {description}
-        </p>
+        hasMarkdownSyntax(description) ? (
+          <div className="text-[13px] font-sans font-medium text-neutral-300 line-clamp-4 leading-relaxed overflow-hidden">
+            <MarkdownRenderer
+              content={description}
+              isSans
+              compact
+              className="!text-[13px] !font-sans !font-medium"
+            />
+          </div>
+        ) : (
+          <p className="text-[13px] font-sans font-medium text-neutral-300 line-clamp-4 leading-relaxed">
+            {description}
+          </p>
+        )
       )}
 
       {/* Tags & Weight */}

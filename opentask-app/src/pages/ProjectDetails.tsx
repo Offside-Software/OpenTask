@@ -6,7 +6,7 @@ import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
 import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
-import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Loader2, RefreshCw, Sparkles, Search, X, Cpu, Filter } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Loader2, RefreshCw, Sparkles, Search, X, Cpu, Filter, Expand, Shrink } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
 import { MeetingIntelligenceTab } from '../components/dashboard/MeetingIntelligenceTab';
@@ -35,1238 +35,1377 @@ import { NotFoundPage } from './NotFound';
 import type { TaskType, Project, Task, Bucket, BucketState } from '../models';
 
 interface ProjectDetailsProps {
-  projectId: string | number;
+    projectId: string | number;
 }
 
 const STATUS_COLORS: Record<BucketState, string> = {
-  'DRAFT': 'bg-slate-500',
-  'PENDING': 'bg-[#F59E0B]',
-  'TODO': 'bg-[#3B82F6]',
-  'ONGOING': 'bg-[#16A34A]',
-  'ON_REVIEW': 'bg-[#8B5CF6]',
-  'COMPLETED': 'bg-slate-400',
+    'DRAFT': 'bg-slate-500',
+    'PENDING': 'bg-[#F59E0B]',
+    'TODO': 'bg-[#3B82F6]',
+    'ONGOING': 'bg-[#16A34A]',
+    'ON_REVIEW': 'bg-[#8B5CF6]',
+    'COMPLETED': 'bg-slate-400',
 };
 
 const tabToKey = (t: string) => {
-  switch (t.toLowerCase()) {
-    case 'overview': return 'overview';
-    case 'tasks': return 'tasks';
-    case 'mom & meetings':
-    case 'meetings':
-    case 'mom':
-      return 'meetings';
-    case 'settings': return 'settings';
-    default: return 'overview';
-  }
+    switch (t.toLowerCase()) {
+        case 'overview': return 'overview';
+        case 'tasks': return 'tasks';
+        case 'mom & meetings':
+        case 'meetings':
+        case 'mom':
+            return 'meetings';
+        case 'settings': return 'settings';
+        default: return 'overview';
+    }
 };
 
 const keyToTab = (k: string) => {
-  switch (k.toLowerCase()) {
-    case 'overview': return 'Overview';
-    case 'tasks': return 'Tasks';
-    case 'mom & meetings':
-    case 'meetings':
-    case 'mom':
-      return 'MoM & Meetings';
-    case 'settings': return 'Settings';
-    default: return 'Overview';
-  }
+    switch (k.toLowerCase()) {
+        case 'overview': return 'Overview';
+        case 'tasks': return 'Tasks';
+        case 'mom & meetings':
+        case 'meetings':
+        case 'mom':
+            return 'MoM & Meetings';
+        case 'settings': return 'Settings';
+        default: return 'Overview';
+    }
 };
 
 export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId }) => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const taskIdParam = searchParams.get('taskId');
-  const [activeTab, setActiveTabState] = useState(() => {
-    const param = searchParams.get('tab') || searchParams.get('tabs');
-    if (param) {
-      return keyToTab(param);
-    }
-    return taskIdParam ? 'Tasks' : 'Overview';
-  });
-
-  const setActiveTab = (tab: string) => {
-    setActiveTabState(tab);
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.set('tab', tabToKey(tab));
-      return next;
-    }, { replace: true });
-  };
-
-  useEffect(() => {
-    const param = searchParams.get('tab') || searchParams.get('tabs');
-    if (param) {
-      const resolved = keyToTab(param);
-      if (resolved !== activeTab) {
-        setActiveTabState(resolved);
-      }
-    }
-  }, [searchParams, activeTab]);
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | null>(null);
-  const [selectedBucketTarget, setSelectedBucketTarget] = useState<number | string | undefined>(undefined);
-  const [bucketToDelete, setBucketToDelete] = useState<number | string | null>(null);
-  const [showMeetingModal, setShowMeetingModal] = useState(false);
-  const [isMcpModalOpen, setIsMcpModalOpen] = useState(false);
-  const [selectedAssigneeFilter, setSelectedAssigneeFilter] = useState<string>('ALL');
-  const [project, setProject] = useState<Project | null>(null);
-  const [selectedBucketForEdit, setSelectedBucketForEdit] = useState<Bucket | null>(null);
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [isRefreshingTasks, setIsRefreshingTasks] = useState(false);
-  const [projectNotFound, setProjectNotFound] = useState(false);
-  const [meetingEventKey, setMeetingEventKey] = useState(0);
-  const meetingJobParam = searchParams.get('meetingJob');
-  const { showToast } = useToast();
-
-  React.useEffect(() => {
-    projectService.getProjectById(projectId)
-      .then(p => {
-        if (!p) {
-          setProjectNotFound(true);
-        } else {
-          setProject(p);
-          setProjectNotFound(false);
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const taskIdParam = searchParams.get('taskId');
+    const [activeTab, setActiveTabState] = useState(() => {
+        const param = searchParams.get('tab') || searchParams.get('tabs');
+        if (param) {
+            return keyToTab(param);
         }
-      })
-      .catch(err => {
-        console.error("Failed to fetch project:", err);
-        setProjectNotFound(true);
-      });
-  }, [projectId]);
-
-  const handleRefreshTasksOnly = async () => {
-    setIsRefreshingTasks(true);
-    try {
-      await refreshBoard(false);
-      showToast('Task list synchronized', 'info');
-    } catch (err) {
-      console.error('Failed to refresh tasks:', err);
-      showToast('Failed to refresh tasks', 'error');
-    } finally {
-      setIsRefreshingTasks(false);
-    }
-  };
-
-  const [isSyncingPrs, setIsSyncingPrs] = useState(false);
-
-  const handleSyncAndReviewPrs = async () => {
-    setIsSyncingPrs(true);
-    try {
-      const res = await prReviewService.syncProjectPrs(projectId);
-      if (res.reviews_triggered > 0) {
-        showToast(`AI Code Review triggered for ${res.reviews_triggered} PR(s)!`, 'success');
-      } else {
-        showToast('Scanned repos: no unreviewed PRs found', 'info');
-      }
-      await refreshBoard(false);
-    } catch (err: any) {
-      console.error('Failed to sync PRs:', err);
-      showToast(err?.message || 'Failed to sync PRs', 'error');
-    } finally {
-      setIsSyncingPrs(false);
-    }
-  };
-
-  const { user } = useAuth();
-  const dbUserId = user?.db_user?.id;
-  const { role, loading: roleLoading } = useCurrentUserRole(projectId, dbUserId);
-  const isManager = role?.toUpperCase() === 'MANAGER' || role?.toUpperCase() === 'OWNER';
-  const { members, refreshMembers } = useProjectMembers(projectId);
-
-  // useBoard: single request for both buckets and tasks (strict data contract) + optimistic helpers
-  const {
-    buckets,
-    tasks,
-    loading: boardLoading,
-    loadingBuckets,
-    loadMoreBucketTasks,
-    refreshBoard,
-    setTasksOptimistically,
-    setBucketsOptimistically,
-    addBucketLocally,
-    removeBucketLocally,
-    updateTaskLocally,
-    updateBucketLocally,
-    addTaskLocally,
-    removeTaskLocally,
-  } = useBoard(projectId);
-
-  const handleMemberRemoved = useCallback((userId: string | number) => {
-    setTasksOptimistically(prevTasks =>
-      prevTasks.map(task => ({
-        ...task,
-        lead_assignee_id:
-          String(task.lead_assignee_id) === String(userId)
-            ? null
-            : task.lead_assignee_id,
-        suggested_assignee_id:
-          String(task.suggested_assignee_id) === String(userId)
-            ? null
-            : task.suggested_assignee_id,
-      })),
-    );
-    setSelectedTaskForEdit(currentTask => {
-      if (!currentTask) return currentTask;
-      return {
-        ...currentTask,
-        lead_assignee_id:
-          String(currentTask.lead_assignee_id) === String(userId)
-            ? null
-            : currentTask.lead_assignee_id,
-        suggested_assignee_id:
-          String(currentTask.suggested_assignee_id) === String(userId)
-            ? null
-            : currentTask.suggested_assignee_id,
-      };
+        return taskIdParam ? 'Tasks' : 'Overview';
     });
-  }, [setTasksOptimistically]);
-  const { refreshDashboard } = useDashboard(projectId);
 
-  const notifyActivityUpdated = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('opentask:activity-updated', { detail: { projectId } }));
-  }, [projectId]);
-
-  // Seamless asynchronous reorder queue (debounced + silent retries, zero-latency UI)
-  const { queueTaskReorder, queueBucketReorder, cancelTaskFromQueue, hasPendingReorders } = useAsyncReorderQueue({
-    projectId,
-    onTasksSynced: () => {
-      refreshDashboard(true);
-      notifyActivityUpdated();
-    },
-    onBucketsSynced: () => refreshDashboard(true),
-    debounceMs: 50,
-  });
-
-  const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting, refreshMeetings, refreshMeeting, removeMeetingLocally } = useMeetings(projectId);
-
-  const handleProjectEvent = useCallback((event: ProjectEvent) => {
-    if (event.entity === 'task' || event.entity === 'bucket') {
-      if (hasPendingReorders()) {
-        // Skip board reload while optimistic moves or network syncs are pending/in flight
-        return;
-      }
-      void refreshBoard(true);
-      void refreshDashboard(true);
-    } else if (event.entity === 'member') {
-      void refreshMembers();
-      void refreshDashboard(true);
-    } else if (event.entity === 'project') {
-      projectService.getProjectById(projectId)
-        .then(setProject)
-        .catch(error => console.error('Failed to refresh project after realtime event:', error));
-    } else if (event.entity === 'meeting') {
-      // Swap the one meeting in place so open meeting cards keep their state.
-      if (event.action === 'deleted' && event.entity_id) removeMeetingLocally(event.entity_id);
-      else if (event.entity_id) void refreshMeeting(event.entity_id);
-      else void refreshMeetings();
-      setMeetingEventKey(k => k + 1);
-    } else if (event.entity === 'meeting_job') {
-      setMeetingEventKey(k => k + 1);
-    }
-    // Drafts are tasks: a move on the board can finish or reopen a meeting's review.
-    if (event.entity === 'task') setMeetingEventKey(k => k + 1);
-  }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally]);
-
-  useProjectRealtime(projectId, { onEvent: handleProjectEvent });
-
-  // Mutation hooks
-  const { createBucket, updateBucket, deleteBucket } = useBuckets(projectId);
-  const { createTask, updateTask, deleteTask } = useTasks(projectId);
-
-  // Auto-scrolling during drag operations (vertical on <main>, horizontal on board)
-  const boardScrollRef = React.useRef<HTMLDivElement>(null);
-  useDragAutoScroll({ boardRef: boardScrollRef });
-
-  const [deletingTaskIds, setDeletingTaskIds] = useState<Set<string | number>>(new Set());
-
-  const bucketsLoading = boardLoading;
-  const tasksLoading = boardLoading;
-
-  const [newBucketName, setNewBucketName] = useState('');
-  const [newBucketState, setNewBucketState] = useState<BucketState>('TODO');
-  const [isCreatingBucket, setIsCreatingBucket] = useState(false);
-  const [isCreatingBucketSubmitting, setIsCreatingBucketSubmitting] = useState(false);
-
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [creatingTaskBucketId, setCreatingTaskBucketId] = useState<string | number | undefined>(undefined);
-  const [creatingTaskTitle, setCreatingTaskTitle] = useState('');
-  const [taskToDelete, setTaskToDelete] = useState<string | number | null>(null);
-
-  // Open / Close task modal with URL query param synchronization
-  const handleOpenTask = (task: Task) => {
-    setSelectedTaskForEdit(task);
-    if (task?.id) {
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev);
-        next.set('taskId', String(task.id));
-        return next;
-      }, { replace: true });
-    }
-  };
-
-  const handleCloseTask = () => {
-    setSelectedTaskForEdit(null);
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.delete('taskId');
-      return next;
-    }, { replace: true });
-  };
-
-  // Auto-open task if ?taskId=... query param is present
-  React.useEffect(() => {
-    if (!taskIdParam) return;
-    const found = tasks.find(t => String(t.id) === String(taskIdParam));
-    if (found) {
-      setSelectedTaskForEdit(found);
-      setActiveTab('Tasks');
-    } else if (!boardLoading) {
-      taskService.getTaskById(taskIdParam)
-        .then(t => {
-          if (t && String(t.project_id) === String(projectId)) {
-            setSelectedTaskForEdit(t);
-            setActiveTab('Tasks');
-          }
-        })
-        .catch(err => {
-          console.warn("Could not find task for taskId query parameter:", taskIdParam, err);
-        });
-    }
-  }, [taskIdParam, tasks, boardLoading, projectId]);
-
-  // Task Search State & Real-time Matching
-  const [taskSearchQuery, setTaskSearchQuery] = useState('');
-  const [isSearchingBackend, setIsSearchingBackend] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  const matchingTasks = useMemo(() => {
-    let result = tasks;
-
-    // Filter by selected assignee dropdown
-    if (selectedAssigneeFilter === 'UNASSIGNED') {
-      result = result.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id);
-    } else if (selectedAssigneeFilter !== 'ALL') {
-      const targetMember = members.find(m => String(m.user_id) === String(selectedAssigneeFilter) || String(m.id) === String(selectedAssigneeFilter));
-      const targetIds = new Set<string>();
-      targetIds.add(String(selectedAssigneeFilter));
-      if (targetMember) {
-        if (targetMember.user_id) targetIds.add(String(targetMember.user_id));
-        if (targetMember.id) targetIds.add(String(targetMember.id));
-      }
-
-      result = result.filter(t => {
-        const inAssigneeIds = t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)));
-        const inLead = t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id));
-        return Boolean(inAssigneeIds || inLead);
-      });
-    }
-
-    const q = taskSearchQuery.trim().toLowerCase();
-    if (!q) return result;
-
-    const rawDigits = q.replace(/^#/, '');
-
-    return result.filter(t => {
-      // 1. Match task ID (Snowflake ID substring)
-      if (rawDigits && String(t.id).includes(rawDigits)) {
-        return true;
-      }
-      // 2. Match title
-      if (t.title && t.title.toLowerCase().includes(q)) {
-        return true;
-      }
-      // 3. Match description
-      if (t.description && t.description.toLowerCase().includes(q)) {
-        return true;
-      }
-      // 4. Match type
-      if (t.type && t.type.toLowerCase().includes(q)) {
-        return true;
-      }
-      // 5. Match branch
-      if (t.branch_name && t.branch_name.toLowerCase().includes(q)) {
-        return true;
-      }
-      // 6. Match all assigned members' names or GitHub usernames
-      const allAssigneeIds = (t.assignee_ids && t.assignee_ids.length > 0)
-        ? t.assignee_ids.map(String)
-        : (t.lead_assignee_id ? [String(t.lead_assignee_id)] : []);
-      for (const uid of allAssigneeIds) {
-        const assignedMember = members.find(m => String(m.user_id) === uid || String(m.id) === uid);
-        if (assignedMember) {
-          if (assignedMember.gh_username && assignedMember.gh_username.toLowerCase().includes(q)) return true;
-          if (assignedMember.display_name && assignedMember.display_name.toLowerCase().includes(q)) return true;
-        }
-      }
-      return false;
-    });
-  }, [tasks, selectedAssigneeFilter, taskSearchQuery, members]);
-
-  // Debounced backend backlog search for tasks not yet in local DOM
-  useEffect(() => {
-    const q = taskSearchQuery.trim();
-    if (q.length < 2) return;
-
-    const timer = setTimeout(() => {
-      setIsSearchingBackend(true);
-      taskService.searchTasks(projectId, q)
-        .then(res => {
-          if (res?.tasks?.length) {
-            setTasksOptimistically((prev: Task[]) => {
-              const existingIds = new Set(prev.map((t: Task) => String(t.id)));
-              const newOnes = res.tasks.filter((t: Task) => !existingIds.has(String(t.id)));
-              if (newOnes.length > 0) {
-                return [...prev, ...newOnes];
-              }
-              return prev;
-            });
-          }
-        })
-        .catch(err => console.warn("Backend task search error:", err))
-        .finally(() => setIsSearchingBackend(false));
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [taskSearchQuery, projectId, setTasksOptimistically]);
-
-  // Keyboard shortcut: Press '/' to focus task search, 'Escape' to clear
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && activeTab === 'Tasks') {
-        const activeTag = document.activeElement?.tagName.toLowerCase();
-        if (activeTag !== 'input' && activeTag !== 'textarea') {
-          e.preventDefault();
-          searchInputRef.current?.focus();
-        }
-      } else if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
-        setTaskSearchQuery('');
-        searchInputRef.current?.blur();
-      }
+    const setActiveTab = (tab: string) => {
+        setActiveTabState(tab);
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('tab', tabToKey(tab));
+            return next;
+        }, { replace: true });
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab]);
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      if (matchingTasks.length === 1) {
-        handleOpenTask(matchingTasks[0]);
-      } else if (taskSearchQuery.trim()) {
-        const q = taskSearchQuery.trim().replace(/^#/, '');
-        const exactMatch = matchingTasks.find(t => String(t.id) === q || String(t.id).endsWith(q));
-        if (exactMatch) {
-          handleOpenTask(exactMatch);
+    useEffect(() => {
+        const param = searchParams.get('tab') || searchParams.get('tabs');
+        if (param) {
+            const resolved = keyToTab(param);
+            if (resolved !== activeTab) {
+                setActiveTabState(resolved);
+            }
         }
-      }
-    }
-  };
+    }, [searchParams, activeTab]);
+    const [showTaskModal, setShowTaskModal] = useState(false);
+    const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | null>(null);
+    const [selectedBucketTarget, setSelectedBucketTarget] = useState<number | string | undefined>(undefined);
+    const [bucketToDelete, setBucketToDelete] = useState<number | string | null>(null);
+    const [showMeetingModal, setShowMeetingModal] = useState(false);
+    const [isMcpModalOpen, setIsMcpModalOpen] = useState(false);
+    const [selectedAssigneeFilter, setSelectedAssigneeFilter] = useState<string>('ALL');
+    const [project, setProject] = useState<Project | null>(null);
+    const [selectedBucketForEdit, setSelectedBucketForEdit] = useState<Bucket | null>(null);
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+    const [isRefreshingTasks, setIsRefreshingTasks] = useState(false);
+    const [projectNotFound, setProjectNotFound] = useState(false);
+    const [meetingEventKey, setMeetingEventKey] = useState(0);
+    const meetingJobParam = searchParams.get('meetingJob');
+    const { showToast } = useToast();
 
-
-  const handleCreateTask = async (data: { project_id: number | string; title: string; type: TaskType; weight: number; bucket_id?: number | string }) => {
-    setIsCreatingTask(true);
-    setCreatingTaskBucketId(data.bucket_id);
-    setCreatingTaskTitle(data.title);
-    try {
-      const created = await createTask(data);
-      if (created) {
-        addTaskLocally(created);
-      }
-      // Immediately disable the indicator as soon as task is created
-      setIsCreatingTask(false);
-      setCreatingTaskBucketId(undefined);
-      setCreatingTaskTitle('');
-
-      // Background sync without blocking indicator dismissal
-      refreshDashboard(true);
-      refreshBoard(true);
-      notifyActivityUpdated();
-    } catch (err) {
-      console.error('Failed to create task', err);
-      setIsCreatingTask(false);
-      setCreatingTaskBucketId(undefined);
-      setCreatingTaskTitle('');
-    }
-  };
-
-  const handleDeleteTask = async (taskId: number | string) => {
-    setDeletingTaskIds(prev => new Set(prev).add(taskId));
-    // Remove from any debounced reorder queues immediately to avoid deadlocks
-    cancelTaskFromQueue(taskId);
-
-    const taskToDelete = tasks.find(t => String(t.id) === String(taskId));
-
-    try {
-      // 1. Delete all attachments associated with this task from Supabase Storage
-      try {
-        await deleteAllTaskAttachments(taskId, taskToDelete?.attachments);
-      } catch (storageErr) {
-        console.warn("Failed to delete attachments from storage:", storageErr);
-      }
-
-      // 2. Delete task from database
-      await deleteTask(taskId);
-      removeTaskLocally(taskId);
-      await Promise.all([refreshBoard(true), refreshDashboard(true)]);
-      notifyActivityUpdated();
-    } catch (err) {
-      console.error("Failed to delete task", err);
-      showToast("Failed to delete task", "error");
-      await refreshBoard(true);
-    } finally {
-      setDeletingTaskIds(prev => {
-        const next = new Set(prev);
-        next.delete(taskId);
-        return next;
-      });
-    }
-  };
-
-  const handleUpdateTask = async (taskId: number | string, data: Partial<Task>) => {
-    // 1. Write optimistic patch to state + cache immediately (no delay)
-    updateTaskLocally(taskId, data);
-    setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(taskId) ? { ...prev, ...data } : prev));
-    // 2. Fire API in background
-    updateTask(taskId, data)
-      .then((confirmed) => {
-        // 3. Write server-confirmed result back to cache to prevent stale reload
-        if (confirmed?.id) {
-          updateTaskLocally(confirmed.id, confirmed);
-          setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(confirmed.id) ? { ...prev, ...confirmed } : prev));
-        }
-        refreshDashboard(true);
-        refreshBoard(true);
-        notifyActivityUpdated();
-      })
-      .catch((err) => {
-        console.error("Failed to update task:", err);
-        // 4. On failure, rollback by pulling fresh data
-        refreshBoard(true);
-      });
-  };
-
-  const handleToggleTaskComplete = async (taskId: number | string, completed: boolean) => {
-    const task = tasks.find(t => String(t.id) === String(taskId));
-    if (!task) return;
-
-    let targetBucket: Bucket | undefined;
-    if (completed) {
-      targetBucket = buckets.find(b => b.state === 'COMPLETED');
-      if (!targetBucket) {
-        try {
-          const newBucket = await createBucket('Completed', 'COMPLETED');
-          if (newBucket) {
-            addBucketLocally(newBucket);
-            targetBucket = newBucket;
-          }
-        } catch (err) {
-          console.error('Failed to create completed bucket', err);
-        }
-      }
-    } else {
-      targetBucket = buckets.find(b => b.state === 'TODO') || buckets.find(b => b.state === 'ONGOING') || buckets.find(b => b.state !== 'COMPLETED');
-    }
-
-    if (targetBucket && targetBucket.id) {
-      handleUpdateTask(taskId, { bucket_id: targetBucket.id });
-      showToast(completed ? "Task marked as complete" : "Task marked as incomplete", "success");
-    } else {
-      showToast("No suitable column found", "error");
-    }
-  };
-
-  const handleMoveTaskToBucket = (taskId: string | number, targetBucketId: string | number) => {
-    const task = tasks.find(t => String(t.id) === String(taskId));
-    if (!task || String(task.bucket_id) === String(targetBucketId)) return;
-
-    const targetBucketTasks = tasks.filter(t => String(t.bucket_id) === String(targetBucketId));
-    const newOrderIdx = targetBucketTasks.length;
-
-    handleUpdateTask(taskId, { bucket_id: targetBucketId, order_idx: newOrderIdx });
-    const targetBucket = buckets.find(b => String(b.id) === String(targetBucketId));
-    showToast(`Moved to ${targetBucket?.name || 'column'}`, "success");
-  };
-
-  const handleDropTask = async (taskId: number | string, newBucketId: number | string, targetTaskId?: number | string) => {
-    // Determine the task order within the target bucket based on where it was dropped
-    const bucketTasks = tasks.filter(t => String(t.bucket_id) === String(newBucketId)).sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
-    const draggedTask = tasks.find(t => String(t.id) === String(taskId));
-    if (!draggedTask) return;
-
-    const sourceBucketId = draggedTask.bucket_id;
-    const isCrossBucket = sourceBucketId && String(sourceBucketId) !== String(newBucketId);
-
-    // Filter out the dragged task to avoid self-collision
-    const filteredTasks = bucketTasks.filter(t => String(t.id) !== String(taskId));
-
-    // Calculate new position
-    let newIndex = filteredTasks.length; // Default to end
-    if (targetTaskId) {
-      const targetIndex = filteredTasks.findIndex(t => String(t.id) === String(targetTaskId));
-      if (targetIndex !== -1) {
-        newIndex = targetIndex;
-      }
-    }
-
-    // Insert into new array
-    const updatedDraggedTask = { ...draggedTask, bucket_id: newBucketId };
-    filteredTasks.splice(newIndex, 0, updatedDraggedTask);
-
-    // Build reordered IDs
-    const taskIds = filteredTasks.map(t => t.id!);
-
-    // OPTIMISTIC UPDATE: Update UI instantaneously (0ms)
-    let reorderedSourceTasks: Task[] = [];
-    if (isCrossBucket) {
-      const remainingSourceTasks = tasks
-        .filter(t => String(t.bucket_id) === String(sourceBucketId) && String(t.id) !== String(taskId))
-        .sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
-      reorderedSourceTasks = remainingSourceTasks.map((t, idx) => ({ ...t, order_idx: idx }));
-      const sourceTaskIds = reorderedSourceTasks.map(t => t.id!);
-      queueTaskReorder(sourceBucketId, sourceTaskIds);
-    }
-
-    const otherTasks = tasks.filter(
-      t => String(t.bucket_id) !== String(newBucketId) &&
-        (!isCrossBucket || String(t.bucket_id) !== String(sourceBucketId)) &&
-        String(t.id) !== String(taskId)
-    );
-    const reorderedBucketTasks = filteredTasks.map((t, idx) => ({ ...t, order_idx: idx, bucket_id: newBucketId }));
-    const nextTasks = [...otherTasks, ...reorderedSourceTasks, ...reorderedBucketTasks];
-    setTasksOptimistically(nextTasks);
-
-    // Asynchronous debounced background sync to database with silent retries
-    queueTaskReorder(newBucketId, taskIds);
-  };
-
-  const handleSaveBucketSettings = async (bucketId: string | number, data: { name: string; description?: string; state?: BucketState }) => {
-    updateBucketLocally(bucketId, data);
-    try {
-      await updateBucket(bucketId, data);
-      showToast("Column settings saved", "success");
-      refreshBoard(true);
-    } catch (err) {
-      console.error("Failed to update bucket", err);
-      showToast("Failed to save column settings", "error");
-      refreshBoard(true);
-    }
-  };
-
-  const handleCreateMeeting = async (data: { project_id: number | string; title: string; date: string; time: string; duration?: string }) => {
-    await createMeeting(data);
-  };
-
-  const handleCreateBucket = async () => {
-    const trimmedName = newBucketName.trim();
-    if (!trimmedName || isCreatingBucketSubmitting) return;
-
-    setIsCreatingBucketSubmitting(true);
-    try {
-      const createdBucket = await createBucket(trimmedName, newBucketState);
-      if (createdBucket) {
-        addBucketLocally(createdBucket);
-      }
-      setNewBucketName('');
-      setNewBucketState('TODO');
-      setIsCreatingBucket(false);
-      showToast('Column created successfully', 'success');
-      refreshDashboard(true);
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to create bucket', 'error');
-    } finally {
-      setIsCreatingBucketSubmitting(false);
-    }
-  };
-
-  const handleDragStartColumn = (e: React.DragEvent<HTMLDivElement>, columnId: string | number) => {
-    e.dataTransfer.setData('columnId', columnId.toString());
-  };
-
-  const handleDropColumn = (e: React.DragEvent<HTMLDivElement>, targetColumnId: string | number) => {
-    e.stopPropagation();
-    const draggedColumnId = e.dataTransfer.getData('columnId');
-    if (!draggedColumnId || String(draggedColumnId) === String(targetColumnId)) return;
-
-    const oldIndex = buckets.findIndex(b => String(b.id) === String(draggedColumnId));
-    const newIndex = buckets.findIndex(b => String(b.id) === String(targetColumnId));
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newBuckets = [...buckets];
-    const [removed] = newBuckets.splice(oldIndex, 1);
-    newBuckets.splice(newIndex, 0, removed);
-    const reorderedBuckets = newBuckets.map((b, idx) => ({ ...b, order_idx: idx }));
-
-    // 1. Instant optimistic UI swap (0ms)
-    setBucketsOptimistically(reorderedBuckets);
-
-    // 2. Asynchronous debounced background sync to database with silent retries
-    queueBucketReorder(reorderedBuckets.map(b => b.id!));
-  };
-
-  const tabs = ['Overview', 'Tasks', 'MoM & Meetings', 'Settings'];
-
-  if (projectNotFound) {
-    return (
-      <NotFoundPage
-        type="project"
-        resourceId={projectId}
-        onRetry={() => {
-          setProjectNotFound(false);
-          projectService.getProjectById(projectId)
+    React.useEffect(() => {
+        projectService.getProjectById(projectId)
             .then(p => {
-              if (p) setProject(p);
-              else setProjectNotFound(true);
+                if (!p) {
+                    setProjectNotFound(true);
+                } else {
+                    setProject(p);
+                    setProjectNotFound(false);
+                }
             })
-            .catch(() => setProjectNotFound(true));
-        }}
-      />
-    );
-  }
+            .catch(err => {
+                console.error("Failed to fetch project:", err);
+                setProjectNotFound(true);
+            });
+    }, [projectId]);
 
-  const isLoading = (roleLoading || boardLoading || meetingsLoading) && buckets.length === 0 && !project;
+    const handleRefreshTasksOnly = async () => {
+        setIsRefreshingTasks(true);
+        try {
+            await refreshBoard(false);
+            showToast('Task list synchronized', 'info');
+        } catch (err) {
+            console.error('Failed to refresh tasks:', err);
+            showToast('Failed to refresh tasks', 'error');
+        } finally {
+            setIsRefreshingTasks(false);
+        }
+    };
 
-  if (isLoading) {
+    const [isSyncingPrs, setIsSyncingPrs] = useState(false);
+
+    const handleSyncAndReviewPrs = async () => {
+        setIsSyncingPrs(true);
+        try {
+            const res = await prReviewService.syncProjectPrs(projectId);
+            if (res.reviews_triggered > 0) {
+                showToast(`AI Code Review triggered for ${res.reviews_triggered} PR(s)!`, 'success');
+            } else {
+                showToast('Scanned repos: no unreviewed PRs found', 'info');
+            }
+            await refreshBoard(false);
+        } catch (err: any) {
+            console.error('Failed to sync PRs:', err);
+            showToast(err?.message || 'Failed to sync PRs', 'error');
+        } finally {
+            setIsSyncingPrs(false);
+        }
+    };
+
+    const { user } = useAuth();
+    const dbUserId = user?.db_user?.id;
+    const { role, loading: roleLoading } = useCurrentUserRole(projectId, dbUserId);
+    const isManager = role?.toUpperCase() === 'MANAGER' || role?.toUpperCase() === 'OWNER';
+    const { members, refreshMembers } = useProjectMembers(projectId);
+
+    // useBoard: single request for both buckets and tasks (strict data contract) + optimistic helpers
+    const {
+        buckets,
+        tasks,
+        loading: boardLoading,
+        loadingBuckets,
+        loadMoreBucketTasks,
+        refreshBoard,
+        setTasksOptimistically,
+        setBucketsOptimistically,
+        addBucketLocally,
+        removeBucketLocally,
+        updateTaskLocally,
+        updateBucketLocally,
+        addTaskLocally,
+        removeTaskLocally,
+    } = useBoard(projectId);
+
+    const handleMemberRemoved = useCallback((userId: string | number) => {
+        setTasksOptimistically(prevTasks =>
+            prevTasks.map(task => ({
+                ...task,
+                lead_assignee_id:
+                    String(task.lead_assignee_id) === String(userId)
+                        ? null
+                        : task.lead_assignee_id,
+                suggested_assignee_id:
+                    String(task.suggested_assignee_id) === String(userId)
+                        ? null
+                        : task.suggested_assignee_id,
+            })),
+        );
+        setSelectedTaskForEdit(currentTask => {
+            if (!currentTask) return currentTask;
+            return {
+                ...currentTask,
+                lead_assignee_id:
+                    String(currentTask.lead_assignee_id) === String(userId)
+                        ? null
+                        : currentTask.lead_assignee_id,
+                suggested_assignee_id:
+                    String(currentTask.suggested_assignee_id) === String(userId)
+                        ? null
+                        : currentTask.suggested_assignee_id,
+            };
+        });
+    }, [setTasksOptimistically]);
+    const { refreshDashboard } = useDashboard(projectId);
+
+    const notifyActivityUpdated = useCallback(() => {
+        window.dispatchEvent(new CustomEvent('opentask:activity-updated', { detail: { projectId } }));
+    }, [projectId]);
+
+    // Seamless asynchronous reorder queue (debounced + silent retries, zero-latency UI)
+    const { queueTaskReorder, queueBucketReorder, cancelTaskFromQueue, hasPendingReorders } = useAsyncReorderQueue({
+        projectId,
+        onTasksSynced: () => {
+            refreshDashboard(true);
+            notifyActivityUpdated();
+        },
+        onBucketsSynced: () => refreshDashboard(true),
+        debounceMs: 50,
+    });
+
+    const { meetings, loading: meetingsLoading, createMeeting, deleteMeeting, refreshMeetings, refreshMeeting, removeMeetingLocally } = useMeetings(projectId);
+
+    const handleProjectEvent = useCallback((event: ProjectEvent) => {
+        if (event.entity === 'task' || event.entity === 'bucket') {
+            if (hasPendingReorders()) {
+                // Skip board reload while optimistic moves or network syncs are pending/in flight
+                return;
+            }
+            void refreshBoard(true);
+            void refreshDashboard(true);
+        } else if (event.entity === 'member') {
+            void refreshMembers();
+            void refreshDashboard(true);
+        } else if (event.entity === 'project') {
+            projectService.getProjectById(projectId)
+                .then(setProject)
+                .catch(error => console.error('Failed to refresh project after realtime event:', error));
+        } else if (event.entity === 'meeting') {
+            // Swap the one meeting in place so open meeting cards keep their state.
+            if (event.action === 'deleted' && event.entity_id) removeMeetingLocally(event.entity_id);
+            else if (event.entity_id) void refreshMeeting(event.entity_id);
+            else void refreshMeetings();
+            setMeetingEventKey(k => k + 1);
+        } else if (event.entity === 'meeting_job') {
+            setMeetingEventKey(k => k + 1);
+        }
+        // Drafts are tasks: a move on the board can finish or reopen a meeting's review.
+        if (event.entity === 'task') setMeetingEventKey(k => k + 1);
+    }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally]);
+
+    useProjectRealtime(projectId, { onEvent: handleProjectEvent });
+
+    // Mutation hooks
+    const { createBucket, updateBucket, deleteBucket } = useBuckets(projectId);
+    const { createTask, updateTask, deleteTask } = useTasks(projectId);
+
+    // Auto-scrolling during drag operations (vertical on <main>, horizontal on board)
+    const boardScrollRef = React.useRef<HTMLDivElement>(null);
+    useDragAutoScroll({ boardRef: boardScrollRef });
+
+    const [deletingTaskIds, setDeletingTaskIds] = useState<Set<string | number>>(new Set());
+
+    const bucketsLoading = boardLoading;
+    const tasksLoading = boardLoading;
+
+    const [newBucketName, setNewBucketName] = useState('');
+    const [newBucketState, setNewBucketState] = useState<BucketState>('TODO');
+    const [isCreatingBucket, setIsCreatingBucket] = useState(false);
+    const [isCreatingBucketSubmitting, setIsCreatingBucketSubmitting] = useState(false);
+
+    const [isCreatingTask, setIsCreatingTask] = useState(false);
+    const [creatingTaskBucketId, setCreatingTaskBucketId] = useState<string | number | undefined>(undefined);
+    const [creatingTaskTitle, setCreatingTaskTitle] = useState('');
+    const [taskToDelete, setTaskToDelete] = useState<string | number | null>(null);
+
+    const [focusBucket, setFocusBucket] = useState(false);
+    const [selectedBucketFocus, setSelectedBucketFocus] = useState<string | 'ALL'>('ALL');
+    const [columnDensity, setColumnDensity] = useState<'normal' | 'wide'>('normal');
+
+    // Reset expand/focus when switching away from Tasks tab
+    useEffect(() => {
+        if (activeTab !== 'Tasks') {
+            setFocusBucket(false);
+            setSelectedBucketFocus('ALL');
+        }
+    }, [activeTab]);
+
+    // Keyboard listener to collapse expanded view with Escape key
+    useEffect(() => {
+        if (!focusBucket) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (!selectedTaskForEdit && !showTaskModal && !selectedBucketForEdit && !bucketToDelete && !taskToDelete && !isMcpModalOpen) {
+                    setFocusBucket(false);
+                    setSelectedBucketFocus('ALL');
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [focusBucket, selectedTaskForEdit, showTaskModal, selectedBucketForEdit, bucketToDelete, taskToDelete, isMcpModalOpen]);
+
+    // Open / Close task modal with URL query param synchronization
+    const handleOpenTask = (task: Task) => {
+        setSelectedTaskForEdit(task);
+        if (task?.id) {
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev);
+                next.set('taskId', String(task.id));
+                return next;
+            }, { replace: true });
+        }
+    };
+
+    const handleCloseTask = () => {
+        setSelectedTaskForEdit(null);
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.delete('taskId');
+            return next;
+        }, { replace: true });
+    };
+
+    // Auto-open task if ?taskId=... query param is present
+    React.useEffect(() => {
+        if (!taskIdParam) return;
+        const found = tasks.find(t => String(t.id) === String(taskIdParam));
+        if (found) {
+            setSelectedTaskForEdit(found);
+            setActiveTab('Tasks');
+        } else if (!boardLoading) {
+            taskService.getTaskById(taskIdParam)
+                .then(t => {
+                    if (t && String(t.project_id) === String(projectId)) {
+                        setSelectedTaskForEdit(t);
+                        setActiveTab('Tasks');
+                    }
+                })
+                .catch(err => {
+                    console.warn("Could not find task for taskId query parameter:", taskIdParam, err);
+                });
+        }
+    }, [taskIdParam, tasks, boardLoading, projectId]);
+
+    // Task Search State & Real-time Matching
+    const [taskSearchQuery, setTaskSearchQuery] = useState('');
+    const [isSearchingBackend, setIsSearchingBackend] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    const matchingTasks = useMemo(() => {
+        let result = tasks;
+
+        // Filter by selected assignee dropdown
+        if (selectedAssigneeFilter === 'UNASSIGNED') {
+            result = result.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id);
+        } else if (selectedAssigneeFilter !== 'ALL') {
+            const targetMember = members.find(m => String(m.user_id) === String(selectedAssigneeFilter) || String(m.id) === String(selectedAssigneeFilter));
+            const targetIds = new Set<string>();
+            targetIds.add(String(selectedAssigneeFilter));
+            if (targetMember) {
+                if (targetMember.user_id) targetIds.add(String(targetMember.user_id));
+                if (targetMember.id) targetIds.add(String(targetMember.id));
+            }
+
+            result = result.filter(t => {
+                const inAssigneeIds = t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)));
+                const inLead = t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id));
+                return Boolean(inAssigneeIds || inLead);
+            });
+        }
+
+        const q = taskSearchQuery.trim().toLowerCase();
+        if (!q) return result;
+
+        const rawDigits = q.replace(/^#/, '');
+
+        return result.filter(t => {
+            // 1. Match task ID (Snowflake ID substring)
+            if (rawDigits && String(t.id).includes(rawDigits)) {
+                return true;
+            }
+            // 2. Match title
+            if (t.title && t.title.toLowerCase().includes(q)) {
+                return true;
+            }
+            // 3. Match description
+            if (t.description && t.description.toLowerCase().includes(q)) {
+                return true;
+            }
+            // 4. Match type
+            if (t.type && t.type.toLowerCase().includes(q)) {
+                return true;
+            }
+            // 5. Match branch
+            if (t.branch_name && t.branch_name.toLowerCase().includes(q)) {
+                return true;
+            }
+            // 6. Match all assigned members' names or GitHub usernames
+            const allAssigneeIds = (t.assignee_ids && t.assignee_ids.length > 0)
+                ? t.assignee_ids.map(String)
+                : (t.lead_assignee_id ? [String(t.lead_assignee_id)] : []);
+            for (const uid of allAssigneeIds) {
+                const assignedMember = members.find(m => String(m.user_id) === uid || String(m.id) === uid);
+                if (assignedMember) {
+                    if (assignedMember.gh_username && assignedMember.gh_username.toLowerCase().includes(q)) return true;
+                    if (assignedMember.display_name && assignedMember.display_name.toLowerCase().includes(q)) return true;
+                }
+            }
+            return false;
+        });
+    }, [tasks, selectedAssigneeFilter, taskSearchQuery, members]);
+
+    // Active buckets to display on board (allows focusing on a single bucket in expanded view)
+    const displayBuckets = useMemo(() => {
+        if (!focusBucket || selectedBucketFocus === 'ALL') {
+            return buckets;
+        }
+        return buckets.filter(b => String(b.id) === String(selectedBucketFocus));
+    }, [buckets, focusBucket, selectedBucketFocus]);
+
+    // Debounced backend backlog search for tasks not yet in local DOM
+    useEffect(() => {
+        const q = taskSearchQuery.trim();
+        if (q.length < 2) return;
+
+        const timer = setTimeout(() => {
+            setIsSearchingBackend(true);
+            taskService.searchTasks(projectId, q)
+                .then(res => {
+                    if (res?.tasks?.length) {
+                        setTasksOptimistically((prev: Task[]) => {
+                            const existingIds = new Set(prev.map((t: Task) => String(t.id)));
+                            const newOnes = res.tasks.filter((t: Task) => !existingIds.has(String(t.id)));
+                            if (newOnes.length > 0) {
+                                return [...prev, ...newOnes];
+                            }
+                            return prev;
+                        });
+                    }
+                })
+                .catch(err => console.warn("Backend task search error:", err))
+                .finally(() => setIsSearchingBackend(false));
+        }, 350);
+
+        return () => clearTimeout(timer);
+    }, [taskSearchQuery, projectId, setTasksOptimistically]);
+
+    // Keyboard shortcut: Press '/' to focus task search, 'Escape' to clear
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === '/' && activeTab === 'Tasks') {
+                const activeTag = document.activeElement?.tagName.toLowerCase();
+                if (activeTag !== 'input' && activeTag !== 'textarea') {
+                    e.preventDefault();
+                    searchInputRef.current?.focus();
+                }
+            } else if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+                setTaskSearchQuery('');
+                searchInputRef.current?.blur();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeTab]);
+
+    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            if (matchingTasks.length === 1) {
+                handleOpenTask(matchingTasks[0]);
+            } else if (taskSearchQuery.trim()) {
+                const q = taskSearchQuery.trim().replace(/^#/, '');
+                const exactMatch = matchingTasks.find(t => String(t.id) === q || String(t.id).endsWith(q));
+                if (exactMatch) {
+                    handleOpenTask(exactMatch);
+                }
+            }
+        }
+    };
+
+    const handleCreateTask = async (data: { project_id: number | string; title: string; type: TaskType; weight: number; bucket_id?: number | string }) => {
+        setIsCreatingTask(true);
+        setCreatingTaskBucketId(data.bucket_id);
+        setCreatingTaskTitle(data.title);
+        try {
+            const created = await createTask(data);
+            if (created) {
+                addTaskLocally(created);
+            }
+            // Immediately disable the indicator as soon as task is created
+            setIsCreatingTask(false);
+            setCreatingTaskBucketId(undefined);
+            setCreatingTaskTitle('');
+
+            // Background sync without blocking indicator dismissal
+            refreshDashboard(true);
+            refreshBoard(true);
+            notifyActivityUpdated();
+        } catch (err) {
+            console.error('Failed to create task', err);
+            setIsCreatingTask(false);
+            setCreatingTaskBucketId(undefined);
+            setCreatingTaskTitle('');
+        }
+    };
+
+    const handleDeleteTask = async (taskId: number | string) => {
+        setDeletingTaskIds(prev => new Set(prev).add(taskId));
+        // Remove from any debounced reorder queues immediately to avoid deadlocks
+        cancelTaskFromQueue(taskId);
+
+        const taskToDelete = tasks.find(t => String(t.id) === String(taskId));
+
+        try {
+            // 1. Delete all attachments associated with this task from Supabase Storage
+            try {
+                await deleteAllTaskAttachments(taskId, taskToDelete?.attachments);
+            } catch (storageErr) {
+                console.warn("Failed to delete attachments from storage:", storageErr);
+            }
+
+            // 2. Delete task from database
+            await deleteTask(taskId);
+            removeTaskLocally(taskId);
+            await Promise.all([refreshBoard(true), refreshDashboard(true)]);
+            notifyActivityUpdated();
+        } catch (err) {
+            console.error("Failed to delete task", err);
+            showToast("Failed to delete task", "error");
+            await refreshBoard(true);
+        } finally {
+            setDeletingTaskIds(prev => {
+                const next = new Set(prev);
+                next.delete(taskId);
+                return next;
+            });
+        }
+    };
+
+    const handleUpdateTask = async (taskId: number | string, data: Partial<Task>) => {
+        // 1. Write optimistic patch to state + cache immediately (no delay)
+        updateTaskLocally(taskId, data);
+        setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(taskId) ? { ...prev, ...data } : prev));
+        // 2. Fire API in background
+        updateTask(taskId, data)
+            .then((confirmed) => {
+                // 3. Write server-confirmed result back to cache to prevent stale reload
+                if (confirmed?.id) {
+                    updateTaskLocally(confirmed.id, confirmed);
+                    setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(confirmed.id) ? { ...prev, ...confirmed } : prev));
+                }
+                refreshDashboard(true);
+                refreshBoard(true);
+                notifyActivityUpdated();
+            })
+            .catch((err) => {
+                console.error("Failed to update task:", err);
+                // 4. On failure, rollback by pulling fresh data
+                refreshBoard(true);
+            });
+    };
+
+    const handleToggleTaskComplete = async (taskId: number | string, completed: boolean) => {
+        const task = tasks.find(t => String(t.id) === String(taskId));
+        if (!task) return;
+
+        let targetBucket: Bucket | undefined;
+        if (completed) {
+            targetBucket = buckets.find(b => b.state === 'COMPLETED');
+            if (!targetBucket) {
+                try {
+                    const newBucket = await createBucket('Completed', 'COMPLETED');
+                    if (newBucket) {
+                        addBucketLocally(newBucket);
+                        targetBucket = newBucket;
+                    }
+                } catch (err) {
+                    console.error('Failed to create completed bucket', err);
+                }
+            }
+        } else {
+            targetBucket = buckets.find(b => b.state === 'TODO') || buckets.find(b => b.state === 'ONGOING') || buckets.find(b => b.state !== 'COMPLETED');
+        }
+
+        if (targetBucket && targetBucket.id) {
+            handleUpdateTask(taskId, { bucket_id: targetBucket.id });
+            showToast(completed ? "Task marked as complete" : "Task marked as incomplete", "success");
+        } else {
+            showToast("No suitable column found", "error");
+        }
+    };
+
+    const handleMoveTaskToBucket = (taskId: string | number, targetBucketId: string | number) => {
+        const task = tasks.find(t => String(t.id) === String(taskId));
+        if (!task || String(task.bucket_id) === String(targetBucketId)) return;
+
+        const targetBucketTasks = tasks.filter(t => String(t.bucket_id) === String(targetBucketId));
+        const newOrderIdx = targetBucketTasks.length;
+
+        handleUpdateTask(taskId, { bucket_id: targetBucketId, order_idx: newOrderIdx });
+        const targetBucket = buckets.find(b => String(b.id) === String(targetBucketId));
+        showToast(`Moved to ${targetBucket?.name || 'column'}`, "success");
+    };
+
+    const handleDropTask = async (taskId: number | string, newBucketId: number | string, targetTaskId?: number | string) => {
+        // Determine the task order within the target bucket based on where it was dropped
+        const bucketTasks = tasks.filter(t => String(t.bucket_id) === String(newBucketId)).sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
+        const draggedTask = tasks.find(t => String(t.id) === String(taskId));
+        if (!draggedTask) return;
+
+        const sourceBucketId = draggedTask.bucket_id;
+        const isCrossBucket = sourceBucketId && String(sourceBucketId) !== String(newBucketId);
+
+        // Filter out the dragged task to avoid self-collision
+        const filteredTasks = bucketTasks.filter(t => String(t.id) !== String(taskId));
+
+        // Calculate new position
+        let newIndex = filteredTasks.length; // Default to end
+        if (targetTaskId) {
+            const targetIndex = filteredTasks.findIndex(t => String(t.id) === String(targetTaskId));
+            if (targetIndex !== -1) {
+                newIndex = targetIndex;
+            }
+        }
+
+        // Insert into new array
+        const updatedDraggedTask = { ...draggedTask, bucket_id: newBucketId };
+        filteredTasks.splice(newIndex, 0, updatedDraggedTask);
+
+        // Build reordered IDs
+        const taskIds = filteredTasks.map(t => t.id!);
+
+        // OPTIMISTIC UPDATE: Update UI instantaneously (0ms)
+        let reorderedSourceTasks: Task[] = [];
+        if (isCrossBucket) {
+            const remainingSourceTasks = tasks
+                .filter(t => String(t.bucket_id) === String(sourceBucketId) && String(t.id) !== String(taskId))
+                .sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
+            reorderedSourceTasks = remainingSourceTasks.map((t, idx) => ({ ...t, order_idx: idx }));
+            const sourceTaskIds = reorderedSourceTasks.map(t => t.id!);
+            queueTaskReorder(sourceBucketId, sourceTaskIds);
+        }
+
+        const otherTasks = tasks.filter(
+            t => String(t.bucket_id) !== String(newBucketId) &&
+                (!isCrossBucket || String(t.bucket_id) !== String(sourceBucketId)) &&
+                String(t.id) !== String(taskId)
+        );
+        const reorderedBucketTasks = filteredTasks.map((t, idx) => ({ ...t, order_idx: idx, bucket_id: newBucketId }));
+        const nextTasks = [...otherTasks, ...reorderedSourceTasks, ...reorderedBucketTasks];
+        setTasksOptimistically(nextTasks);
+
+        // Asynchronous debounced background sync to database with silent retries
+        queueTaskReorder(newBucketId, taskIds);
+    };
+
+    const handleSaveBucketSettings = async (bucketId: string | number, data: { name: string; description?: string; state?: BucketState }) => {
+        updateBucketLocally(bucketId, data);
+        try {
+            await updateBucket(bucketId, data);
+            showToast("Column settings saved", "success");
+            refreshBoard(true);
+        } catch (err) {
+            console.error("Failed to update bucket", err);
+            showToast("Failed to save column settings", "error");
+            refreshBoard(true);
+        }
+    };
+
+    const handleCreateMeeting = async (data: { project_id: number | string; title: string; date: string; time: string; duration?: string }) => {
+        await createMeeting(data);
+    };
+
+    const handleCreateBucket = async () => {
+        const trimmedName = newBucketName.trim();
+        if (!trimmedName || isCreatingBucketSubmitting) return;
+
+        setIsCreatingBucketSubmitting(true);
+        try {
+            const createdBucket = await createBucket(trimmedName, newBucketState);
+            if (createdBucket) {
+                addBucketLocally(createdBucket);
+            }
+            setNewBucketName('');
+            setNewBucketState('TODO');
+            setIsCreatingBucket(false);
+            showToast('Column created successfully', 'success');
+            refreshDashboard(true);
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to create bucket', 'error');
+        } finally {
+            setIsCreatingBucketSubmitting(false);
+        }
+    };
+
+    const handleDragStartColumn = (e: React.DragEvent<HTMLDivElement>, columnId: string | number) => {
+        e.dataTransfer.setData('columnId', columnId.toString());
+    };
+
+    const handleDropColumn = (e: React.DragEvent<HTMLDivElement>, targetColumnId: string | number) => {
+        e.stopPropagation();
+        const draggedColumnId = e.dataTransfer.getData('columnId');
+        if (!draggedColumnId || String(draggedColumnId) === String(targetColumnId)) return;
+
+        const oldIndex = buckets.findIndex(b => String(b.id) === String(draggedColumnId));
+        const newIndex = buckets.findIndex(b => String(b.id) === String(targetColumnId));
+
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const newBuckets = [...buckets];
+        const [removed] = newBuckets.splice(oldIndex, 1);
+        newBuckets.splice(newIndex, 0, removed);
+        const reorderedBuckets = newBuckets.map((b, idx) => ({ ...b, order_idx: idx }));
+
+        // 1. Instant optimistic UI swap (0ms)
+        setBucketsOptimistically(reorderedBuckets);
+
+        // 2. Asynchronous debounced background sync to database with silent retries
+        queueBucketReorder(reorderedBuckets.map(b => b.id!));
+    };
+
+    const tabs = ['Overview', 'Tasks', 'MoM & Meetings', 'Settings'];
+
+    if (projectNotFound) {
+        return (
+            <NotFoundPage
+                type="project"
+                resourceId={projectId}
+                onRetry={() => {
+                    setProjectNotFound(false);
+                    projectService.getProjectById(projectId)
+                        .then(p => {
+                            if (p) setProject(p);
+                            else setProjectNotFound(true);
+                        })
+                        .catch(() => setProjectNotFound(true));
+                }}
+            />
+        );
+    }
+
+    const isLoading = (roleLoading || boardLoading || meetingsLoading) && buckets.length === 0 && !project;
+
+    if (isLoading) {
+        return (
+            <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-10rem)] w-full">
+                <LoadingScreen
+                    fullscreen={false}
+                    message="SYNCING PERMISSIONS & DATA…"
+                    subtext="// VERIFYING RBAC & SYNCHRONIZING BOARD ENGINE"
+                />
+            </div>
+        );
+    }
+
     return (
-      <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-10rem)] w-full">
-        <LoadingScreen
-          fullscreen={false}
-          message="SYNCING PERMISSIONS & DATA…"
-          subtext="// VERIFYING RBAC & SYNCHRONIZING BOARD ENGINE"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className={`animate-in fade-in duration-200 flex flex-col max-w-[1600px] mx-auto w-full select-none ${activeTab === 'Tasks' ? 'flex-1 min-h-0' : 'h-full'}`}>
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-4 shrink-0">
-        <button
-          onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-none bg-[#141619] border-2 border-black flex items-center justify-center text-neutral-300 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-        >
-          <ChevronLeft size={20} strokeWidth={3} />
-        </button>
-        <div>
-          <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[10px] font-black uppercase tracking-wider mb-1 inline-block">
+        <div className={`animate-in fade-in duration-200 flex flex-col max-w-[1600px] mx-auto w-full select-none ${activeTab === 'Tasks' ? 'flex-1 min-h-0' : 'h-full'}`}>
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-4 shrink-0">
+                <button
+                    onClick={() => navigate(-1)}
+                    className="w-10 h-10 rounded-none bg-[#141619] border-2 border-black flex items-center justify-center text-neutral-300 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                    <ChevronLeft size={20} strokeWidth={3} />
+                </button>
+                <div>
+                    <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[13px] font-black uppercase tracking-wider mb-1 inline-block">
             // PROJECT PIPELINE CONTROL
-          </span>
-          <h1 className="text-[26px] sm:text-[30px] font-black text-white uppercase tracking-tight font-mono leading-none">
-            {project ? project.name : 'LOADING PROJECT...'}
-          </h1>
-          <p className="text-[11px] font-mono text-neutral-400 mt-1 uppercase tracking-wider">
-            {project ? project.issue || "SYSTEM PIPELINE NOMINAL." : '...'}
-          </p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 mb-4 bg-[#0E1012] p-1.5 rounded-none border-2 border-black w-fit shadow-[3px_3px_0px_0px_#000000] flex-wrap shrink-0">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none flex items-center gap-2 cursor-pointer ${activeTab === tab
-              ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]'
-              : 'bg-[#141619] text-neutral-400 border border-neutral-800 hover:border-white hover:text-white'
-              }`}
-          >
-            {tab === 'Overview' && <LayoutDashboard size={14} strokeWidth={2.5} />}
-            {tab === 'Tasks' && <Briefcase size={14} strokeWidth={2.5} />}
-            {tab === 'MoM & Meetings' && <Video size={14} strokeWidth={2.5} />}
-            {tab === 'Settings' && <Settings size={14} strokeWidth={2.5} />}
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      <div className={`min-h-0 ${activeTab === 'Tasks' ? 'flex-1 flex flex-col' : ''}`}>
-        {/* Overview */}
-        {activeTab === 'Overview' && (
-          roleLoading ? <div className="text-neutral-500 font-mono text-[12px] py-10 text-center">// RESOLVING PERMISSIONS...</div> :
-            isManager ? <ProjectOverviewPM projectId={projectId} /> : (
-              <ProjectOverviewDev
-                projectId={projectId}
-                tasks={tasks}
-                buckets={buckets}
-                onDropTask={handleDropTask}
-                onUpdateTask={handleUpdateTask}
-              />
-            )
-        )}
-
-        {/* Tasks — Kanban */}
-        {activeTab === 'Tasks' && (
-          <div className="bg-[#0C0D0E] border-2 border-neutral-700 rounded-none p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-[6px_6px_0px_0px_#000000]">
-            <div className="flex justify-between items-center mb-3 pb-3 border-b-2 border-neutral-800 flex-wrap gap-2 shrink-0">
-              <div>
-                <h2 className="text-[16px] font-mono font-black text-white uppercase tracking-wider">
-                  <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
-                </h2>
-                <p className="text-[11px] font-mono text-neutral-400 mt-0.5 uppercase tracking-wider">
-                  6-STAGE STACK ARCHITECTURE • DRAFT → COMPLETED
-                </p>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => setIsMcpModalOpen(true)}
-                  className="px-3.5 py-1.5 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                  title="Configure IDE Model Context Protocol (MCP) server endpoints"
-                >
-                  <Cpu size={13} strokeWidth={2.5} />
-                  <span>AI MCP</span>
-                </button>
-                <button
-                  onClick={handleSyncAndReviewPrs}
-                  disabled={isSyncingPrs}
-                  className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
-                  title="Scan connected repositories and immediately run Gemini AI Code Review on open PRs"
-                >
-                  <Sparkles size={13} strokeWidth={2.5} className={isSyncingPrs ? 'animate-spin text-black' : 'text-[#FFE600]'} />
-                  <span>{isSyncingPrs ? 'REVIEWING PRS...' : 'SYNC & REVIEW PRS'}</span>
-                </button>
-                <button
-                  onClick={handleRefreshTasksOnly}
-                  disabled={isRefreshingTasks}
-                  className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
-                  title="Refresh tasks without reloading the web page"
-                >
-                  <RefreshCw size={13} strokeWidth={2.5} className={isRefreshingTasks ? 'animate-spin text-black' : 'text-[#FFE600]'} />
-                  <span>{isRefreshingTasks ? 'SYNCING...' : 'REFRESH TASKS'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Task Search Bar & Assignee Filter */}
-            <div className="mb-3 flex items-center justify-between gap-3 flex-wrap bg-[#141619] p-2.5 sm:p-3 border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0">
-              <div className="flex items-center gap-3 flex-1 min-w-[260px] flex-wrap">
-                <div className="relative flex-1 min-w-[220px] max-w-xl">
-                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-500">
-                    <Search size={14} />
-                  </div>
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={taskSearchQuery}
-                    onChange={(e) => setTaskSearchQuery(e.target.value)}
-                    onKeyDown={handleSearchKeyDown}
-                    placeholder="SEARCH TASKS (TITLE, #ID, TAG, ASSIGNEE)... [/]"
-                    className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-8 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
-                  />
-                  {taskSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setTaskSearchQuery('')}
-                      className="absolute inset-y-0 right-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
-                      title="Clear Search (Esc)"
-                    >
-                      <X size={14} strokeWidth={2.5} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Assignee Filter Dropdown */}
-                <div className="flex items-center gap-1.5 bg-[#0B0E14] border-2 border-black px-2.5 py-1.5 shadow-[2px_2px_0px_0px_#000000]">
-                  <Filter size={13} className="text-[#FFE600] shrink-0" />
-                  <span className="font-mono text-[10px] font-black uppercase text-neutral-400 shrink-0">ASSIGNEE:</span>
-                  <select
-                    value={selectedAssigneeFilter}
-                    onChange={(e) => setSelectedAssigneeFilter(e.target.value)}
-                    className="bg-transparent font-mono text-[11px] font-bold text-white uppercase focus:outline-none cursor-pointer"
-                  >
-                    <option value="ALL" className="bg-[#141619] text-white">ALL ASSIGNEES ({tasks.length})</option>
-                    <option value="UNASSIGNED" className="bg-[#141619] text-white">
-                      UNASSIGNED ({tasks.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id).length})
-                    </option>
-                    {members.map(m => {
-                      const uid = String(m.user_id);
-                      const targetIds = new Set<string>([uid]);
-                      if (m.id) targetIds.add(String(m.id));
-
-                      const count = tasks.filter(t =>
-                        (t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)))) ||
-                        (t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id)))
-                      ).length;
-                      return (
-                        <option key={uid} value={uid} className="bg-[#141619] text-white">
-                          @{m.gh_username || m.display_name || `Member #${uid}`} ({count})
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </div>
-
-              {(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL') && (
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 bg-[#1E2227] text-neutral-300 border border-neutral-700 font-mono text-[11px] font-bold uppercase tracking-wider">
-                    <span className="text-[#FFE600] font-black mr-1">{matchingTasks.length}</span>
-                    OF {tasks.length} MATCHING
-                  </span>
-                  {isSearchingBackend && (
-                    <span className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-400">
-                      <Loader2 size={12} className="animate-spin text-[#FFE600]" />
-                      SEARCHING BACKLOG...
                     </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTaskSearchQuery('');
-                      setSelectedAssigneeFilter('ALL');
-                    }}
-                    className="px-2 py-1 bg-[#1E2227] hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-700 font-mono text-[10px] uppercase font-bold cursor-pointer"
-                  >
-                    RESET
-                  </button>
+                    <h1 className="text-[26px] sm:text-[30px] font-black text-white uppercase tracking-tight font-mono leading-none">
+                        {project ? project.name : 'LOADING PROJECT...'}
+                    </h1>
+                    <p className="text-[11px] font-mono text-neutral-400 mt-1 uppercase tracking-wider">
+                        {project ? project.issue || "SYSTEM PIPELINE NOMINAL." : '...'}
+                    </p>
                 </div>
-              )}
             </div>
 
-            {tasksLoading || bucketsLoading ? (
-              <div className="flex-1 flex items-center justify-center text-slate-500 text-[14px]">Loading board state...</div>
-            ) : (
-              <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0 items-stretch">
-                {buckets.map(bucket => {
-                  const isFiltered = Boolean(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL');
-                  const colTasks = matchingTasks.filter(t => String(t.bucket_id) === String(bucket.id));
-                  return (
-                    <KanbanColumn
-                      key={bucket.id}
-                      id={bucket.id!}
-                      name={bucket.name || bucket.state}
-                      description={bucket.description}
-                      colorClass={STATUS_COLORS[bucket.state] || 'bg-slate-500'}
-                      statusText="ACTIVE"
-                      taskCount={colTasks.length}
-                      totalTasks={isFiltered ? colTasks.length : bucket.task_count}
-                      isLoadingMore={!!loadingBuckets[String(bucket.id)]}
-                      onLoadMore={loadMoreBucketTasks}
-                      onDropTask={handleDropTask}
-                      onDragStartColumn={handleDragStartColumn}
-                      onDropColumn={handleDropColumn}
-                      onAddTask={(bId) => { setSelectedBucketTarget(bId); setShowTaskModal(true); }}
-                      onDeleteBucket={(bId) => setBucketToDelete(bId)}
-                      onEditBucket={() => setSelectedBucketForEdit(bucket)}
+            {/* Tabs */}
+            <div className="flex gap-2 mb-4 bg-[#0E1012] p-1.5 rounded-none border-2 border-black w-fit shadow-[3px_3px_0px_0px_#000000] flex-wrap shrink-0">
+                {tabs.map(tab => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none flex items-center gap-2 cursor-pointer ${activeTab === tab
+                            ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]'
+                            : 'bg-[#141619] text-neutral-400 border border-neutral-800 hover:border-white hover:text-white'
+                            }`}
                     >
-                      <div className="flex flex-col gap-3">
-                        {colTasks.map(task => {
-                          const isDeleting = deletingTaskIds.has(task.id!);
-                          if (isDeleting) {
-                            return (
-                              <div
-                                key={task.id}
-                                className="border-2 border-dashed border-[#EF4444] bg-[#161214] rounded-none p-3.5 animate-pulse select-none"
-                              >
-                                <div className="flex items-center justify-between gap-2 mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <Loader2 size={13} className="animate-spin text-[#EF4444]" />
-                                    <span className="font-mono text-[10px] text-[#EF4444] font-black uppercase tracking-wider">
-                                      REMOVING TASK...
-                                    </span>
-                                  </div>
-                                  <span className="font-mono text-[10px] text-neutral-500 font-bold">
-                                    #{String(task.id).slice(-4)}
-                                  </span>
-                                </div>
-                                <div className="font-mono text-[12px] text-neutral-400 font-bold uppercase truncate line-through">
-                                  {task.title}
-                                </div>
-                              </div>
-                            );
-                          }
+                        {tab === 'Overview' && <LayoutDashboard size={14} strokeWidth={2.5} />}
+                        {tab === 'Tasks' && <Briefcase size={14} strokeWidth={2.5} />}
+                        {tab === 'MoM & Meetings' && <Video size={14} strokeWidth={2.5} />}
+                        {tab === 'Settings' && <Settings size={14} strokeWidth={2.5} />}
+                        {tab}
+                    </button>
+                ))}
+            </div>
 
-                          const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
-                          const rawAssigneeIds = (task.assignee_ids && task.assignee_ids.length > 0)
-                            ? task.assignee_ids.map(String)
-                            : (task.lead_assignee_id ? [String(task.lead_assignee_id)] : []);
-                          const cardAssignees = rawAssigneeIds.map(uid => {
-                            const m = members.find(mem => String(mem.user_id) === uid);
-                            return {
-                              userId: uid,
-                              name: m?.gh_username || m?.display_name || `Member #${uid}`,
-                              avatarUrl: m?.avatar_url || (m?.gh_username ? `https://github.com/${m.gh_username}.png?size=64` : undefined),
-                            };
-                          });
-
-                          const assignedMember = task.lead_assignee_id ? members.find(m => String(m.user_id) === String(task.lead_assignee_id)) : undefined;
-                          const assigneeName = assignedMember?.gh_username || assignedMember?.display_name || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
-                          const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
-
-                          return (
-                            <KanbanCard
-                              key={task.id}
-                              id={task.id!}
-                              title={task.title}
-                              type={task.type}
-                              weight={task.weight}
-                              assignee={assigneeName}
-                              assigneeAvatar={assigneeAvatar}
-                              assignees={cardAssignees}
-                              pr={!!task.prUrl}
-                              repoUrl={task.repo_url}
-                              description={task.description}
-                              warnStagnant={task.warnStagnant}
-                              isSuggested={task.isSuggested}
-                              isCompleted={isTaskCompleted}
-                              onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
-                              onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
-                              onClick={() => handleOpenTask(task)}
-                              onDelete={() => setTaskToDelete(task.id!)}
-                              onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
+            {/* Tab Content */}
+            <div className={`min-h-0 ${activeTab === 'Tasks' ? 'flex-1 flex flex-col' : ''}`}>
+                {/* Overview */}
+                {activeTab === 'Overview' && (
+                    roleLoading ? <div className="text-neutral-500 font-mono text-[12px] py-10 text-center">// RESOLVING PERMISSIONS...</div> :
+                        isManager ? <ProjectOverviewPM projectId={projectId} /> : (
+                            <ProjectOverviewDev
+                                projectId={projectId}
+                                tasks={tasks}
+                                buckets={buckets}
+                                onDropTask={handleDropTask}
+                                onUpdateTask={handleUpdateTask}
                             />
-                          );
-                        })}
-
-                        {/* In-flight new task creation ghost card */}
-                        {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
-                          <div className="border-2 border-dashed border-[#FFE600] bg-[#141619] rounded-none p-3 animate-pulse">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Loader2 size={13} className="animate-spin text-[#FFE600]" />
-                              <span className="font-mono text-[10px] text-[#FFE600] font-black uppercase tracking-wider">CREATING TASK...</span>
-                            </div>
-                            <div className="font-mono text-[12px] text-white font-bold uppercase truncate">
-                              {creatingTaskTitle || '// NEW TASK'}
-                            </div>
-                          </div>
-                        )}
-
-                        <button
-                          onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
-                          className="w-full py-2.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-black border-2 border-dashed border-neutral-700 hover:border-black hover:bg-[#FFE600] rounded-none transition-all duration-75 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                        >
-                          <Plus size={14} strokeWidth={3} /> Add Task
-                        </button>
-
-                      </div>
-                    </KanbanColumn>
-
-                  );
-                })}
-
-                {/* In-Flight Creating Column Indicator */}
-                {isCreatingBucketSubmitting && (
-                  <div className="min-w-[316px] w-[316px] shrink-0 border-2 border-dashed border-[#FFE600] bg-[#141619] p-5 rounded-none flex flex-col justify-center items-center shadow-[4px_4px_0px_0px_#000000] animate-pulse h-full">
-                    <div className="flex items-center gap-2 text-[#FFE600] font-mono text-[12px] font-black uppercase mb-2">
-                      <Loader2 size={16} className="animate-spin text-[#FFE600]" />
-                      <span>CREATING COLUMN...</span>
-                    </div>
-                    <div className="font-mono text-[13px] text-white font-bold uppercase truncate max-w-[260px] text-center">
-                      <span className="text-[#FFE600] mr-1">//</span>{newBucketName || 'NEW COLUMN'}
-                    </div>
-                    <div className="font-mono text-[10px] text-neutral-400 mt-2">
-                      // PROVISIONING STATE: {newBucketState}
-                    </div>
-                  </div>
+                        )
                 )}
 
-                {/* Add New Bucket Column */}
-                <div className="min-w-[280px] w-[280px] shrink-0">
-                  {!isCreatingBucket ? (
-                    <button
-                      onClick={() => setIsCreatingBucket(true)}
-                      className="w-full h-12 border-2 border-dashed border-black bg-[#121417] rounded-none flex items-center justify-center gap-2 text-neutral-400 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] cursor-pointer"
-                    >
-                      <Plus size={16} strokeWidth={3} /> ADD COLUMN
-                    </button>
-                  ) : (
-                    <div className="border-2 border-black rounded-none bg-[#121417] p-4 space-y-3 font-mono shadow-[4px_4px_0px_0px_#000000]">
-                      <input
-                        type="text"
-                        autoFocus
-                        disabled={isCreatingBucketSubmitting}
-                        value={newBucketName}
-                        onChange={e => setNewBucketName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleCreateBucket();
-                          if (e.key === 'Escape' && !isCreatingBucketSubmitting) {
-                            setIsCreatingBucket(false);
-                            setNewBucketName('');
-                            setNewBucketState('TODO');
-                          }
-                        }}
-                        placeholder="COLUMN NAME"
-                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50"
-                      />
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">// BEHAVIOR STATE</label>
-                        <select
-                          value={newBucketState}
-                          disabled={isCreatingBucketSubmitting}
-                          onChange={(e) => setNewBucketState(e.target.value as BucketState)}
-                          className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white focus:border-[#FFE600] focus:outline-none appearance-none shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50"
-                        >
-                          <option value="DRAFT">DRAFT (AI Suggestions)</option>
-                          <option value="PENDING">PENDING (Approval Needed)</option>
-                          <option value="TODO">TODO (Task Queue)</option>
-                          <option value="ONGOING">ONGOING (Active Work)</option>
-                          <option value="ON_REVIEW">ON_REVIEW (Testing/QA)</option>
-                          <option value="COMPLETED">COMPLETED (Finished)</option>
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          onClick={handleCreateBucket}
-                          disabled={!newBucketName.trim() || isCreatingBucketSubmitting}
-                          className="flex-1 bg-[#FFE600] text-black border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          {isCreatingBucketSubmitting ? (
-                            <>
-                              <Loader2 size={13} className="animate-spin" />
-                              <span>CREATING...</span>
-                            </>
-                          ) : (
-                            'Save'
-                          )}
-                        </button>
-                        <button
-                          disabled={isCreatingBucketSubmitting}
-                          onClick={() => { setIsCreatingBucket(false); setNewBucketName(''); setNewBucketState('TODO'); }}
-                          className="flex-1 bg-[#1E2227] text-neutral-300 border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                {/* Tasks — Kanban */}
+                {activeTab === 'Tasks' && (
+                    <div className={
+                        focusBucket
+                            ? "fixed inset-0 z-[45] bg-[#0C0D0E] p-3 sm:p-5 flex flex-col min-h-0 overflow-hidden select-none animate-in fade-in duration-150"
+                            : "bg-[#0C0D0E] border-2 border-neutral-700 rounded-none p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-[6px_6px_0px_0px_#000000]"
+                    }>
+                        <div className="flex justify-between items-center mb-3 pb-3 border-b-2 border-neutral-800 flex-wrap gap-2 shrink-0">
+                            <div>
+                                {focusBucket ? (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[13px] font-black uppercase tracking-wider inline-block">
+                                                // EXPANDED KANBAN WORKSPACE
+                                            </span>
+                                            <span className="text-neutral-400 font-mono text-[11px] font-bold uppercase truncate max-w-sm sm:max-w-md">
+                                                {project ? project.name : 'PROJECT'}
+                                            </span>
+                                        </div>
+                                        <h2 className="text-[17px] sm:text-[19px] font-mono font-black text-white uppercase tracking-wider">
+                                            <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
+                                        </h2>
+                                    </>
+                                ) : (
+                                    <>
+                                        <h2 className="text-[16px] font-mono font-black text-white uppercase tracking-wider">
+                                            <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
+                                        </h2>
+                                        <p className="text-[11px] font-mono text-neutral-400 mt-0.5 uppercase tracking-wider">
+                                            6-STAGE STACK ARCHITECTURE • DRAFT → COMPLETED
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <div className="flex items-center border-2 border-black bg-[#141619] p-0.5 shadow-[2px_2px_0px_0px_#000000]">
+                                    <button
+                                        type="button"
+                                        onClick={() => setColumnDensity('normal')}
+                                        className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all cursor-pointer ${columnDensity === 'normal'
+                                            ? 'bg-[#FFE600] text-black'
+                                            : 'text-neutral-400 hover:text-white'
+                                            }`}
+                                        title="Standard column width (316px)"
+                                    >
+                                        STANDARD
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setColumnDensity('wide')}
+                                        className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all cursor-pointer ${columnDensity === 'wide'
+                                            ? 'bg-[#FFE600] text-black'
+                                            : 'text-neutral-400 hover:text-white'
+                                            }`}
+                                        title="Wide column width (420px)"
+                                    >
+                                        WIDE
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => setIsMcpModalOpen(true)}
+                                    className="px-3.5 py-1.5 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                    title="Configure IDE Model Context Protocol (MCP) server endpoints"
+                                >
+                                    <Cpu size={13} strokeWidth={2.5} />
+                                    <span>AI MCP</span>
+                                </button>
+                                <button
+                                    onClick={handleSyncAndReviewPrs}
+                                    disabled={isSyncingPrs}
+                                    className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+                                    title="Scan connected repositories and immediately run Gemini AI Code Review on open PRs"
+                                >
+                                    <Sparkles size={13} strokeWidth={2.5} className={isSyncingPrs ? 'animate-spin text-black' : ''} />
+                                    <span>{isSyncingPrs ? 'REVIEWING PRS...' : 'SYNC & REVIEW PRS'}</span>
+                                </button>
+                                <button
+                                    onClick={handleRefreshTasksOnly}
+                                    disabled={isRefreshingTasks}
+                                    className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+                                    title="Refresh tasks without reloading the web page"
+                                >
+                                    <RefreshCw size={13} strokeWidth={2.5} className={isRefreshingTasks ? 'animate-spin text-black' : ''} />
+                                    <span>{isRefreshingTasks ? 'SYNCING...' : 'REFRESH TASKS'}</span>
+                                </button>
+                                {focusBucket ? (
+                                    <button
+                                        onClick={() => {
+                                            setFocusBucket(false);
+                                            setSelectedBucketFocus('ALL');
+                                        }}
+                                        className="px-3.5 py-1.5 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                        title="Exit expanded view (Esc)"
+                                    >
+                                        <Shrink size={13} strokeWidth={2.5} />
+                                        <span>COLLAPSE</span>
+                                        <kbd className="hidden sm:inline bg-black text-[#FFE600] px-1 py-0.2 text-[9px] font-mono border border-neutral-700">ESC</kbd>
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => setFocusBucket(true)}
+                                        className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                        title="Expand bucket and board workspace"
+                                    >
+                                        <Expand size={13} strokeWidth={2.5} />
+                                        <span>EXPAND</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Task Search Bar & Assignee Filter */}
+                        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap bg-[#141619] p-2.5 sm:p-3 border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0">
+                            <div className="flex items-center gap-3 flex-1 min-w-[260px] flex-wrap">
+                                <div className="relative flex-1 min-w-[220px] max-w-xl">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-500">
+                                        <Search size={14} />
+                                    </div>
+                                    <input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        value={taskSearchQuery}
+                                        onChange={(e) => setTaskSearchQuery(e.target.value)}
+                                        onKeyDown={handleSearchKeyDown}
+                                        placeholder="SEARCH TASKS (TITLE, #ID, TAG, ASSIGNEE)... [/]"
+                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-8 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                                    />
+                                    {taskSearchQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setTaskSearchQuery('')}
+                                            className="absolute inset-y-0 right-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
+                                            title="Clear Search (Esc)"
+                                        >
+                                            <X size={14} strokeWidth={2.5} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Assignee Filter Dropdown */}
+                                <div className="flex items-center gap-1.5 bg-[#0B0E14] border-2 border-black px-2.5 py-1.5 shadow-[2px_2px_0px_0px_#000000]">
+                                    <Filter size={13} className="text-[#FFE600] shrink-0" />
+                                    <span className="font-mono text-[13px] font-black uppercase text-neutral-400 shrink-0">ASSIGNEE:</span>
+                                    <select
+                                        value={selectedAssigneeFilter}
+                                        onChange={(e) => setSelectedAssigneeFilter(e.target.value)}
+                                        className="bg-transparent font-mono text-[11px] font-bold text-white uppercase focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="ALL" className="bg-[#141619] text-white">ALL ASSIGNEES ({tasks.length})</option>
+                                        <option value="UNASSIGNED" className="bg-[#141619] text-white">
+                                            UNASSIGNED ({tasks.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id).length})
+                                        </option>
+                                        {members.map(m => {
+                                            const uid = String(m.user_id);
+                                            const targetIds = new Set<string>([uid]);
+                                            if (m.id) targetIds.add(String(m.id));
+
+                                            const count = tasks.filter(t =>
+                                                (t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)))) ||
+                                                (t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id)))
+                                            ).length;
+                                            return (
+                                                <option key={uid} value={uid} className="bg-[#141619] text-white">
+                                                    @{m.gh_username || m.display_name || `Member #${uid}`} ({count})
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+
+                                {/* Bucket Focus Dropdown */}
+                                <div className="flex items-center gap-1.5 bg-[#0B0E14] border-2 border-black px-2.5 py-1.5 shadow-[2px_2px_0px_0px_#000000]">
+                                    <Filter size={13} className="text-[#FFE600] shrink-0" />
+                                    <span className="font-mono text-[13px] font-black uppercase text-neutral-400 shrink-0">BUCKET FOCUS:</span>
+                                    <select
+                                        value={selectedBucketFocus}
+                                        onChange={(e) => setSelectedBucketFocus(e.target.value)}
+                                        className="bg-transparent font-mono text-[11px] font-bold text-white uppercase focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="ALL" className="bg-[#141619] text-white">
+                                            ALL BUCKETS ({buckets.length})
+                                        </option>
+                                        {buckets.map(b => {
+                                            const bTasksCount = matchingTasks.filter(t => String(t.bucket_id) === String(b.id)).length;
+                                            return (
+                                                <option key={b.id} value={String(b.id)} className="bg-[#141619] text-white">
+                                                    {b.name || b.state} ({bTasksCount})
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+
+                                {(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL' || selectedBucketFocus !== 'ALL') && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2.5 py-1.5 bg-[#1E2227] text-neutral-300 border border-neutral-700 font-mono text-[11px] font-bold uppercase tracking-wider">
+                                            <span className="text-[#FFE600] font-black mr-1">{matchingTasks.length}</span>
+                                            OF {tasks.length} MATCHING
+                                        </span>
+                                        {isSearchingBackend && (
+                                            <span className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-400">
+                                                <Loader2 size={12} className="animate-spin text-[#FFE600]" />
+                                                SEARCHING BACKLOG...
+                                            </span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setTaskSearchQuery('');
+                                                setSelectedAssigneeFilter('ALL');
+                                                setSelectedBucketFocus('ALL');
+                                            }}
+                                            className="p-1.5 bg-[#1E2227] hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-700 font-mono text-[12px] uppercase font-bold cursor-pointer"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        {tasksLoading || bucketsLoading ? (
+                            <div className="flex-1 flex items-center justify-center text-slate-500 text-[14px]">Loading board state...</div>
+                        ) : (
+                            <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0 items-stretch">
+                                {displayBuckets.map(bucket => {
+                                    const isFiltered = Boolean(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL');
+                                    const colTasks = matchingTasks.filter(t => String(t.bucket_id) === String(bucket.id));
+                                    return (
+                                        <KanbanColumn
+                                            key={bucket.id}
+                                            id={bucket.id!}
+                                            name={bucket.name || bucket.state}
+                                            description={bucket.description}
+                                            colorClass={STATUS_COLORS[bucket.state] || 'bg-slate-500'}
+                                            statusText="ACTIVE"
+                                            taskCount={colTasks.length}
+                                            totalTasks={isFiltered ? colTasks.length : bucket.task_count}
+                                            isLoadingMore={!!loadingBuckets[String(bucket.id)]}
+                                            onLoadMore={loadMoreBucketTasks}
+                                            onDropTask={handleDropTask}
+                                            onDragStartColumn={handleDragStartColumn}
+                                            onDropColumn={handleDropColumn}
+                                            onAddTask={(bId) => { setSelectedBucketTarget(bId); setShowTaskModal(true); }}
+                                            onDeleteBucket={(bId) => setBucketToDelete(bId)}
+                                            onEditBucket={() => setSelectedBucketForEdit(bucket)}
+                                            onFocusBucket={(bId) => {
+                                                setFocusBucket(true);
+                                                setSelectedBucketFocus(String(bId));
+                                            }}
+                                            widthClass={
+                                                selectedBucketFocus !== 'ALL'
+                                                    ? 'min-w-[420px] max-w-4xl flex-1'
+                                                    : columnDensity === 'wide'
+                                                        ? 'min-w-[420px] w-[512px]'
+                                                        : 'min-w-[316px] w-[360px]'
+                                            }
+                                        >
+                                            <div className="flex flex-col gap-3">
+                                                {colTasks.map(task => {
+                                                    const isDeleting = deletingTaskIds.has(task.id!);
+                                                    if (isDeleting) {
+                                                        return (
+                                                            <div
+                                                                key={task.id}
+                                                                className="border-2 border-dashed border-[#EF4444] bg-[#161214] rounded-none p-3.5 animate-pulse select-none"
+                                                            >
+                                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Loader2 size={13} className="animate-spin text-[#EF4444]" />
+                                                                        <span className="font-mono text-[13px] text-[#EF4444] font-black uppercase tracking-wider">
+                                                                            REMOVING TASK...
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="font-mono text-[13px] text-neutral-500 font-bold">
+                                                                        #{String(task.id).slice(-4)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="font-mono text-[12px] text-neutral-400 font-bold uppercase truncate line-through">
+                                                                    {task.title}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    const isTaskCompleted = bucket.state === 'COMPLETED' || task.status === 'COMPLETED';
+                                                    const rawAssigneeIds = (task.assignee_ids && task.assignee_ids.length > 0)
+                                                        ? task.assignee_ids.map(String)
+                                                        : (task.lead_assignee_id ? [String(task.lead_assignee_id)] : []);
+                                                    const cardAssignees = rawAssigneeIds.map(uid => {
+                                                        const m = members.find(mem => String(mem.user_id) === uid);
+                                                        return {
+                                                            userId: uid,
+                                                            name: m?.gh_username || m?.display_name || `Member #${uid}`,
+                                                            avatarUrl: m?.avatar_url || (m?.gh_username ? `https://github.com/${m.gh_username}.png?size=64` : undefined),
+                                                        };
+                                                    });
+
+                                                    const assignedMember = task.lead_assignee_id ? members.find(m => String(m.user_id) === String(task.lead_assignee_id)) : undefined;
+                                                    const assigneeName = assignedMember?.gh_username || assignedMember?.display_name || (task.lead_assignee_id ? `User #${task.lead_assignee_id}` : undefined);
+                                                    const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
+
+                                                    return (
+                                                        <KanbanCard
+                                                            key={task.id}
+                                                            id={task.id!}
+                                                            title={task.title}
+                                                            type={task.type}
+                                                            weight={task.weight}
+                                                            assignee={assigneeName}
+                                                            assigneeAvatar={assigneeAvatar}
+                                                            assignees={cardAssignees}
+                                                            pr={!!task.prUrl}
+                                                            repoUrl={task.repo_url}
+                                                            description={task.description}
+                                                            warnStagnant={task.warnStagnant}
+                                                            isSuggested={task.isSuggested}
+                                                            isCompleted={isTaskCompleted}
+                                                            onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
+                                                            onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
+                                                            onClick={() => handleOpenTask(task)}
+                                                            onDelete={() => setTaskToDelete(task.id!)}
+                                                            onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
+                                                        />
+                                                    );
+                                                })}
+
+                                                {/* In-flight new task creation ghost card */}
+                                                {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
+                                                    <div className="border-2 border-dashed border-[#FFE600] bg-[#141619] rounded-none p-3 animate-pulse">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Loader2 size={13} className="animate-spin text-[#FFE600]" />
+                                                            <span className="font-mono text-[13px] text-[#FFE600] font-black uppercase tracking-wider">CREATING TASK...</span>
+                                                        </div>
+                                                        <div className="font-mono text-[12px] text-white font-bold uppercase truncate">
+                                                            {creatingTaskTitle || '// NEW TASK'}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
+                                                    className="w-full py-2.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-black border-2 border-dashed border-neutral-700 hover:border-black hover:bg-[#FFE600] rounded-none transition-all duration-75 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                                >
+                                                    <Plus size={14} strokeWidth={3} /> Add Task
+                                                </button>
+
+                                            </div>
+                                        </KanbanColumn>
+
+                                    );
+                                })}
+
+                                {/* In-Flight Creating Column Indicator */}
+                                {isCreatingBucketSubmitting && (
+                                    <div className="min-w-[316px] w-[316px] shrink-0 border-2 border-dashed border-[#FFE600] bg-[#141619] p-5 rounded-none flex flex-col justify-center items-center shadow-[4px_4px_0px_0px_#000000] animate-pulse h-full">
+                                        <div className="flex items-center gap-2 text-[#FFE600] font-mono text-[12px] font-black uppercase mb-2">
+                                            <Loader2 size={16} className="animate-spin text-[#FFE600]" />
+                                            <span>CREATING COLUMN...</span>
+                                        </div>
+                                        <div className="font-mono text-[13px] text-white font-bold uppercase truncate max-w-[260px] text-center">
+                                            <span className="text-[#FFE600] mr-1">//</span>{newBucketName || 'NEW COLUMN'}
+                                        </div>
+                                        <div className="font-mono text-[13px] text-neutral-400 mt-2">
+                      // PROVISIONING STATE: {newBucketState}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Add New Bucket Column */}
+                                {selectedBucketFocus === 'ALL' && (
+                                    <div className="min-w-[280px] w-[280px] shrink-0">
+                                        {!isCreatingBucket ? (
+                                            <button
+                                                onClick={() => setIsCreatingBucket(true)}
+                                                className="w-full h-12 border-2 border-dashed border-black bg-[#121417] rounded-none flex items-center justify-center gap-2 text-neutral-400 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] cursor-pointer"
+                                            >
+                                                <Plus size={16} strokeWidth={3} /> ADD COLUMN
+                                            </button>
+                                        ) : (
+                                            <div className="border-2 border-black rounded-none bg-[#121417] p-4 space-y-3 font-mono shadow-[4px_4px_0px_0px_#000000]">
+                                                <input
+                                                    type="text"
+                                                    autoFocus
+                                                    disabled={isCreatingBucketSubmitting}
+                                                    value={newBucketName}
+                                                    onChange={e => setNewBucketName(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') handleCreateBucket();
+                                                        if (e.key === 'Escape' && !isCreatingBucketSubmitting) {
+                                                            setIsCreatingBucket(false);
+                                                            setNewBucketName('');
+                                                            setNewBucketState('TODO');
+                                                        }
+                                                    }}
+                                                    placeholder="COLUMN NAME"
+                                                    className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50"
+                                                />
+                                                <div className="space-y-1">
+                                                    <label className="text-[13px] text-neutral-400 font-bold uppercase tracking-wider">// BEHAVIOR STATE</label>
+                                                    <select
+                                                        value={newBucketState}
+                                                        disabled={isCreatingBucketSubmitting}
+                                                        onChange={(e) => setNewBucketState(e.target.value as BucketState)}
+                                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white focus:border-[#FFE600] focus:outline-none appearance-none shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50"
+                                                    >
+                                                        <option value="DRAFT">DRAFT (AI Suggestions)</option>
+                                                        <option value="PENDING">PENDING (Approval Needed)</option>
+                                                        <option value="TODO">TODO (Task Queue)</option>
+                                                        <option value="ONGOING">ONGOING (Active Work)</option>
+                                                        <option value="ON_REVIEW">ON_REVIEW (Testing/QA)</option>
+                                                        <option value="COMPLETED">COMPLETED (Finished)</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2 pt-1">
+                                                    <button
+                                                        onClick={handleCreateBucket}
+                                                        disabled={!newBucketName.trim() || isCreatingBucketSubmitting}
+                                                        className="flex-1 bg-[#FFE600] text-black border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                                                    >
+                                                        {isCreatingBucketSubmitting ? (
+                                                            <>
+                                                                <Loader2 size={13} className="animate-spin" />
+                                                                <span>CREATING...</span>
+                                                            </>
+                                                        ) : (
+                                                            'Save'
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        disabled={isCreatingBucketSubmitting}
+                                                        onClick={() => { setIsCreatingBucket(false); setNewBucketName(''); setNewBucketState('TODO'); }}
+                                                        className="flex-1 bg-[#1E2227] text-neutral-300 border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+
                     </div>
-                  )}
-                </div>
-              </div>
+                )}
+
+                {/* MoM & Meetings */}
+                {activeTab === 'MoM & Meetings' && (
+                    <div className="space-y-6">
+                        <MeetingIntelligenceTab
+                            projectId={projectId}
+                            members={members}
+                            buckets={buckets}
+                            refreshKey={meetingEventKey}
+                            initialJobId={meetingJobParam}
+                            onReviewClosed={() => setSearchParams(prev => {
+                                const next = new URLSearchParams(prev);
+                                next.delete('meetingJob');
+                                return next;
+                            }, { replace: true })}
+                            meetings={meetings}
+                            meetingsLoading={meetingsLoading}
+                            onMeetingChanged={refreshMeeting}
+                            onMeetingsChanged={refreshMeetings}
+                            onDeleteMeeting={deleteMeeting}
+                        />
+                    </div>
+                )}
+
+                {/* Settings */}
+                {activeTab === 'Settings' && (
+                    <ProjectSettingsTab
+                        projectId={projectId}
+                        onProjectUpdated={(updated) => setProject(updated)}
+                        onMembersChanged={refreshMembers}
+                        onMemberRemoved={handleMemberRemoved}
+                    />
+                )}
+            </div>
+
+            {/* Modals */}
+            {showTaskModal && (
+                <TaskFormModal
+                    projectId={projectId}
+                    title="New Task"
+                    initial={{ bucket_id: selectedBucketTarget }}
+                    onClose={() => { setShowTaskModal(false); setSelectedBucketTarget(undefined); }}
+                    onSubmit={handleCreateTask}
+                />
+            )}
+            {showMeetingModal && (
+                <MeetingFormModal
+                    projectId={projectId}
+                    onClose={() => setShowMeetingModal(false)}
+                    onSubmit={handleCreateMeeting}
+                />
+            )}
+            {selectedTaskForEdit && (
+                <TaskDetailModal
+                    task={selectedTaskForEdit}
+                    buckets={buckets}
+                    members={members}
+                    projectRepoUrls={project?.gh_repo_url || []}
+                    onClose={handleCloseTask}
+                    onUpdate={handleUpdateTask}
+                />
             )}
 
+            {selectedBucketForEdit && (
+                <BucketSettingsModal
+                    bucket={selectedBucketForEdit}
+                    isOpen={!!selectedBucketForEdit}
+                    onClose={() => setSelectedBucketForEdit(null)}
+                    onSave={handleSaveBucketSettings}
+                />
+            )}
 
-          </div>
-        )}
+            {bucketToDelete && (
+                <ConfirmModal
+                    title="Delete Column"
+                    message="Are you sure you want to delete this column? This action cannot be undone and only works if the column is empty."
+                    confirmLabel="Delete Column"
+                    onConfirm={async () => {
+                        const targetId = bucketToDelete;
+                        setBucketToDelete(null);
+                        removeBucketLocally(targetId);
+                        try {
+                            await deleteBucket(targetId);
+                            refreshDashboard(true);
+                        } catch (err) {
+                            console.error("Failed to delete bucket", err);
+                            showToast("Failed to delete column. Reverting...", "error");
+                            refreshBoard(true);
+                        }
+                    }}
+                    onCancel={() => setBucketToDelete(null)}
+                    variant="danger"
+                />
+            )}
 
-        {/* MoM & Meetings */}
-        {activeTab === 'MoM & Meetings' && (
-          <div className="space-y-6">
-            <MeetingIntelligenceTab
-              projectId={projectId}
-              members={members}
-              buckets={buckets}
-              refreshKey={meetingEventKey}
-              initialJobId={meetingJobParam}
-              onReviewClosed={() => setSearchParams(prev => {
-                const next = new URLSearchParams(prev);
-                next.delete('meetingJob');
-                return next;
-              }, { replace: true })}
-              meetings={meetings}
-              meetingsLoading={meetingsLoading}
-              onMeetingChanged={refreshMeeting}
-              onMeetingsChanged={refreshMeetings}
-              onDeleteMeeting={deleteMeeting}
+            <McpConfigModal
+                isOpen={isMcpModalOpen}
+                onClose={() => setIsMcpModalOpen(false)}
+                projectId={projectId}
+                projectName={project?.name}
             />
-          </div>
-        )}
 
-        {/* Settings */}
-        {activeTab === 'Settings' && (
-          <ProjectSettingsTab
-            projectId={projectId}
-            onProjectUpdated={(updated) => setProject(updated)}
-            onMembersChanged={refreshMembers}
-            onMemberRemoved={handleMemberRemoved}
-          />
-        )}
-      </div>
+            <TaskContextMenu
+                contextMenu={contextMenu}
+                buckets={buckets}
+                onClose={() => setContextMenu(null)}
+                onEdit={(t) => handleOpenTask(t)}
+                onToggleComplete={(tId, completed) => handleToggleTaskComplete(tId, completed)}
+                onMoveToBucket={handleMoveTaskToBucket}
+                onDelete={(tId) => setTaskToDelete(tId)}
+            />
 
-      {/* Modals */}
-      {showTaskModal && (
-        <TaskFormModal
-          projectId={projectId}
-          title="New Task"
-          initial={{ bucket_id: selectedBucketTarget }}
-          onClose={() => { setShowTaskModal(false); setSelectedBucketTarget(undefined); }}
-          onSubmit={handleCreateTask}
-        />
-      )}
-      {showMeetingModal && (
-        <MeetingFormModal
-          projectId={projectId}
-          onClose={() => setShowMeetingModal(false)}
-          onSubmit={handleCreateMeeting}
-        />
-      )}
-      {selectedTaskForEdit && (
-        <TaskDetailModal
-          task={selectedTaskForEdit}
-          buckets={buckets}
-          members={members}
-          projectRepoUrls={project?.gh_repo_url || []}
-          onClose={handleCloseTask}
-          onUpdate={handleUpdateTask}
-        />
-      )}
-
-      {selectedBucketForEdit && (
-        <BucketSettingsModal
-          bucket={selectedBucketForEdit}
-          isOpen={!!selectedBucketForEdit}
-          onClose={() => setSelectedBucketForEdit(null)}
-          onSave={handleSaveBucketSettings}
-        />
-      )}
-
-      {bucketToDelete && (
-        <ConfirmModal
-          title="Delete Column"
-          message="Are you sure you want to delete this column? This action cannot be undone and only works if the column is empty."
-          confirmLabel="Delete Column"
-          onConfirm={async () => {
-            const targetId = bucketToDelete;
-            setBucketToDelete(null);
-            removeBucketLocally(targetId);
-            try {
-              await deleteBucket(targetId);
-              refreshDashboard(true);
-            } catch (err) {
-              console.error("Failed to delete bucket", err);
-              showToast("Failed to delete column. Reverting...", "error");
-              refreshBoard(true);
-            }
-          }}
-          onCancel={() => setBucketToDelete(null)}
-          variant="danger"
-        />
-      )}
-
-      <McpConfigModal
-        isOpen={isMcpModalOpen}
-        onClose={() => setIsMcpModalOpen(false)}
-        projectId={projectId}
-        projectName={project?.name}
-      />
-
-      <TaskContextMenu
-        contextMenu={contextMenu}
-        buckets={buckets}
-        onClose={() => setContextMenu(null)}
-        onEdit={(t) => handleOpenTask(t)}
-        onToggleComplete={(tId, completed) => handleToggleTaskComplete(tId, completed)}
-        onMoveToBucket={handleMoveTaskToBucket}
-        onDelete={(tId) => setTaskToDelete(tId)}
-      />
-
-      {taskToDelete && (
-        <ConfirmModal
-          title="DELETE TASK"
-          message="Are sure want to permanently delete this task? This record will be permanently purged from data base."
-          confirmLabel="DELETE TASK"
-          cancelLabel="CANCEL"
-          variant="danger"
-          onConfirm={() => {
-            if (taskToDelete) {
-              handleDeleteTask(taskToDelete);
-              setTaskToDelete(null);
-            }
-          }}
-          onCancel={() => setTaskToDelete(null)}
-        />
-      )}
-    </div>
-  );
+            {taskToDelete && (
+                <ConfirmModal
+                    title="DELETE TASK"
+                    message="Are sure want to permanently delete this task? This record will be permanently purged from data base."
+                    confirmLabel="DELETE TASK"
+                    cancelLabel="CANCEL"
+                    variant="danger"
+                    onConfirm={() => {
+                        if (taskToDelete) {
+                            handleDeleteTask(taskToDelete);
+                            setTaskToDelete(null);
+                        }
+                    }}
+                    onCancel={() => setTaskToDelete(null)}
+                />
+            )}
+        </div>
+    );
 };
