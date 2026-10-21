@@ -55,13 +55,7 @@ where
         for r in rows {
             let stored_key: Option<String> = r.try_get("api_key").ok().flatten();
             if let Some(stored) = stored_key {
-                let is_valid = if stored.starts_with("$argon2") {
-                    crate::services::hasher::verify_hash(&key, &stored)
-                } else {
-                    stored == key
-                };
-
-                if is_valid {
+                if stored == key {
                     let id: i64 = r.try_get("id").unwrap_or(0);
                     let name: String = r.try_get("name").unwrap_or_default();
                     matched = Some(ProjectContext {

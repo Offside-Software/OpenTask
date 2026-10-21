@@ -46,13 +46,20 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
 }) => {
   const [jobs, setJobs] = useState<MeetingJobSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshingHistory, setIsRefreshingHistory] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [pollTick, setPollTick] = useState(0);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [transcriptFor, setTranscriptFor] = useState<{ jobId: string; title: string } | null>(null);
+
   const reviewTarget = reviewJobId ?? initialJobId ?? null;
   const seenJobs = useRef<Map<string, string> | null>(null);
-  const reload = () => setReloadTick((t) => t + 1);
+  const reload = () => {
+    setIsRefreshingHistory(true);
+    setReloadTick((t) => t + 1);
+    setIsRefreshingHistory(false);
+  };
+
   // A recording's job only exists once its upload starts; reload when an upload here gets or finishes one.
   const uploads = useMeetingUploads();
   const uploadSignal = uploads
@@ -99,6 +106,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
     }
     return byMeeting;
   }, [jobs]);
+
   const refreshSignal = `${refreshKey}:${reloadTick}`;
 
   const closeReview = () => {
@@ -108,8 +116,11 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
 
   return (
     <div className="space-y-6">
-      <MeetingIntakePanel projectId={projectId} members={members} onSubmitted={reload} />
-      <MeetingJobsPanel jobs={jobs} loading={loading} onRefresh={reload} onReview={setReviewJobId} />
+      <div className="grid grid-cols-5 gap-6">
+        <MeetingIntakePanel className="col-span-3" projectId={projectId} members={members} onSubmitted={reload} />
+        <MeetingJobsPanel className="col-span-2" jobs={jobs} loading={loading} isRefreshing={isRefreshingHistory} onRefresh={reload} onReview={setReviewJobId} />
+      </div>
+
       <PipelineHealthPanel projectId={projectId} refreshSignal={`${refreshSignal}:${pollTick}`} onRetried={reload} />
 
       <SurfaceCard title="Historical Meetings" subtitle={`${meetings.length} Past Sessions`} icon={Video} rightElement={null}>
