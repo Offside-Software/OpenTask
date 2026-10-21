@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw, Users, Paperclip, UploadCloud, FileText, Download, Trash2, Image as ImageIcon, Eye } from 'lucide-react';
+import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, Minus, Code, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw, Users, Paperclip, UploadCloud, FileText, Download, Trash2, Image as ImageIcon, Eye } from 'lucide-react';
 import type { Task, Bucket, ProjectMember, PrReview, ExtractedTask, TaskAttachment } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
 import { useToast } from '../../design-system/Toast';
 import { Badge } from '../../design-system/Badge';
-import { MarkdownRenderer } from '../../design-system/MarkdownRenderer';
+import { MarkdownRenderer, hasMarkdownSyntax } from '../../design-system/MarkdownRenderer';
 import { prReviewService } from '../../services/prReviewService';
 import { taskService } from '../../services/taskService';
 import { uploadTaskAttachment, deleteTaskAttachment, formatFileSize, isImageFile, MAX_FILE_SIZE_BYTES } from '../../services/supabaseStorage';
@@ -28,6 +28,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 }) => {
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description || '');
+    const [descriptionViewMode, setDescriptionViewMode] = useState<'raw' | 'markdown'>(() => {
+        return hasMarkdownSyntax(task.description) ? 'markdown' : 'raw';
+    });
+    const [descriptionFontSize, setDescriptionFontSize] = useState<number>(13);
+
+    useEffect(() => {
+        if (task) {
+            setDescription(task.description || '');
+            if (hasMarkdownSyntax(task.description)) {
+                setDescriptionViewMode('markdown');
+            }
+        }
+    }, [task.id]);
+
     const [repoUrl, setRepoUrl] = useState(task.repo_url || '');
     const [prUrl, setPrUrl] = useState(task.prUrl || '');
     const [reviews, setReviews] = useState<PrReview[]>([]);
@@ -503,16 +517,98 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <div className="flex-1 min-w-0 space-y-5 sm:space-y-6 max-w-full">
                         {/* Description */}
                         <div>
-                            <div className="flex items-center gap-2 mb-2 text-white font-black text-[12px] uppercase">
-                                <AlignLeft size={14} />
-                                <h3>// DESCRIPTION</h3>
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                <div className="flex items-center gap-2 text-white font-black text-[12px] uppercase">
+                                    <AlignLeft size={14} />
+                                    <h3>// DESCRIPTION</h3>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Font Size Adjuster (+ / -) */}
+                                    <div className="flex items-center border-2 border-black bg-[#141619] shadow-[2px_2px_0px_0px_#000000]">
+                                        <button
+                                            type="button"
+                                            onClick={() => setDescriptionFontSize(prev => Math.max(11, prev - 1))}
+                                            disabled={descriptionFontSize <= 11}
+                                            className="px-2 py-1 text-neutral-300 hover:text-black hover:bg-[#FFE600] disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500 font-mono text-[11px] font-black transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
+                                            title="Decrease font size (-1px)"
+                                        >
+                                            <Minus size={12} strokeWidth={3} />
+                                        </button>
+                                        <span
+                                            className="px-2 py-1 py-0.5 font-mono text-[12px] font-bold text-[#FFE600] select-none cursor-pointer hover:underline"
+                                            title="Click to reset font size to 13px"
+                                            onClick={() => setDescriptionFontSize(13)}
+                                        >
+                                            {descriptionFontSize}PX
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDescriptionFontSize(prev => Math.min(22, prev + 1))}
+                                            disabled={descriptionFontSize >= 22}
+                                            className="px-2 py-1 text-neutral-300 hover:text-black hover:bg-[#FFE600] disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500 font-mono text-[11px] font-black transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
+                                            title="Increase font size (+1px)"
+                                        >
+                                            <Plus size={12} strokeWidth={3} />
+                                        </button>
+                                    </div>
+
+                                    {/* View Mode Switch (Raw / Markdown) */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setDescriptionViewMode('raw')}
+                                        className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer flex items-center gap-1.5 border-2 border-black ${descriptionViewMode === 'raw'
+                                            ? 'bg-[#FFE600] text-black'
+                                            : 'text-neutral-400 hover:text-white'
+                                            }`}
+                                        title="Raw text / editor"
+                                    >
+                                        <Code size={12} strokeWidth={2.5} />
+                                        RAW
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDescriptionViewMode('markdown')}
+                                        className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer flex items-center gap-1.5 border-2 border-black ${descriptionViewMode === 'markdown'
+                                            ? 'bg-[#FFE600] text-black shadow-[2px_2px_0px_0px_#000000]'
+                                            : 'text-neutral-400 hover:text-white'
+                                            }`}
+                                        title="Rendered Markdown view"
+                                    >
+                                        <Eye size={12} strokeWidth={2.5} />
+                                        MARKDOWN
+                                    </button>
+                                </div>
                             </div>
-                            <textarea
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="ENTER TECHNICAL SPECIFICATIONS OR REQUIREMENTS..."
-                                className="w-full h-128 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-3 text-[14px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] font-medium transition-all resize-y"
-                            />
+
+                            {descriptionViewMode === 'raw' ? (
+                                <textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="ENTER TECHNICAL SPECIFICATIONS OR REQUIREMENTS (MARKDOWN SUPPORTED)..."
+                                    style={{ fontSize: `${descriptionFontSize}px` }}
+                                    className="w-full h-120 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-3 font-sans font-medium text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-all resize-y leading-relaxed"
+                                />
+                            ) : (
+                                <div
+                                    style={{ fontSize: `${descriptionFontSize}px` }}
+                                    className="w-full h-120 overflow-y-auto border-2 border-black rounded-none px-4 py-3 font-sans font-medium text-white shadow-[2px_2px_0px_0px_#000000] transition-all resize-y leading-relaxed"
+                                >
+                                    {description.trim() ? (
+                                        <MarkdownRenderer
+                                            content={description}
+                                            isSans
+                                            style={{ fontSize: `${descriptionFontSize}px` }}
+                                            className="!font-sans !font-medium"
+                                        />
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-neutral-500 font-sans font-medium text-center py-16">
+                                            <p className="text-[13px] text-neutral-400 mb-1">// NO DESCRIPTION ENTERED</p>
+                                            <p className="text-[12px] text-neutral-600">Switch to RAW view to write specifications or notes.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Attachments & Specifications */}
