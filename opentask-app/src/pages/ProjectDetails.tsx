@@ -872,7 +872,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                                         type="button"
                                         onClick={() => setColumnDensity('normal')}
                                         className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all cursor-pointer ${columnDensity === 'normal'
-                                            ? 'bg-[#FFE600] text-black shadow-[1px_1px_0px_0px_#000000]'
+                                            ? 'bg-[#FFE600] text-black'
                                             : 'text-neutral-400 hover:text-white'
                                             }`}
                                         title="Standard column width (316px)"
@@ -883,7 +883,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                                         type="button"
                                         onClick={() => setColumnDensity('wide')}
                                         className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all cursor-pointer ${columnDensity === 'wide'
-                                            ? 'bg-[#FFE600] text-black shadow-[1px_1px_0px_0px_#000000]'
+                                            ? 'bg-[#FFE600] text-black'
                                             : 'text-neutral-400 hover:text-white'
                                             }`}
                                         title="Wide column width (420px)"
