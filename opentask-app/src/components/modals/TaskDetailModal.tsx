@@ -511,7 +511,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="ENTER TECHNICAL SPECIFICATIONS OR REQUIREMENTS..."
-                                className="w-full h-64 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-3 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-all resize-y"
+                                className="w-full h-128 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-3 text-[14px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] font-medium transition-all resize-y"
                             />
                         </div>
 

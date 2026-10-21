@@ -181,7 +181,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       </div>
 
       {description && (
-        <p className="text-[11px] font-mono text-neutral-400 line-clamp-2 leading-relaxed">
+        <p className="text-[13px] font-medium line-clamp-4 leading-relaxed">
           {description}
         </p>
       )}
