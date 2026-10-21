@@ -6,16 +6,28 @@ use reqwest::StatusCode;
 use serde_json::{json, Value};
 
 use super::llm::{LlmError, WhisperResponse, WhisperSegment};
+use super::usage;
 
 pub struct CfWhisper<'a> {
     pub base_url: &'a str,
     pub account_id: &'a str,
     pub api_token: &'a str,
     pub model: &'a str,
+    pub project_id: Option<i64>,
 }
 
 impl CfWhisper<'_> {
-    pub async fn transcribe(&self, path: &Path, language: Option<&str>, prompt: Option<&str>) -> Result<WhisperResponse, LlmError> {
+    pub async fn transcribe(
+        &self,
+        path: &Path,
+        language: Option<&str>,
+        prompt: Option<&str>,
+        audio_secs: f32,
+    ) -> Result<WhisperResponse, LlmError> {
+        let audio = audio_secs.ceil() as u32;
+        if let Some(wait) = usage::global().and_then(|l| l.wait_for(None, self.model, 0, audio)) {
+            return Err(LlmError::RateLimited { retry_after: Some(wait) });
+        }
         let bytes = tokio::fs::read(path)
             .await
             .map_err(|e| LlmError::Fatal(format!("could not read the audio part: {e}")))?;
@@ -54,8 +66,12 @@ impl CfWhisper<'_> {
                 LlmError::Fatal(format!("Cloudflare {status}: {detail}"))
             });
         }
-        parse_response(&value["result"])
-            .ok_or_else(|| LlmError::Transient("Cloudflare returned no segments".to_string()))
+        let response = parse_response(&value["result"])
+            .ok_or_else(|| LlmError::Transient("Cloudflare returned no segments".to_string()))?;
+        if let Some(limiter) = usage::global() {
+            limiter.record(self.project_id, false, self.model, 0, audio);
+        }
+        Ok(response)
     }
 }
 

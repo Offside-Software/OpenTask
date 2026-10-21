@@ -4,18 +4,22 @@ pub mod config;
 pub mod drafts;
 pub mod extract;
 pub mod gate;
+pub mod health;
 pub mod intake;
 pub mod jobs;
+pub mod keys;
 pub mod llm;
 pub mod media;
 pub mod postprocess;
 pub mod prompts;
 pub mod recall;
+pub mod retention;
 pub mod review;
 pub mod steps;
 pub mod storage;
 pub mod transcript;
 pub mod uploads;
+pub mod usage;
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -66,13 +70,20 @@ pub fn spawn_worker(pool: PgPool, config: Config, realtime: RealtimeHub) {
     let (poll_pool, poll_config, poll_realtime, poll_cfg) = (pool.clone(), config.clone(), realtime.clone(), cfg.clone());
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(poll_every);
+        let mut last_retention: Option<std::time::Instant> = None;
         loop {
             interval.tick().await;
             intake::poll_recall_bots(&poll_pool, &poll_config, &poll_realtime, &poll_cfg).await;
             uploads::sweep(&poll_pool, &poll_realtime, &poll_cfg).await;
+            if last_retention.is_none_or(|t| t.elapsed() >= Duration::from_secs(3600)) {
+                retention::sweep(&poll_pool, &poll_cfg).await;
+                last_retention = Some(std::time::Instant::now());
+            }
         }
     });
 
+    let (usage_pool, usage_cfg) = (pool.clone(), cfg.clone());
+    tokio::spawn(async move { usage::init(usage_pool, &usage_cfg).await });
     if let Some(store) = cfg.media_store.as_ref() {
         tracing::info!("[Meeting Pipeline] Recording uploads go to the {}", store.kind());
     }
@@ -177,6 +188,8 @@ async fn run_job(ctx: &WorkerContext, mut claimed: ClaimedJob) {
                 tracing::info!("[Meeting Pipeline] Job {job_id}: deferred until {until}: {reason}");
                 if let Err(e) = jobs::release_until(&ctx.pool, job_id, until, &reason, false).await {
                     tracing::warn!("[Meeting Pipeline] Job {job_id}: could not defer: {e}");
+                } else if let Some(project_id) = claimed.project_id {
+                    ctx.realtime.publish(project_id.0, "meeting_job", "updated", Some(job_id));
                 }
                 return;
             }

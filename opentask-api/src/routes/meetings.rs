@@ -299,6 +299,7 @@ pub async fn invite_bot(
 ) -> Result<Json<IntakeResponse>, AppError> {
     let project_id = payload.project_id.0;
     let user_id = require_project_member(&state.pool, &user, project_id).await?;
+    crate::services::meeting_pipeline::usage::check_project_quota(&state.pool, &pipeline(&state.config).0, project_id, None).await?;
     let requested: Vec<i64> = payload.attendee_ids.iter().map(|a| a.0).collect();
     let new = NewMeeting {
         project_id,

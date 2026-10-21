@@ -7,6 +7,7 @@ import { meetingJobService } from "../../services/meetingJobService";
 import { useMeetingUploads } from "../../services/meetingUploads";
 import { MeetingIntakePanel } from "../meetings/MeetingIntakePanel";
 import { MeetingJobsPanel } from "../meetings/MeetingJobsPanel";
+import { PipelineHealthPanel } from "../meetings/PipelineHealthPanel";
 import { DraftReviewModal } from "../meetings/DraftReviewModal";
 import { TranscriptModal } from "../meetings/TranscriptModal";
 import { isJobActive } from "../meetings/meetingJobUi";
@@ -109,6 +110,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
     <div className="space-y-6">
       <MeetingIntakePanel projectId={projectId} members={members} onSubmitted={reload} />
       <MeetingJobsPanel jobs={jobs} loading={loading} onRefresh={reload} onReview={setReviewJobId} />
+      <PipelineHealthPanel projectId={projectId} refreshSignal={`${refreshSignal}:${pollTick}`} onRetried={reload} />
 
       <SurfaceCard title="Historical Meetings" subtitle={`${meetings.length} Past Sessions`} icon={Video} rightElement={null}>
         {meetingsLoading && meetings.length === 0 ? (

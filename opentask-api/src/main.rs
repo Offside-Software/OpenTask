@@ -73,12 +73,8 @@ async fn main() -> anyhow::Result<()> {
     // Shared by the HTTP routes and the meeting pipeline worker
     let realtime = services::realtime::RealtimeHub::new();
 
-    // Meeting-to-task pipeline worker (off unless MEETING_PIPELINE_ENABLED is set)
-    if config.meeting_pipeline_enabled {
-        services::meeting_pipeline::spawn_worker(pool.clone(), config.clone(), realtime.clone());
-    } else {
-        tracing::info!("[Meeting Pipeline] Worker disabled (set MEETING_PIPELINE_ENABLED=true to run it)");
-    }
+    // Meeting-to-task pipeline worker
+    services::meeting_pipeline::spawn_worker(pool.clone(), config.clone(), realtime.clone());
 
     // 6. Setup CORS
     let cors = CorsLayer::new()

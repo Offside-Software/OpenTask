@@ -80,6 +80,7 @@ async fn cloudflare_whisper_transcribes() {
         account_id: cfg.cf_account_id.as_deref().expect("CLOUDFLARE_ACCOUNT_ID is not set"),
         api_token: cfg.cf_api_token.as_deref().expect("CLOUDFLARE_API_TOKEN is not set"),
         model: cfg.cf_asr_model,
+        project_id: None,
     };
     let (path, cleanup) = match std::env::var("LIVE_AUDIO_FILE") {
         Ok(file) => (std::path::PathBuf::from(file), false),
@@ -90,7 +91,7 @@ async fn cloudflare_whisper_transcribes() {
         }
     };
     let language = std::env::var("LIVE_AUDIO_LANGUAGE").ok();
-    let result = cf.transcribe(&path, language.as_deref(), None).await;
+    let result = cf.transcribe(&path, language.as_deref(), None, 0.0).await;
     if cleanup {
         let _ = std::fs::remove_file(&path);
     }

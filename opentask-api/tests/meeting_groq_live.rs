@@ -1,10 +1,3 @@
-//! Checks that the real Groq API accepts the pipeline's requests (models, JSON modes, reasoning
-//! settings). Uses a few free-tier requests, so it only runs on demand:
-//!
-//!   cargo test --test meeting_groq_live -- --ignored --nocapture
-//!
-//! Reads GROQ_API_KEY from the environment or .env. Touches no database.
-
 use opentask_api::config::Config;
 use opentask_api::models::meeting::GateVerdict;
 use opentask_api::services::meeting_pipeline::config::PipelineConfig;
@@ -99,7 +92,7 @@ async fn whisper_transcribes_a_recording() {
     for part in &parts {
         let part_duration = media::probe_audio_duration(&cfg.ffprobe_path, part).await.unwrap();
         let reply = llm
-            .transcribe(cfg.asr_model, part, language.as_deref(), Some("Project meeting: OpenTask."))
+            .transcribe(cfg.asr_model, part, language.as_deref(), Some("Project meeting: OpenTask."), part_duration)
             .await
             .unwrap_or_else(|e| panic!("Whisper failed: {e:?}"));
         replies.push((offset, reply));

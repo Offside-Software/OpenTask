@@ -14,7 +14,9 @@ use super::postprocess::match_assignee;
 use super::recall::{self, DownloadError};
 use super::steps::project_members;
 use super::transcript::{assign_speakers, parse_speaker_timeline, segments_from_asr};
+use super::keys;
 use super::uploads;
+use super::usage;
 use super::{StepError, StepOutcome, WorkerContext};
 use crate::models::meeting::{GateResult, GateVerdict, JobStatus, Segment, SourceType};
 
@@ -110,13 +112,15 @@ enum PartOutcome {
 async fn transcribe_part(
     llm: &LlmClient,
     ctx: &WorkerContext,
+    project_id: i64,
     path: &Path,
     prompt: &str,
+    seconds: f32,
 ) -> Result<PartOutcome, StepError> {
     let mut waits = 0;
     loop {
         match llm
-            .transcribe(ctx.cfg.asr_model, path, ctx.cfg.asr_language.as_deref(), Some(prompt))
+            .transcribe(ctx.cfg.asr_model, path, ctx.cfg.asr_language.as_deref(), Some(prompt), seconds)
             .await
         {
             Ok(response) => return Ok(PartOutcome::Done(response)),
@@ -128,8 +132,8 @@ async fn transcribe_part(
                     continue;
                 }
                 let until = Utc::now() + chrono::Duration::from_std(wait).unwrap_or(chrono::Duration::minutes(5));
-                if let Some(cf) = cloudflare(ctx) {
-                    match cf.transcribe(path, ctx.cfg.asr_language.as_deref(), Some(prompt)).await {
+                if let Some(cf) = cloudflare(ctx, project_id) {
+                    match cf.transcribe(path, ctx.cfg.asr_language.as_deref(), Some(prompt), seconds).await {
                         Ok(response) => {
                             tracing::info!("[Meeting Pipeline] Groq Whisper is rate limited; transcribed the part with Cloudflare");
                             return Ok(PartOutcome::Done(response));
@@ -145,12 +149,13 @@ async fn transcribe_part(
     }
 }
 
-fn cloudflare(ctx: &WorkerContext) -> Option<CfWhisper<'_>> {
+fn cloudflare(ctx: &WorkerContext, project_id: i64) -> Option<CfWhisper<'_>> {
     Some(CfWhisper {
         base_url: &ctx.cfg.cf_api_base,
         account_id: ctx.cfg.cf_account_id.as_deref()?,
         api_token: ctx.cfg.cf_api_token.as_deref()?,
         model: ctx.cfg.cf_asr_model,
+        project_id: Some(project_id),
     })
 }
 
@@ -217,10 +222,9 @@ async fn stored_checkpoint(ctx: &WorkerContext, job_id: i64) -> Result<Option<As
 }
 
 pub async fn transcribe_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Result<StepOutcome, StepError> {
-    let llm = ctx
-        .llm
-        .as_ref()
-        .ok_or_else(|| StepError::Fatal("GROQ_API_KEY is not configured".to_string()))?;
+    let llm = &keys::llm_for(ctx, claimed.project_id.map(|p| p.0).unwrap_or_default())
+        .await?
+        .ok_or_else(|| StepError::Fatal("No Groq API key: set GROQ_API_KEY or the project's own key".to_string()))?;
     let job = &claimed.job;
     let job_id = job.id.0;
     let project_id = claimed.project_id.map(|p| p.0).unwrap_or_default();
@@ -231,8 +235,7 @@ pub async fn transcribe_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Resul
     let stored = stored_checkpoint(ctx, job_id).await?;
     let dir = TempDir::create("opentask-meeting").map_err(|e| StepError::Retryable(format!("no temp dir: {e}")))?;
 
-    // Every part already transcribed (a retry after a crash, or after the upload was removed):
-    // nothing needs downloading again.
+    // Every part already transcribed (a retry after a crash, or after the upload was removed)
     let complete = stored
         .as_ref()
         .filter(|c| c.part_secs == cfg.asr_part_secs && c.part_count > 0 && c.parts.len() == c.part_count)
@@ -299,7 +302,16 @@ pub async fn transcribe_step(ctx: &WorkerContext, claimed: &ClaimedJob) -> Resul
             continue;
         }
         let part_duration = media::probe_audio_duration(&cfg.ffprobe_path, path).await.map_err(media_error)?;
-        match transcribe_part(llm, ctx, path, &prompt).await? {
+        if cfg.project_audio_minutes_per_day > 0 && !llm.has_own_key() {
+            let used = usage::project_audio_today(pool, project_id, cfg).await.map_err(db_error)?;
+            if used + part_duration.ceil() as i64 > cfg.project_audio_minutes_per_day as i64 * 60 {
+                return Ok(StepOutcome::Defer {
+                    until: usage::next_utc_midnight(Utc::now()),
+                    reason: format!("the project's {} transcription minutes for today are used up", cfg.project_audio_minutes_per_day),
+                });
+            }
+        }
+        match transcribe_part(llm, ctx, project_id, path, &prompt, part_duration).await? {
             PartOutcome::Done(response) => {
                 tracing::info!(
                     "[Meeting Pipeline] Job {job_id}: transcribed part {}/{} ({:.0}s, {} segments)",

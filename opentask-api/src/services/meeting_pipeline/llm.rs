@@ -3,6 +3,9 @@ use std::time::Duration;
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 
+use super::config::GroqTier;
+use super::usage;
+
 pub const GROQ_BASE_URL: &str = "https://api.groq.com/openai/v1";
 
 #[derive(Debug, Clone)]
@@ -10,6 +13,10 @@ pub struct LlmClient {
     http: Client,
     base_url: String,
     api_key: String,
+    /// Usage is booked to this project.
+    project_id: Option<i64>,
+    /// Set when this is the project's own key rather than the shared one.
+    own_key: Option<GroqTier>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -56,10 +63,49 @@ impl LlmClient {
             http,
             base_url: base_url.trim_end_matches('/').to_string(),
             api_key: api_key.to_string(),
+            project_id: None,
+            own_key: None,
         }
     }
 
+    pub fn with_own_key(self, tier: GroqTier) -> Self {
+        Self { own_key: Some(tier), ..self }
+    }
+
+    pub fn has_own_key(&self) -> bool {
+        self.own_key.is_some()
+    }
+
+    /// The budget calls are checked against; `None` for an own Developer-tier key (no local limits).
+    fn limit_scope(&self) -> Option<usage::Scope> {
+        match self.own_key {
+            None => Some(None),
+            Some(GroqTier::Free) => Some(self.project_id),
+            Some(GroqTier::Developer) => None,
+        }
+    }
+
+    fn wait_for(&self, model: &str, tokens: u32, audio: u32) -> Option<Duration> {
+        let scope = self.limit_scope()?;
+        usage::global()?.wait_for(scope, model, tokens, audio)
+    }
+
+    fn record(&self, model: &str, tokens: u32, audio: u32) {
+        if let Some(limiter) = usage::global() {
+            limiter.record(self.project_id, self.own_key.is_some(), model, tokens, audio);
+        }
+    }
+
+    pub fn for_project(&self, project_id: i64) -> Self {
+        Self { project_id: Some(project_id), ..self.clone() }
+    }
+
     pub async fn chat(&self, req: &ChatRequest<'_>) -> Result<ChatResponse, LlmError> {
+        let estimate = req.messages.iter().map(|(_, c)| c.chars().count() as u32).sum::<u32>().div_ceil(3)
+            + req.max_completion_tokens;
+        if let Some(wait) = self.wait_for(req.model, estimate, 0) {
+            return Err(LlmError::RateLimited { retry_after: Some(wait) });
+        }
         let messages: Vec<Value> = req
             .messages
             .iter()
@@ -124,6 +170,7 @@ impl LlmClient {
             prompt_tokens: data["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32,
             completion_tokens: data["usage"]["completion_tokens"].as_u64().unwrap_or(0) as u32,
         };
+        self.record(req.model, usage.prompt_tokens + usage.completion_tokens, 0);
         Ok(ChatResponse { content, usage })
     }
 }
@@ -159,7 +206,12 @@ impl LlmClient {
         path: &std::path::Path,
         language: Option<&str>,
         prompt: Option<&str>,
+        audio_secs: f32,
     ) -> Result<WhisperResponse, LlmError> {
+        let audio = audio_secs.ceil() as u32;
+        if let Some(wait) = self.wait_for(model, 0, audio) {
+            return Err(LlmError::RateLimited { retry_after: Some(wait) });
+        }
         let bytes = tokio::fs::read(path)
             .await
             .map_err(|e| LlmError::Fatal(format!("could not read the audio part: {e}")))?;
@@ -209,9 +261,12 @@ impl LlmClient {
                 LlmError::Fatal(format!("{status}: {detail}"))
             });
         }
-        resp.json::<WhisperResponse>()
+        let response = resp
+            .json::<WhisperResponse>()
             .await
-            .map_err(|e| LlmError::Transient(format!("unreadable transcription: {}", e.without_url())))
+            .map_err(|e| LlmError::Transient(format!("unreadable transcription: {}", e.without_url())))?;
+        self.record(model, 0, audio);
+        Ok(response)
     }
 }
 

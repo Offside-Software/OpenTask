@@ -7,6 +7,7 @@ use super::gate::run_gate;
 use super::llm::LlmClient;
 use super::recall;
 use super::transcript::{plain_text, segments_from_text};
+use super::usage;
 use super::wake_worker;
 use crate::config::{Config, RECALL_REGIONS};
 use crate::error::AppError;
@@ -188,6 +189,7 @@ pub async fn create_text_job(
             cfg.max_text_chars
         )));
     }
+    usage::check_project_quota(pool, cfg, new.project_id, None).await?;
     let segments = segments_from_text(text);
 
     let mut tx = pool.begin().await?;
@@ -197,7 +199,8 @@ pub async fn create_text_job(
     realtime.publish(new.project_id, "meeting", "created", Some(meeting.id.0));
 
     let models = [cfg.gate_model, cfg.gate_fallback_model];
-    let gate = run_gate(llm, &models, &plain_text(&segments), cfg.gate_head_chars, cfg.gate_tail_chars).await;
+    let llm = llm.map(|l| l.for_project(new.project_id));
+    let gate = run_gate(llm.as_ref(), &models, &plain_text(&segments), cfg.gate_head_chars, cfg.gate_tail_chars).await;
     let status = if gate.verdict == GateVerdict::No { JobStatus::NoActions } else { JobStatus::Queued };
     transition(pool, job.id.0, meeting.id.0, JobStatus::Created, status, Some(&gate), None).await?;
     realtime.publish(new.project_id, "meeting_job", "updated", Some(job.id.0));

@@ -21,6 +21,8 @@ use crate::routes::meetings::require_project_member;
 use crate::services::meeting_pipeline::intake::{self, NewMeeting};
 use crate::services::meeting_pipeline::review::{self, ReviewOutcome};
 use crate::services::meeting_pipeline::pipeline;
+use crate::services::meeting_pipeline::health;
+use crate::services::meeting_pipeline::keys;
 use crate::services::meeting_pipeline::storage::MediaStore;
 use crate::services::meeting_pipeline::uploads;
 
@@ -37,6 +39,9 @@ pub fn router() -> Router<AppState> {
         )
         .route("/meeting-jobs", get(list_jobs).post(create_media_job))
         .route("/meeting-jobs/{job_id}/complete", post(complete_upload))
+        .route("/meeting-jobs/health", get(job_health))
+        .route("/meeting-jobs/ai-key", get(get_ai_key).put(set_ai_key).delete(remove_ai_key))
+        .route("/meeting-jobs/{job_id}/retry", post(retry_job))
         .route("/meeting-jobs/{job_id}", get(get_job))
         .route("/meeting-jobs/{job_id}/transcript", get(get_transcript))
         .route("/meeting-jobs/{job_id}/drafts/approve", post(approve_drafts))
@@ -73,7 +78,8 @@ pub async fn create_text_job(
         timezone: payload.timezone.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "Asia/Jakarta".to_string()),
         attendee_ids: intake::member_ids(&state.pool, project_id, &requested).await?,
     };
-    let (cfg, llm) = pipeline(&state.config);
+    let (cfg, shared) = pipeline(&state.config);
+    let llm = keys::llm_for_project(&state.pool, &state.config, cfg, shared.as_ref(), project_id).await?;
     let response = intake::create_text_job(&state.pool, &state.realtime, cfg, llm.as_ref(), new, &payload.text).await?;
     Ok(Json(response))
 }
@@ -113,9 +119,12 @@ pub async fn create_media_job(
         &state.realtime,
         cfg,
         new,
-        &payload.file_name,
-        payload.content_type.as_deref(),
-        payload.size_bytes,
+        uploads::UploadFile {
+            name: &payload.file_name,
+            content_type: payload.content_type.as_deref(),
+            size_bytes: payload.size_bytes,
+            duration_sec: payload.duration_sec,
+        },
     )
     .await?;
     Ok(Json(response))
@@ -157,6 +166,112 @@ pub async fn local_upload(
         .await
         .map_err(AppError::BadRequest)?;
     Ok(StatusCode::OK)
+}
+
+/// Today's quota and free-tier use, and the project's failed or waiting jobs.
+pub async fn job_health(
+    State(state): State<AppState>,
+    CurrentUser(user, _): CurrentUser,
+    Query(query): Query<JobListQuery>,
+) -> Result<Json<health::MeetingHealth>, AppError> {
+    let project_id = query.project_id.0;
+    let user_id = require_project_member(&state.pool, &user, project_id).await?;
+    let can_manage = health::is_manager(&state.pool, project_id, user_id).await?;
+    let (cfg, _) = pipeline(&state.config);
+    Ok(Json(health::project_health(&state.pool, cfg, project_id, can_manage).await?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetAiKeyPayload {
+    pub project_id: SafeId,
+    pub api_key: String,
+    pub tier: Option<String>,
+}
+
+async fn require_manager(state: &AppState, user: &GitHubUserResponse, project_id: i64) -> Result<i64, AppError> {
+    let user_id = require_project_member(&state.pool, user, project_id).await?;
+    if !health::is_manager(&state.pool, project_id, user_id).await? {
+        return Err(AppError::Forbidden("Only project owners and admins can change the project's API key".to_string()));
+    }
+    Ok(user_id)
+}
+
+pub async fn get_ai_key(
+    State(state): State<AppState>,
+    CurrentUser(user, _): CurrentUser,
+    Query(query): Query<JobListQuery>,
+) -> Result<Json<keys::ProjectKeyInfo>, AppError> {
+    let project_id = query.project_id.0;
+    let user_id = require_project_member(&state.pool, &user, project_id).await?;
+    let can_manage = health::is_manager(&state.pool, project_id, user_id).await?;
+    Ok(Json(keys::info(&state.pool, project_id, can_manage).await?))
+}
+
+pub async fn set_ai_key(
+    State(state): State<AppState>,
+    CurrentUser(user, _): CurrentUser,
+    Json(payload): Json<SetAiKeyPayload>,
+) -> Result<Json<keys::ProjectKeyInfo>, AppError> {
+    let project_id = payload.project_id.0;
+    let user_id = require_manager(&state, &user, project_id).await?;
+    let tier = keys::parse_tier(payload.tier.as_deref())?;
+    let (cfg, _) = pipeline(&state.config);
+    let info = keys::save(&state.pool, &state.config, cfg, project_id, user_id, &payload.api_key, tier).await?;
+    let actor = user.name.clone().unwrap_or_else(|| user.login.clone());
+    let _ = crate::routes::activities::record_project_event(
+        &state.pool,
+        project_id,
+        Some(user_id),
+        Some(&actor),
+        "set",
+        "the project's Groq API key",
+        "MEETING_AI_KEY_SET",
+        "PROJECT",
+        Some(project_id),
+        Some(json!({ "hint": info.hint, "tier": info.tier })),
+    )
+    .await;
+    Ok(Json(info))
+}
+
+pub async fn remove_ai_key(
+    State(state): State<AppState>,
+    CurrentUser(user, _): CurrentUser,
+    Query(query): Query<JobListQuery>,
+) -> Result<Json<keys::ProjectKeyInfo>, AppError> {
+    let project_id = query.project_id.0;
+    let user_id = require_manager(&state, &user, project_id).await?;
+    if keys::remove(&state.pool, project_id).await? {
+        let actor = user.name.clone().unwrap_or_else(|| user.login.clone());
+        let _ = crate::routes::activities::record_project_event(
+            &state.pool,
+            project_id,
+            Some(user_id),
+            Some(&actor),
+            "removed",
+            "the project's Groq API key",
+            "MEETING_AI_KEY_REMOVED",
+            "PROJECT",
+            Some(project_id),
+            None,
+        )
+        .await;
+    }
+    Ok(Json(keys::info(&state.pool, project_id, true).await?))
+}
+
+pub async fn retry_job(
+    State(state): State<AppState>,
+    CurrentUser(user, _): CurrentUser,
+    Path(job_id): Path<SafeId>,
+) -> Result<Json<crate::models::meeting::MeetingJobResponse>, AppError> {
+    let (project_id, user_id) = member_job(&state, &user, job_id.0).await?;
+    if !health::is_manager(&state.pool, project_id, user_id).await? {
+        return Err(AppError::Forbidden("Only project owners and admins can retry meeting jobs".to_string()));
+    }
+    let job = health::retry(&state.pool, job_id.0).await?;
+    state.realtime.publish(project_id, "meeting_job", "updated", Some(job_id.0));
+    Ok(Json(job))
 }
 
 pub async fn list_jobs(
