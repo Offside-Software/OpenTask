@@ -2,8 +2,11 @@ import { apiFetch } from "./apiClient";
 import type {
   ApproveDraftItem,
   DraftReviewResult,
+  MeetingHealth,
   MeetingIntake,
+  MeetingJob,
   MeetingMediaIntake,
+  ProjectAiKey,
   MeetingJobDetail,
   MeetingJobSummary,
   TranscriptSegment,
@@ -39,7 +42,7 @@ export const meetingJobService = {
     }),
 
   /** Creates the meeting and job for a recording and returns where to upload it. */
-  createMediaJob: (fields: MeetingIntakeFields & { file_name: string; content_type?: string; size_bytes: number }) =>
+  createMediaJob: (fields: MeetingIntakeFields & { file_name: string; content_type?: string; size_bytes: number; duration_sec?: number }) =>
     apiFetch<MeetingMediaIntake>("/meeting-jobs", {
       method: "POST",
       body: JSON.stringify(fields),
@@ -47,6 +50,19 @@ export const meetingJobService = {
 
   completeUpload: (jobId: string) =>
     apiFetch<MeetingIntake>(`/meeting-jobs/${jobId}/complete`, { method: "POST" }),
+
+  getHealth: (projectId: string | number) => apiFetch<MeetingHealth>(`/meeting-jobs/health?project_id=${projectId}`),
+
+  retryJob: (jobId: string) => apiFetch<MeetingJob>(`/meeting-jobs/${jobId}/retry`, { method: "POST" }),
+
+  setAiKey: (projectId: string | number, apiKey: string, tier: "free" | "developer") =>
+    apiFetch<ProjectAiKey>("/meeting-jobs/ai-key", {
+      method: "PUT",
+      body: JSON.stringify({ project_id: String(projectId), api_key: apiKey, tier }),
+    }),
+
+  removeAiKey: (projectId: string | number) =>
+    apiFetch<ProjectAiKey>(`/meeting-jobs/ai-key?project_id=${projectId}`, { method: "DELETE" }),
 
   approveDrafts: (jobId: string, items: ApproveDraftItem[]) =>
     apiFetch<DraftReviewResult>(`/meeting-jobs/${jobId}/drafts/approve`, {

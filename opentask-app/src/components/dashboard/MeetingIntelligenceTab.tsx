@@ -7,6 +7,7 @@ import { meetingJobService } from "../../services/meetingJobService";
 import { useMeetingUploads } from "../../services/meetingUploads";
 import { MeetingIntakePanel } from "../meetings/MeetingIntakePanel";
 import { MeetingJobsPanel } from "../meetings/MeetingJobsPanel";
+import { PipelineHealthPanel } from "../meetings/PipelineHealthPanel";
 import { DraftReviewModal } from "../meetings/DraftReviewModal";
 import { TranscriptModal } from "../meetings/TranscriptModal";
 import { isJobActive } from "../meetings/meetingJobUi";
@@ -50,7 +51,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
   const [pollTick, setPollTick] = useState(0);
   const [reviewJobId, setReviewJobId] = useState<string | null>(null);
   const [transcriptFor, setTranscriptFor] = useState<{ jobId: string; title: string } | null>(null);
-  
+
   const reviewTarget = reviewJobId ?? initialJobId ?? null;
   const seenJobs = useRef<Map<string, string> | null>(null);
   const reload = () => {
@@ -105,7 +106,7 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
     }
     return byMeeting;
   }, [jobs]);
-  
+
   const refreshSignal = `${refreshKey}:${reloadTick}`;
 
   const closeReview = () => {
@@ -119,6 +120,8 @@ export const MeetingIntelligenceTab: React.FC<MeetingIntelligenceTabProps> = ({
         <MeetingIntakePanel className="col-span-3" projectId={projectId} members={members} onSubmitted={reload} />
         <MeetingJobsPanel className="col-span-2" jobs={jobs} loading={loading} isRefreshing={isRefreshingHistory} onRefresh={reload} onReview={setReviewJobId} />
       </div>
+
+      <PipelineHealthPanel projectId={projectId} refreshSignal={`${refreshSignal}:${pollTick}`} onRetried={reload} />
 
       <SurfaceCard title="Historical Meetings" subtitle={`${meetings.length} Past Sessions`} icon={Video} rightElement={null}>
         {meetingsLoading && meetings.length === 0 ? (

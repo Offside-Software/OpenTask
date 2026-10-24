@@ -1,4 +1,4 @@
-use crate::config::{get_clean_env, Config};
+use crate::config::get_clean_env;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroqTier {
@@ -30,6 +30,7 @@ pub struct PipelineConfig {
     pub cf_account_id: Option<String>,
     pub cf_api_token: Option<String>,
     pub cf_api_base: String,
+    pub cf_audio_sec_per_day: u32,
     pub asr_language: Option<String>,
     pub asr_part_secs: u32,
     pub asr_bitrate: &'static str,
@@ -71,6 +72,13 @@ pub struct PipelineConfig {
     // Limits
     pub max_tasks_per_job: usize,
     pub max_text_chars: usize,
+    pub project_jobs_per_day: u32,
+    pub project_audio_minutes_per_day: u32,
+    pub transcript_retention_days: u32,
+}
+
+fn env_u32(name: &str, default: u32) -> u32 {
+    get_clean_env(name).and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
 impl PipelineConfig {
@@ -105,6 +113,8 @@ impl PipelineConfig {
             cf_api_token: get_clean_env("CLOUDFLARE_API_TOKEN"),
             cf_api_base: get_clean_env("CLOUDFLARE_API_BASE_URL")
                 .unwrap_or_else(|| "https://api.cloudflare.com/client/v4".to_string()),
+            // Workers AI free tier: 10,000 neurons a day, roughly 3.5 hours of Whisper; kept under it.
+            cf_audio_sec_per_day: 10_800,
             // Indonesian by default; MEETING_ASR_LANGUAGE=auto to detect.
             asr_language: match get_clean_env("MEETING_ASR_LANGUAGE").map(|l| l.to_ascii_lowercase()) {
                 Some(l) if l == "auto" => None,
@@ -146,6 +156,9 @@ impl PipelineConfig {
 
             max_tasks_per_job: 30,
             max_text_chars: 300_000,
+            project_jobs_per_day: env_u32("MEETING_PROJECT_JOBS_PER_DAY", 20),
+            project_audio_minutes_per_day: env_u32("MEETING_PROJECT_AUDIO_MINUTES_PER_DAY", 180),
+            transcript_retention_days: env_u32("MEETING_TRANSCRIPT_RETENTION_DAYS", 90),
         }
     }
 
@@ -155,11 +168,6 @@ impl PipelineConfig {
             .saturating_mul(1_i64 << exponent)
             .min(self.retry_max_secs)
     }
-}
-
-/// The Groq key for a project's meeting jobs. Environment only for now (Scalable to per project later on)
-pub fn resolve_groq_key(config: &Config, _project_id: i64) -> Option<String> {
-    config.groq_api_key.clone()
 }
 
 #[cfg(test)]

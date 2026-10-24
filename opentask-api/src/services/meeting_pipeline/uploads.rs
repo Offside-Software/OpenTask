@@ -28,16 +28,24 @@ fn content_type(declared: Option<&str>) -> String {
         .to_string()
 }
 
+/// The file the browser is about to upload; `duration_sec` when it extracted the audio.
+pub struct UploadFile<'a> {
+    pub name: &'a str,
+    pub content_type: Option<&'a str>,
+    pub size_bytes: u64,
+    pub duration_sec: Option<f32>,
+}
+
 pub async fn create_media_job(
     pool: &PgPool,
     realtime: &RealtimeHub,
     cfg: &PipelineConfig,
     new: NewMeeting,
-    file_name: &str,
-    declared_type: Option<&str>,
-    size_bytes: u64,
+    file: UploadFile<'_>,
 ) -> Result<MediaIntakeResponse, AppError> {
     let store = store(cfg)?;
+    let size_bytes = file.size_bytes;
+    super::usage::check_project_quota(pool, cfg, new.project_id, file.duration_sec.map(|d| d.ceil() as u32)).await?;
     if size_bytes == 0 {
         return Err(AppError::BadRequest("The file is empty".to_string()));
     }
@@ -51,7 +59,7 @@ pub async fn create_media_job(
 
     let mut tx = pool.begin().await?;
     let (_, job) = insert_meeting_and_job(&mut tx, &new, JobStatus::Created).await?;
-    let key = storage::upload_key(new.project_id, job.id.0, file_name);
+    let key = storage::upload_key(new.project_id, job.id.0, file.name);
     crate::db::query("UPDATE opentask.meeting_jobs SET r2_keys = $2 WHERE id = $1;")
         .bind(job.id.0)
         .bind(serde_json::json!([key]))
@@ -62,7 +70,7 @@ pub async fn create_media_job(
     realtime.publish(new.project_id, "meeting", "created", Some(meeting.id.0));
     realtime.publish(new.project_id, "meeting_job", "updated", Some(job.id.0));
 
-    let upload = store.presign_put(&key, &content_type(declared_type), Duration::from_secs(cfg.upload_url_minutes * 60));
+    let upload = store.presign_put(&key, &content_type(file.content_type), Duration::from_secs(cfg.upload_url_minutes * 60));
     Ok(MediaIntakeResponse { meeting, job, upload })
 }
 
@@ -156,7 +164,8 @@ pub async fn sweep(pool: &PgPool, realtime: &RealtimeHub, cfg: &PipelineConfig) 
         FROM opentask.meeting_jobs j
         JOIN opentask.meetings m ON m.id = j.meeting_id
         WHERE j.r2_keys <> '[]'::jsonb
-          AND (j.status IN ('FAILED', 'NO_ACTIONS', 'DRAFTS_READY', 'REVIEWED')
+          AND (j.status IN ('NO_ACTIONS', 'DRAFTS_READY', 'REVIEWED')
+               OR (j.status = 'FAILED' AND m.created_at < NOW() - INTERVAL '1 day')
                OR (j.status = 'CREATED' AND j.source_type = 'MEDIA' AND m.created_at < NOW() - make_interval(hours => $1)))
         ORDER BY j.id
         LIMIT 50;

@@ -59,7 +59,7 @@ if (typeof window !== "undefined") window.addEventListener("beforeunload", warnB
 class Cancelled extends Error {}
 
 /** Extracted audio, or `null` to send the original file. Throws when the file has no audio. */
-function extractAudio(id: string, file: File, run: Running): Promise<{ blob: Blob; extension: string } | null> {
+function extractAudio(id: string, file: File, run: Running): Promise<{ blob: Blob; extension: string; duration: number } | null> {
   return new Promise((resolve, reject) => {
     let worker: Worker;
     try {
@@ -79,7 +79,7 @@ function extractAudio(id: string, file: File, run: Running): Promise<{ blob: Blo
         patch(id, { progress: Math.min(1, Math.max(0, reply.progress)) });
       } else if (reply.type === "done") {
         finish();
-        resolve({ blob: new Blob([reply.buffer], { type: reply.mimeType }), extension: reply.extension });
+        resolve({ blob: new Blob([reply.buffer], { type: reply.mimeType }), extension: reply.extension, duration: reply.duration });
       } else if (reply.type === "no-audio") {
         finish();
         reject(new Error("This file has no audio track."));
@@ -156,6 +156,7 @@ async function run(id: string, file: File, fields: MeetingIntakeFields) {
       file_name: fileName,
       content_type: body.type || undefined,
       size_bytes: body.size,
+      duration_sec: extracted?.duration,
     });
     patch(id, { jobId: created.job.id, meetingId: String(created.meeting.id) });
     check();

@@ -387,6 +387,7 @@ pub struct CreateMediaJobPayload {
     pub file_name: String,
     pub content_type: Option<String>,
     pub size_bytes: u64,
+    pub duration_sec: Option<f32>,
 }
 
 /// The new meeting and job, plus where to send the file.

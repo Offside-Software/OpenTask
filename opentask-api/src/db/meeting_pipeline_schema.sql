@@ -92,3 +92,39 @@ BEGIN
     END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_tasks_meeting_id ON opentask.tasks(meeting_id) WHERE meeting_id IS NOT NULL;
+
+-- AI calls per UTC day, project (0 = none) and model: free-tier limits and project quotas.
+-- own_key: made with the project's own API key rather than the shared one.
+CREATE TABLE IF NOT EXISTS opentask.ai_usage_daily (
+    day           DATE NOT NULL,
+    project_id    BIGINT NOT NULL DEFAULT 0,
+    model         TEXT NOT NULL,
+    own_key       BOOLEAN NOT NULL DEFAULT FALSE,
+    requests      INTEGER NOT NULL DEFAULT 0,
+    tokens        BIGINT NOT NULL DEFAULT 0,
+    audio_seconds INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, project_id, model, own_key)
+);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'opentask' AND table_name = 'ai_usage_daily' AND column_name = 'own_key'
+    ) THEN
+        ALTER TABLE opentask.ai_usage_daily ADD COLUMN own_key BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE opentask.ai_usage_daily DROP CONSTRAINT ai_usage_daily_pkey;
+        ALTER TABLE opentask.ai_usage_daily ADD PRIMARY KEY (day, project_id, model, own_key);
+    END IF;
+END $$;
+
+-- A project's own provider API key, AES-256-GCM encrypted with a key derived from SECRET_KEY.
+CREATE TABLE IF NOT EXISTS opentask.project_ai_keys (
+    project_id BIGINT NOT NULL REFERENCES opentask.projects(id) ON DELETE CASCADE,
+    provider   TEXT NOT NULL,
+    key_cipher BYTEA NOT NULL,
+    key_hint   TEXT NOT NULL,
+    tier       TEXT NOT NULL DEFAULT 'free',
+    updated_by BIGINT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (project_id, provider)
+);
