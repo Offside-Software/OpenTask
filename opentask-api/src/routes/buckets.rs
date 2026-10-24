@@ -1,4 +1,4 @@
-﻿use axum::{
+use axum::{
     extract::{Path, State},
     http::StatusCode,
     routing::{get, post, put},
@@ -100,7 +100,6 @@ pub async fn get_bucket(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Bucket {bucket_id} not found")))?;
 
-    state.realtime.publish(row.project_id.as_ref().map(|id| id.0).unwrap_or(0), "bucket", "updated", row.id.as_ref().map(|id| id.0));
     Ok(Json(row))
 }
 
@@ -129,6 +128,12 @@ pub async fn update_bucket(
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Bucket {bucket_id} not found")))?;
+
+    if let Some(pid) = row.project_id.as_ref() {
+        state
+            .realtime
+            .publish(pid.0, "bucket", "updated", row.id.as_ref().map(|id| id.0));
+    }
 
     Ok(Json(row))
 }
@@ -188,26 +193,43 @@ pub async fn reorder_buckets(
             .collect(),
     };
 
+    if items.is_empty() {
+        return Ok(Json(serde_json::json!({
+            "status": "success",
+            "order": Vec::<String>::new()
+        })));
+    }
+
     if items.len() > 100 {
         return Err(AppError::BadRequest(
             "A maximum of 100 buckets can be reordered at once".to_string(),
         ));
     }
 
-    let mut tx = state.pool.begin().await?;
+    let mut bucket_ids = Vec::with_capacity(items.len());
+    let mut order_indices = Vec::with_capacity(items.len());
     let mut ordered_ids = Vec::with_capacity(items.len());
 
     for (b_id, order_idx) in &items {
         ordered_ids.push(b_id.to_string());
-        crate::db::query("UPDATE opentask.buckets SET order_idx = $1, updated_at = NOW() WHERE id = $2 AND project_id = $3;")
-            .bind(order_idx)
-            .bind(b_id.0)
-            .bind(project_id.0)
-            .execute(&mut *tx)
-            .await?;
+        bucket_ids.push(b_id.0);
+        order_indices.push(*order_idx);
     }
 
-    tx.commit().await?;
+    crate::db::query(
+        r#"
+        UPDATE opentask.buckets AS b
+        SET order_idx = u.order_idx,
+            updated_at = NOW()
+        FROM UNNEST($1::BIGINT[], $2::INT[]) AS u(id, order_idx)
+        WHERE b.id = u.id AND b.project_id = $3;
+        "#,
+    )
+    .bind(&bucket_ids)
+    .bind(&order_indices)
+    .bind(project_id.0)
+    .execute(&state.pool)
+    .await?;
 
     tracing::info!(
         "Reordered {} buckets for project {}",

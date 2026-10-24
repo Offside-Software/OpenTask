@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
 import { AuthProvider } from "./auth/authContext";
 import { useAuth } from "./auth/useAuth";
 import { LoadingScreen } from "./components/ui/LoadingScreen";
@@ -12,11 +12,15 @@ import { TaskRedirectPage } from "./pages/TaskRedirectPage";
 import { NotFoundPage } from "./pages/NotFound";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPrompt";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ThemeProvider } from "./context/themeContext";
 import { NetworkBadge } from "./components/ui/NetworkBadge";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { MeetingUploadTray } from "./components/meetings/MeetingUploadTray";
+import { ProjectTabsProvider, useProjectTabs } from "./context/projectTabsContext";
+import { ProjectTabBar } from "./components/layout/ProjectTabBar";
+import { ToastProvider } from "./design-system/Toast";
+import { UpdateProvider } from "./components/updater/UpdateChecker";
 import "./App.css";
 
 function AppShell() {
@@ -37,17 +41,20 @@ function AppShell() {
       {/* Global Telemetry & Network Status Badge */}
       <NetworkBadge />
 
-      <main className="flex-1 overflow-y-auto no-scrollbar bg-dots flex flex-col">
+      <main className="flex-1 overflow-y-auto no-scrollbar bg-dots flex flex-col min-w-0">
+        {/* Project Multi-Tab Bar */}
+        <ProjectTabBar />
+
         <div className="px-4 pt-4 sm:pt-6 pb-6 flex-1 flex flex-col min-h-0">
           <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/workspaces" element={<WorkspacesPage />} />
-          <Route path="/projects/:projectId" element={<ProjectDetailsPageWrapper />} />
-          <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/workspaces" element={<WorkspacesPage />} />
+            <Route path="/projects/:projectId" element={<ProjectDetailsPageWrapper />} />
+            <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
         </div>
       </main>
 
@@ -59,22 +66,47 @@ function AppShell() {
   );
 }
 
-// Wrapper to pass the projectId param correctly to the old component prop structure
-import { useParams } from "react-router-dom";
+// Wrapper to keep open project tabs preserved for instant switching while syncing URL
 function ProjectDetailsPageWrapper() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { tabs, openTab, updateTabName } = useProjectTabs();
+
+  useEffect(() => {
+    if (projectId) {
+      openTab({ id: projectId });
+    }
+  }, [projectId, openTab]);
 
   if (!projectId) {
     navigate('/workspaces', { replace: true });
     return null;
   }
 
-  return <ProjectDetailsPage projectId={projectId} />;
-}
+  // Ensure current projectId is included in render list even before tabs state updates
+  const effectiveTabs = tabs.some(t => String(t.id) === String(projectId))
+    ? tabs
+    : [...tabs, { id: String(projectId), name: 'Loading…' }];
 
-import { ToastProvider } from './design-system/Toast';
-import { UpdateProvider } from './components/updater/UpdateChecker';
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {effectiveTabs.map(tab => {
+        const isCurrentActive = String(tab.id) === String(projectId);
+        return (
+          <div
+            key={tab.id}
+            className={isCurrentActive ? "flex-1 flex flex-col min-h-0" : "hidden"}
+          >
+            <ProjectDetailsPage
+              projectId={tab.id}
+              onProjectLoaded={(p) => updateTabName(tab.id, p.name)}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -83,7 +115,9 @@ export default function App() {
         <AuthProvider>
           <ToastProvider>
             <UpdateProvider>
-              <AppShell />
+              <ProjectTabsProvider>
+                <AppShell />
+              </ProjectTabsProvider>
             </UpdateProvider>
           </ToastProvider>
         </AuthProvider>
@@ -91,4 +125,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-

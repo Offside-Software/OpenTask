@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { LayoutDashboard, Briefcase, Bell, Settings, LogOut, Sun, Moon, MessageSquarePlus, Github, ExternalLink } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Briefcase,
+  Bell,
+  Settings,
+  LogOut,
+  Sun,
+  Moon,
+  MessageSquarePlus,
+  Github,
+  ExternalLink,
+  PanelLeftClose
+} from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../context/themeContext';
 import { getDisplayName } from '../../auth/displayName';
@@ -26,8 +38,26 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
   const navigate = useNavigate();
   const { alerts } = useAlerts({ userId: user?.db_user?.id });
 
-  const [isHovered, setIsHovered] = useState(false);
+  // Persist collapsed state to localStorage (default is collapsed on compact screens, or user preference)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('opentask:sidebar:collapsed');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('opentask:sidebar:collapsed', String(next));
+      } catch { }
+      return next;
+    });
+  };
 
   const currentPage = location.pathname.split('/')[1] || 'dashboard';
 
@@ -41,31 +71,58 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
 
   return (
     <>
-      <div className="w-[68px] flex-shrink-0 relative z-40 select-none">
+      <div
+        className={`${isCollapsed ? 'w-[68px]' : 'w-60'
+          } flex-shrink-0 relative z-40 select-none transition-all duration-200 ease-in-out`}
+      >
         <aside
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          className={`absolute inset-y-0 left-0 border-r-2 border-black flex flex-col py-5 px-3 bg-[#0C0D0E] z-40 transition-all duration-200 ease-in-out overflow-hidden shadow-[4px_0px_0px_0px_rgba(0,0,0,0.4)] ${isHovered ? 'w-60' : 'w-[68px]'
+          className={`absolute inset-y-0 left-0 border-r-2 border-black flex flex-col py-5 px-3 bg-[#0C0D0E] z-40 transition-all duration-200 ease-in-out overflow-hidden shadow-[4px_0px_0px_0px_rgba(0,0,0,0.4)] ${isCollapsed ? 'w-[68px]' : 'w-60'
             }`}
         >
-          {/* Brutalist Brand Badge */}
-          <div
-            className="flex items-center gap-3 mb-7 cursor-pointer w-full"
-            onClick={() => navigate('/dashboard')}
-            title="OpenTask Root"
-          >
-            <div className="w-11 h-11 rounded-none border-2 border-black bg-[#FFE600] flex items-center justify-center shrink-0 shadow-[3px_3px_0px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform">
-              <img src={logo} alt="OpenTask Logo" className="w-7 h-7 object-contain" />
+          {/* Brutalist Brand Header & Collapse Toggle */}
+          {!isCollapsed ? (
+            <div className="flex items-center justify-between gap-2 mb-6 w-full">
+              <div
+                className="flex items-center gap-3 cursor-pointer min-w-0"
+                onClick={() => navigate('/dashboard')}
+                title="OpenTask Root"
+              >
+                <div className="w-11 h-11 rounded-none border-2 border-black bg-[#FFE600] flex items-center justify-center shrink-0 shadow-[3px_3px_0px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform">
+                  <img src={logo} alt="OpenTask Logo" className="w-7 h-7 object-contain" />
+                </div>
+                <div className="min-w-0 overflow-hidden">
+                  <span className="text-white font-mono font-black text-[15px] uppercase tracking-wider block leading-tight truncate">
+                    OPENTASK
+                  </span>
+                  <span className="text-neutral-400 font-mono text-[9px] uppercase tracking-widest block truncate">
+                    // COMMAND ROOT
+                  </span>
+                </div>
+              </div>
+
+              {/* Collapse Button */}
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Collapse Sidebar"
+                aria-label="Collapse Sidebar"
+                className="w-8 h-8 rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer flex items-center justify-center shrink-0"
+              >
+                <PanelLeftClose size={16} strokeWidth={2.5} />
+              </button>
+
             </div>
-            <div className={`min-w-0 overflow-hidden transition-all duration-200 ${isHovered ? 'opacity-100 max-w-[170px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
-              <span className="text-white font-mono font-black text-[15px] uppercase tracking-wider block leading-tight whitespace-nowrap">
-                OPENTASK
-              </span>
-              <span className="text-neutral-400 font-mono text-[9px] uppercase tracking-widest block whitespace-nowrap">
-                // COMMAND ROOT
-              </span>
+          ) : (
+            <div className="flex flex-col items-center gap-2 mb-6 w-full">
+              <div
+                className="w-11 h-11 rounded-none border-2 border-black bg-[#FFE600] flex items-center justify-center shrink-0 shadow-[3px_3px_0px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform cursor-pointer"
+                onClick={toggleSidebar}
+                title="OpenTask Root"
+              >
+                <img src={logo} alt="OpenTask Logo" className="w-7 h-7 object-contain" />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Nav */}
           <nav className="flex flex-col gap-3 w-full">
@@ -90,7 +147,10 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
                       </div>
                     )}
                   </div>
-                  <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+                  <div
+                    className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
+                      }`}
+                  >
                     <span className="text-[11px] font-mono font-black tracking-wider uppercase whitespace-nowrap block">
                       {fullLabel}
                     </span>
@@ -115,7 +175,10 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
                   <Moon size={18} strokeWidth={2.5} className="text-black" />
                 )}
               </div>
-              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+              <div
+                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
+                  }`}
+              >
                 <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 whitespace-nowrap block">
                   {theme === 'dark' ? 'LIGHT THEME' : 'DARK THEME'}
                 </span>
@@ -131,7 +194,10 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 <MessageSquarePlus size={18} strokeWidth={2.5} className="group-hover:text-[#FFE600] text-[#FFE600]" />
               </div>
-              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+              <div
+                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
+                  }`}
+              >
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 group-hover:text-[#FFE600] block">
                     FEEDBACK
@@ -154,7 +220,10 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 <Github size={18} strokeWidth={2.2} />
               </div>
-              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+              <div
+                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
+                  }`}
+              >
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 group-hover:text-white block">
                     SOURCE CODE
@@ -172,7 +241,10 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
               <div className="w-10 h-full flex items-center justify-center shrink-0">
                 <Settings size={18} strokeWidth={2.5} />
               </div>
-              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+              <div
+                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
+                  }`}
+              >
                 <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 whitespace-nowrap block">
                   SETTINGS
                 </span>
@@ -189,7 +261,10 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
                   {initials || <LogOut size={12} />}
                 </div>
               </div>
-              <div className={`overflow-hidden transition-all duration-200 pl-1.5 ${isHovered ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'}`}>
+              <div
+                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
+                  }`}
+              >
                 <div className="min-w-0 text-left whitespace-nowrap">
                   <span className="text-[11px] font-mono font-black uppercase tracking-wider truncate block leading-tight">
                     {displayName}

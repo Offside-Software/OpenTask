@@ -65,6 +65,47 @@ export function resolveApiUrl(endpoint: string): string {
   return `/api${cleanEndpoint}`;
 }
 
+export function getRealtimeBaseUrl(): string {
+  const base = getBaseUrl();
+  if (base) {
+    return base;
+  }
+
+  // Vercel rewrites (/api/*) only proxy stateless HTTP requests and cannot upgrade WebSocket (wss://) connections.
+  // In production builds without an explicit VITE_API_BASE_URL, connect WebSockets directly to the backend host.
+  if (!import.meta.env.DEV) {
+    return DEFAULT_PRODUCTION_API_URL;
+  }
+
+  return "";
+}
+
+export function resolveRealtimeUrl(endpoint: string): URL {
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const baseUrl = getRealtimeBaseUrl();
+  const fallbackOrigin =
+    typeof window !== "undefined" ? window.location.origin : "http://localhost:8000";
+
+  if (baseUrl) {
+    const cleanBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+    const apiEndpoint = cleanEndpoint.startsWith("/api/")
+      ? cleanEndpoint
+      : `/api${cleanEndpoint}`;
+    const fullUrl =
+      cleanBase.endsWith("/api") && apiEndpoint.startsWith("/api/")
+        ? `${cleanBase}${apiEndpoint.slice(4)}`
+        : `${cleanBase}${apiEndpoint}`;
+
+    const wsUrl = new URL(fullUrl, fallbackOrigin);
+    wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
+    return wsUrl;
+  }
+
+  const wsUrl = new URL(resolveApiUrl(cleanEndpoint), fallbackOrigin);
+  wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
+  return wsUrl;
+}
+
 export function getStoredToken(): string | null {
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
@@ -83,6 +124,10 @@ export function getStoredToken(): string | null {
 
 // Map to cleanly deduplicate concurrent identical GET requests
 const pendingGetRequests = new Map<string, Promise<unknown>>();
+
+export function clearPendingGetRequests(): void {
+  pendingGetRequests.clear();
+}
 
 export async function apiFetch<T>(
   endpoint: string,

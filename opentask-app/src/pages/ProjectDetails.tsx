@@ -36,6 +36,7 @@ import type { TaskType, Project, Task, Bucket, BucketState } from '../models';
 
 interface ProjectDetailsProps {
     projectId: string | number;
+    onProjectLoaded?: (project: Project) => void;
 }
 
 const STATUS_COLORS: Record<BucketState, string> = {
@@ -73,7 +74,7 @@ const keyToTab = (k: string) => {
     }
 };
 
-export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId }) => {
+export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, onProjectLoaded }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const taskIdParam = searchParams.get('taskId');
@@ -127,6 +128,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
                 } else {
                     setProject(p);
                     setProjectNotFound(false);
+                    onProjectLoaded?.(p);
                 }
             })
             .catch(err => {
