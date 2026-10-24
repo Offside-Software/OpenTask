@@ -101,6 +101,30 @@ export const taskService = {
     );
   },
 
+  reorderTasksBatch: async (
+    projectId: string | number,
+    primaryBucketId: number | string,
+    tasks: { id: number | string; order_idx: number; bucket_id: number | string }[],
+  ): Promise<{
+    status: string;
+    order: (number | string)[];
+    bucket_id: number | string;
+  }> => {
+    return await apiFetch(
+      `/projects/${projectId}/buckets/${primaryBucketId}/tasks/reorder`,
+      {
+        method: "PUT",
+        body: JSONBig.stringify({
+          tasks: tasks.map((t) => ({
+            id: String(t.id),
+            order_idx: t.order_idx,
+            bucket_id: String(t.bucket_id),
+          })),
+        }),
+      },
+    );
+  },
+
   getBuckets: async (projectId: number | string): Promise<Bucket[]> => {
     return await apiFetch<Bucket[]>(`/projects/${projectId}/buckets`);
   },
@@ -144,4 +168,3 @@ export const taskService = {
     );
   },
 };
-

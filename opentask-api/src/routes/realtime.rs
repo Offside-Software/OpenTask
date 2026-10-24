@@ -9,6 +9,7 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use crate::{
     error::AppError,
@@ -129,8 +130,17 @@ async fn stream_project_events(
     mut receiver: tokio::sync::broadcast::Receiver<crate::services::realtime::ProjectEvent>,
 ) {
     let (mut sender, mut incoming) = socket.split();
+    let mut ping_interval = tokio::time::interval(Duration::from_secs(25));
+    // Skip immediate first tick
+    ping_interval.tick().await;
+
     loop {
         tokio::select! {
+            _ = ping_interval.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    break;
+                }
+            }
             event = receiver.recv() => {
                 match event {
                     Ok(event) if event.project_id == project_id.to_string() => {

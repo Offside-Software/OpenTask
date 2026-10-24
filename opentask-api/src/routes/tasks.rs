@@ -676,29 +676,48 @@ pub async fn reorder_tasks(
             .collect(),
     };
 
+    if items.is_empty() {
+        return Ok(Json(json!({
+            "status": "success",
+            "order": Vec::<String>::new(),
+            "bucket_id": target_bucket_id
+        })));
+    }
+
     if items.len() > 500 {
         return Err(AppError::BadRequest(
             "A maximum of 500 tasks can be reordered at once".to_string(),
         ));
     }
 
-    let mut tx = state.pool.begin().await?;
+    let mut task_ids = Vec::with_capacity(items.len());
+    let mut order_indices = Vec::with_capacity(items.len());
+    let mut bucket_ids = Vec::with_capacity(items.len());
     let mut ordered_ids = Vec::with_capacity(items.len());
 
     for (t_id, order_idx, b_id) in &items {
         ordered_ids.push(t_id.to_string());
-        crate::db::query(
-            "UPDATE opentask.tasks SET order_idx = $1, bucket_id = $2, updated_at = NOW() WHERE id = $3 AND project_id = $4;"
-        )
-        .bind(order_idx)
-        .bind(b_id)
-        .bind(t_id.0)
-        .bind(project_id.0)
-        .execute(&mut *tx)
-        .await?;
+        task_ids.push(t_id.0);
+        order_indices.push(*order_idx);
+        bucket_ids.push(*b_id);
     }
 
-    tx.commit().await?;
+    crate::db::query(
+        r#"
+        UPDATE opentask.tasks AS t
+        SET order_idx = u.order_idx,
+            bucket_id = u.bucket_id,
+            updated_at = NOW()
+        FROM UNNEST($1::BIGINT[], $2::INT[], $3::BIGINT[]) AS u(id, order_idx, bucket_id)
+        WHERE t.id = u.id AND t.project_id = $4;
+        "#,
+    )
+    .bind(&task_ids)
+    .bind(&order_indices)
+    .bind(&bucket_ids)
+    .bind(project_id.0)
+    .execute(&state.pool)
+    .await?;
 
     tracing::info!(
         "Reordered {} tasks for project {} into bucket {}",
@@ -795,6 +814,8 @@ pub async fn batch_review_tasks(
         .await?;
 
     tx.commit().await?;
+
+    state.realtime.publish(payload.project_id.0, "task", "created", None);
 
     let _ = crate::routes::activities::record_project_event(
         &state.pool,

@@ -13,7 +13,7 @@ interface UseAsyncReorderQueueOptions {
 /**
  * Modern asynchronous reorder queue.
  * - Updates UI immediately in memory (0ms latency, seamless drag-and-drop).
- * - Debounces and coalesces rapid consecutive moves so only the final resting state is synced.
+ * - Debounces and coalesces rapid consecutive moves (including cross-bucket moves) into a single atomic request.
  * - Silently retries transient network errors in the background instead of abruptly snapping cards back.
  */
 export const useAsyncReorderQueue = ({
@@ -26,7 +26,7 @@ export const useAsyncReorderQueue = ({
 
   // Map of bucketId -> latest ordered task IDs
   const pendingTasks = useRef<Map<string, (string | number)[]>>(new Map());
-  const taskTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const taskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pending bucket order
   const pendingBuckets = useRef<(string | number)[] | null>(null);
@@ -63,37 +63,67 @@ export const useAsyncReorderQueue = ({
   };
 
   /**
-   * Queue task reorder for a bucket. Coalesces moves within debounceMs.
+   * Queue task reorder for a bucket. Coalesces intra-bucket and cross-bucket moves within debounceMs
+   * into a single atomic batch request so the backend commits and broadcasts a single realtime event.
    */
   const queueTaskReorder = useCallback(
     (bucketId: string | number, taskIds: (string | number)[]) => {
       const bKey = String(bucketId);
       pendingTasks.current.set(bKey, taskIds);
 
-      // Clear previous pending timer for this bucket
-      const existingTimer = taskTimers.current.get(bKey);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
+      if (taskTimer.current) {
+        clearTimeout(taskTimer.current);
       }
 
-      const timer = setTimeout(async () => {
-        taskTimers.current.delete(bKey);
-        const latestTaskIds = pendingTasks.current.get(bKey);
-        if (!latestTaskIds || !projectId) return;
+      taskTimer.current = setTimeout(async () => {
+        taskTimer.current = null;
+        if (pendingTasks.current.size === 0 || !projectId) return;
 
+        // Snapshot current pending entries
+        const snapshot = new Map(pendingTasks.current);
+        const batchItems: { id: string | number; order_idx: number; bucket_id: string }[] = [];
+        let primaryBucketId: string | null = null;
+
+        snapshot.forEach((ids, bId) => {
+          if (!primaryBucketId || ids.length > 0) {
+            primaryBucketId = bId;
+          }
+          ids.forEach((id, idx) => {
+            batchItems.push({
+              id: String(id),
+              order_idx: idx,
+              bucket_id: bId,
+            });
+          });
+        });
+
+        if (!primaryBucketId || batchItems.length === 0) {
+          snapshot.forEach((_, bId) => {
+            if (pendingTasks.current.get(bId) === snapshot.get(bId)) {
+              pendingTasks.current.delete(bId);
+            }
+          });
+          return;
+        }
+
+        const targetBucket = primaryBucketId;
         const success = await executeWithRetry(() =>
-          taskService.reorderTasks(projectId, bucketId, latestTaskIds),
+          snapshot.size === 1
+            ? taskService.reorderTasks(projectId, targetBucket, snapshot.get(targetBucket) ?? [])
+            : taskService.reorderTasksBatch(projectId, targetBucket, batchItems),
         );
 
         if (success) {
-          pendingTasks.current.delete(bKey);
+          snapshot.forEach((ids, bId) => {
+            if (pendingTasks.current.get(bId) === ids) {
+              pendingTasks.current.delete(bId);
+            }
+          });
           onTasksSynced?.();
         } else {
           showToast("Sync warning: Some task moves could not be saved to server", "error");
         }
       }, debounceMs);
-
-      taskTimers.current.set(bKey, timer);
     },
     [projectId, debounceMs, onTasksSynced, showToast],
   );
@@ -145,10 +175,13 @@ export const useAsyncReorderQueue = ({
   // Clean up all pending timers on unmount
   useEffect(() => {
     return () => {
-      taskTimers.current.forEach((t) => clearTimeout(t));
-      taskTimers.current.clear();
+      if (taskTimer.current) {
+        clearTimeout(taskTimer.current);
+        taskTimer.current = null;
+      }
       if (bucketTimer.current) {
         clearTimeout(bucketTimer.current);
+        bucketTimer.current = null;
       }
     };
   }, []);
@@ -156,7 +189,7 @@ export const useAsyncReorderQueue = ({
   const hasPendingReorders = useCallback(() => {
     return (
       pendingTasks.current.size > 0 ||
-      taskTimers.current.size > 0 ||
+      taskTimer.current !== null ||
       activeSyncCount.current > 0 ||
       pendingBuckets.current !== null ||
       bucketTimer.current !== null
