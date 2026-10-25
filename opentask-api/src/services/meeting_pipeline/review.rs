@@ -1,7 +1,6 @@
 use chrono::NaiveDate;
 use sqlx::PgPool;
 
-use super::drafts::ensure_bucket;
 use crate::error::AppError;
 use crate::models::meeting::{
     ApproveDraftItem, DatabaseMeeting, DraftTaskView, JobStatus, MeetingJob, MeetingJobDetail, MeetingJobResponse,
@@ -176,10 +175,13 @@ struct DraftRow {
 pub struct ReviewOutcome {
     pub job: MeetingJobResponse,
     pub meeting_id: i64,
-    /// (task id, lead assignee, title)
+    /// Approved drafts: (task id, lead assignee, title)
     pub moved: Vec<(i64, Option<i64>, String)>,
+    /// Rejected drafts, now deleted: (task id, title)
+    pub deleted: Vec<(i64, String)>,
+    /// The Todo column made because the project had none
+    pub created_bucket: Option<i64>,
     pub pending_drafts: i64,
-    pub archived_bucket_id: Option<i64>,
 }
 
 async fn lock_reviewable_job(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, job_id: i64) -> Result<Option<i64>, AppError> {
@@ -262,6 +264,52 @@ async fn lock_draft(
     Ok(draft)
 }
 
+/// Name of the Todo column made when a project has none.
+pub const NEW_TODO_COLUMN: &str = "Todo";
+
+/// The project's first Todo column, and whether it was just made. A project without one gets
+/// an ordinary (unlocked) Todo column right after its Draft and Pending columns.
+async fn todo_bucket(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, project_id: i64) -> Result<(i64, bool), sqlx::Error> {
+    const FIND: &str = "SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'TODO' ORDER BY order_idx, id LIMIT 1;";
+    if let Some(id) = crate::db::query_scalar::<_, i64>(FIND).bind(project_id).fetch_optional(&mut **tx).await? {
+        return Ok((id, false));
+    }
+    // Two reviews approving at once must not both add a column.
+    crate::db::query("SELECT 1 FROM opentask.projects WHERE id = $1 FOR UPDATE;")
+        .bind(project_id)
+        .execute(&mut **tx)
+        .await?;
+    if let Some(id) = crate::db::query_scalar::<_, i64>(FIND).bind(project_id).fetch_optional(&mut **tx).await? {
+        return Ok((id, false));
+    }
+
+    let order_idx: i32 = crate::db::query_scalar(
+        "SELECT COALESCE(MAX(order_idx) FILTER (WHERE state IN ('DRAFT', 'PENDING')), -1) + 1 FROM opentask.buckets WHERE project_id = $1;",
+    )
+    .bind(project_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    crate::db::query("UPDATE opentask.buckets SET order_idx = order_idx + 1 WHERE project_id = $1 AND order_idx >= $2;")
+        .bind(project_id)
+        .bind(order_idx)
+        .execute(&mut **tx)
+        .await?;
+    let id = crate::services::id_generator::next_id();
+    crate::db::query(
+        r#"
+        INSERT INTO opentask.buckets (id, project_id, name, state, is_system_locked, order_idx, created_at, updated_at)
+        VALUES ($1, $2, $3, 'TODO', FALSE, $4, NOW(), NOW());
+        "#,
+    )
+    .bind(id)
+    .bind(project_id)
+    .bind(NEW_TODO_COLUMN)
+    .bind(order_idx)
+    .execute(&mut **tx)
+    .await?;
+    Ok((id, true))
+}
+
 async fn next_order(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, bucket_id: i64) -> Result<i32, sqlx::Error> {
     crate::db::query_scalar("SELECT COALESCE(MAX(order_idx), -1) + 1 FROM opentask.tasks WHERE bucket_id = $1;")
         .bind(bucket_id)
@@ -321,12 +369,9 @@ pub async fn approve(
     let mut tx = pool.begin().await?;
     let alert_id = lock_reviewable_job(&mut tx, job_id).await?;
 
-    let default_bucket: Option<i64> = crate::db::query_scalar(
-        "SELECT id FROM opentask.buckets WHERE project_id = $1 AND state = 'TODO' ORDER BY order_idx, id LIMIT 1;",
-    )
-    .bind(project_id)
-    .fetch_optional(&mut *tx)
-    .await?;
+    // Looked up (or made) only when an item does not name its column.
+    let mut default_bucket: Option<i64> = None;
+    let mut created_bucket: Option<i64> = None;
     let members: Vec<i64> =
         crate::db::query_scalar("SELECT user_id FROM opentask.project_member WHERE project_id = $1;")
             .bind(project_id)
@@ -352,8 +397,17 @@ pub async fn approve(
                     _ => return Err(AppError::BadRequest("Approved tasks go to a Todo or Pending column".to_string())),
                 }
             }
-            None => default_bucket
-                .ok_or_else(|| AppError::BadRequest("The project has no Todo column; pick one".to_string()))?,
+            None => match default_bucket {
+                Some(id) => id,
+                None => {
+                    let (id, created) = todo_bucket(&mut tx, project_id).await?;
+                    if created {
+                        created_bucket = Some(id);
+                    }
+                    default_bucket = Some(id);
+                    id
+                }
+            },
         };
 
         let assignees: Vec<i64> = item.assignee_ids.iter().map(|a| a.0).collect();
@@ -422,32 +476,29 @@ pub async fn approve(
         meeting_id: job.meeting_id.0,
         job: MeetingJobResponse::from(job),
         moved,
+        deleted: Vec::new(),
+        created_bucket,
         pending_drafts,
-        archived_bucket_id: None,
     })
 }
 
+/// Rejected drafts are deleted, with their evidence row (cascade).
 pub async fn reject(pool: &PgPool, job_id: i64, project_id: i64, task_ids: &[SafeId]) -> Result<ReviewOutcome, AppError> {
     if task_ids.is_empty() || task_ids.len() > MAX_REVIEW_ITEMS {
         return Err(AppError::BadRequest(format!("Send between 1 and {MAX_REVIEW_ITEMS} task ids")));
     }
     let mut tx = pool.begin().await?;
     let alert_id = lock_reviewable_job(&mut tx, job_id).await?;
-    let archived = ensure_bucket(&mut tx, project_id, "ARCHIVED", "Archived", false).await?;
 
-    let mut moved = Vec::with_capacity(task_ids.len());
+    let mut deleted = Vec::with_capacity(task_ids.len());
     for task_id in task_ids {
         let draft = lock_draft(&mut tx, job_id, task_id.0).await?;
-        let order_idx = next_order(&mut tx, archived).await?;
-        crate::db::query(
-            "UPDATE opentask.tasks SET bucket_id = $2, order_idx = $3, updated_at = NOW() WHERE id = $1;",
-        )
-        .bind(task_id.0)
-        .bind(archived)
-        .bind(order_idx)
-        .execute(&mut *tx)
-        .await?;
-        moved.push((task_id.0, None, draft.title));
+        crate::db::query("DELETE FROM opentask.tasks WHERE id = $1 AND project_id = $2;")
+            .bind(task_id.0)
+            .bind(project_id)
+            .execute(&mut *tx)
+            .await?;
+        deleted.push((task_id.0, draft.title));
     }
 
     let pending_drafts = settle_review(&mut tx, job_id, alert_id).await?;
@@ -456,9 +507,10 @@ pub async fn reject(pool: &PgPool, job_id: i64, project_id: i64, task_ids: &[Saf
     Ok(ReviewOutcome {
         meeting_id: job.meeting_id.0,
         job: MeetingJobResponse::from(job),
-        moved,
+        moved: Vec::new(),
+        deleted,
+        created_bucket: None,
         pending_drafts,
-        archived_bucket_id: Some(archived),
     })
 }
 

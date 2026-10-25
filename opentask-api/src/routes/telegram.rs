@@ -56,6 +56,7 @@ pub async fn telegram_webhook(
 
             crate::services::telegram::handle_telegram_callback_query(
                 &state.pool,
+                &state.realtime,
                 bot_token,
                 qid,
                 &chat_id.to_string(),

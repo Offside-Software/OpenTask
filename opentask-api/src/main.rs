@@ -57,11 +57,14 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let realtime = services::realtime::RealtimeHub::new();
+
     // 5. Telegram 24/7 Polling Worker & Guaranteed Notification Dispatcher
     let telegram_pool = pool.clone();
     let telegram_config = config.clone();
+    let telegram_realtime = realtime.clone();
     tokio::spawn(async move {
-        services::telegram::run_telegram_polling(telegram_pool, telegram_config).await;
+        services::telegram::run_telegram_polling(telegram_pool, telegram_config, telegram_realtime).await;
     });
 
     let dispatcher_pool = pool.clone();
@@ -69,9 +72,6 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         services::telegram::run_telegram_alert_dispatcher(dispatcher_pool, dispatcher_config).await;
     });
-
-    // Shared by the HTTP routes and the meeting pipeline worker
-    let realtime = services::realtime::RealtimeHub::new();
 
     // Meeting-to-task pipeline worker
     services::meeting_pipeline::spawn_worker(pool.clone(), config.clone(), realtime.clone());

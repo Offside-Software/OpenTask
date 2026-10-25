@@ -55,6 +55,8 @@ export const meetingJobService = {
 
   retryJob: (jobId: string) => apiFetch<MeetingJob>(`/meeting-jobs/${jobId}/retry`, { method: "POST" }),
 
+  getAiKey: (projectId: string | number) => apiFetch<ProjectAiKey>(`/meeting-jobs/ai-key?project_id=${projectId}`),
+
   setAiKey: (projectId: string | number, apiKey: string, tier: "free" | "developer") =>
     apiFetch<ProjectAiKey>("/meeting-jobs/ai-key", {
       method: "PUT",

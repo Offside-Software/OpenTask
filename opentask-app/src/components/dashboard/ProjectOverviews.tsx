@@ -247,6 +247,11 @@ export const ProjectOverviewPM: React.FC<ProjectOverviewProps> = ({ projectId })
                     </div>
                     <ProgressBar value={m.progress} colorClass={m.status === 'critical' ? 'bg-[#EF4444]' : m.status === 'warning' ? 'bg-[#FFE600]' : 'bg-[#22C55E]'} label="" />
                     <p className="text-neutral-400 font-mono text-[10px] mt-1 font-bold uppercase">// {m.target_label}</p>
+                    {(m.draft_tasks ?? 0) > 0 && (
+                      <Badge variant="warning" className="mt-2">
+                        {m.draft_tasks} drafted task{m.draft_tasks === 1 ? "" : "s"} awaiting review, not counted
+                      </Badge>
+                    )}
                   </div>
                 ))
               )}

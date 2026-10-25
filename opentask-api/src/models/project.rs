@@ -52,6 +52,8 @@ pub struct ProjectDashboardMetric {
     pub progress: i32,
     pub status: Option<String>,
     pub target_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub draft_tasks: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -140,6 +140,7 @@ export interface ProjectMetric {
   progress: number; // 0-100
   status: "critical" | "warning" | "success" | "default";
   target_label: string; // e.g., 'Target < 12h'
+  draft_tasks?: number;
 }
 
 export interface UserProjectStats {

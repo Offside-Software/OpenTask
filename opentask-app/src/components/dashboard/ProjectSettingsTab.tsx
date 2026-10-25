@@ -12,6 +12,7 @@ import { ConfirmModal } from '../modals/ConfirmModal';
 import { LoadingScreen } from '../ui/LoadingScreen';
 import { RepositoryPickerModal } from '../modals/RepositoryPickerModal';
 import { McpConfigModal } from '../modals/McpConfigModal';
+import { GroqKeyCard } from '../meetings/GroqKeyCard';
 import { useNavigate } from 'react-router-dom';
 import { getCached, setCached } from '../../utils/cache';
 import type { Project, ProjectMember } from '../../models';
@@ -725,7 +726,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                 </SurfaceCard>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-3 gap-6">
                 {/* Custom Integrated AI (BYOT Gemini Key) */}
                 <SurfaceCard
                     title="Custom Integrated AI"
@@ -811,7 +812,7 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                         </a>
                                     </div>
 
-                                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                    <div className="flex items-center gap-4 flex-wrap sm:flex-wrap">
                                         <div className="relative flex-1 min-w-[280px]">
                                             <input
                                                 type={showCustomAiKey ? "text" : "password"}
@@ -893,6 +894,9 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                         )}
                     </div>
                 </SurfaceCard>
+
+                {/* Meeting pipeline: the project's own Groq key */}
+                <GroqKeyCard className="col-span-1" projectId={projectId} />
 
                 {/* AI Native Agent Access Card */}
                 <SurfaceCard

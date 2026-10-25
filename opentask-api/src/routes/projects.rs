@@ -446,12 +446,14 @@ pub async fn get_project_dashboard(
         .await
         .unwrap_or_default();
 
-    // 5. Calculate metrics (e.g task completion)
+    // 5. Calculate metrics (e.g task completion). Drafts are not accepted work yet, so they are
+    // counted apart and left out of the progress.
     let counts_row = crate::db::query(
             r#"
-            SELECT 
+            SELECT
                 COUNT(*) FILTER (WHERE b.state = 'COMPLETED') AS completed,
-                COUNT(*) AS total
+                COUNT(*) FILTER (WHERE b.state <> 'DRAFT') AS total,
+                COUNT(*) FILTER (WHERE b.state = 'DRAFT') AS drafts
             FROM opentask.tasks t
             JOIN opentask.buckets b ON t.bucket_id = b.id
             WHERE t.project_id = $1
@@ -462,13 +464,14 @@ pub async fn get_project_dashboard(
         .await?;
 
 
-    let (completed, total): (i64, i64) = counts_row
+    let (completed, total, drafts): (i64, i64, i64) = counts_row
         .map(|r| {
             let comp: i64 = r.try_get("completed").unwrap_or(0);
             let tot: i64 = r.try_get("total").unwrap_or(0);
-            (comp, tot)
+            let drafts: i64 = r.try_get("drafts").unwrap_or(0);
+            (comp, tot, drafts)
         })
-        .unwrap_or((0, 0));
+        .unwrap_or((0, 0, 0));
 
     let progress = if total > 0 {
         ((completed as f64 / total as f64) * 100.0).round() as i32
@@ -482,6 +485,7 @@ pub async fn get_project_dashboard(
         progress,
         status: Some(if progress >= 50 {"ON_TRACK".to_string()} else { "AT_RISK".to_string()} ),
         target_label: Some("100% by deadline".to_string()),
+        draft_tasks: Some(drafts),
     }];
 
     Ok(Json(ProjectDashboardResponse {

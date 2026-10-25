@@ -180,6 +180,7 @@ async fn resolve_installation_id(
 async fn trigger_review_if_gemini_active(
     pool: &sqlx::PgPool,
     config: &crate::config::Config,
+    realtime: &crate::services::realtime::RealtimeHub,
     repo_name: &str,
     pr_number: i64,
     installation_id: u64,
@@ -238,11 +239,13 @@ async fn trigger_review_if_gemini_active(
     let pool_clone = pool.clone();
     let config_clone = config.clone();
     let repo_clone = repo_name.to_string();
+    let realtime_clone = realtime.clone();
 
     tokio::spawn(async move {
         if let Err(e) = evaluate_pull_request(
             &pool_clone,
             &config_clone,
+            &realtime_clone,
             &repo_clone,
             pr_number,
             installation_id,
@@ -547,6 +550,7 @@ pub async fn handle_webhook(
                         trigger_review_if_gemini_active(
                             &state.pool,
                             &state.config,
+                            &state.realtime,
                             repo_name,
                             pr_number,
                             installation_id,
@@ -658,6 +662,7 @@ pub async fn handle_webhook(
                                             trigger_review_if_gemini_active(
                                                 &state.pool,
                                                 &state.config,
+                                                &state.realtime,
                                                 repo_name,
                                                 pr_number,
                                                 installation_id,

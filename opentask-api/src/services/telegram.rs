@@ -183,6 +183,7 @@ pub async fn edit_telegram_message_text(
 
 pub async fn handle_telegram_callback_query(
     pool: &PgPool,
+    realtime: &crate::services::realtime::RealtimeHub,
     bot_token: &str,
     callback_query_id: &str,
     chat_id: &str,
@@ -226,7 +227,7 @@ pub async fn handle_telegram_callback_query(
             LEFT JOIN opentask.projects p ON t.project_id = p.id
             LEFT JOIN opentask.buckets b ON t.bucket_id = b.id
             WHERE (t.lead_assignee_id = $1 OR $1 = ANY(COALESCE(t.assignee_ids, '{}'::BIGINT[])))
-              AND (b.state IS NULL OR b.state != 'COMPLETED')
+              AND (b.state IS NULL OR b.state NOT IN ('COMPLETED', 'DRAFT'))
             ORDER BY t.updated_at DESC
             LIMIT 10;
             "#
@@ -371,13 +372,16 @@ pub async fn handle_telegram_callback_query(
 
                 if let Ok(Some(b_row)) = bucket_res {
                     let bucket_id: i64 = b_row.try_get("id").unwrap_or(0);
-                    let _ = crate::db::query(
+                    let moved = crate::db::query(
                         "UPDATE opentask.tasks SET bucket_id = $1, last_activity_at = NOW(), updated_at = NOW() WHERE id = $2;"
                     )
                     .bind(bucket_id)
                     .bind(task_id)
                     .execute(pool)
                     .await;
+                    if moved.is_ok() {
+                        realtime.publish(project_id, "task", "moved", Some(task_id));
+                    }
 
                     answer_callback_query(bot_token, callback_query_id, "Tugas dipindahkan ke Ongoing! ▶️").await;
 
@@ -430,13 +434,16 @@ pub async fn handle_telegram_callback_query(
 
                 if let Ok(Some(b_row)) = bucket_res {
                     let bucket_id: i64 = b_row.try_get("id").unwrap_or(0);
-                    let _ = crate::db::query(
+                    let moved = crate::db::query(
                         "UPDATE opentask.tasks SET bucket_id = $1, last_activity_at = NOW(), updated_at = NOW() WHERE id = $2;"
                     )
                     .bind(bucket_id)
                     .bind(task_id)
                     .execute(pool)
                     .await;
+                    if moved.is_ok() {
+                        realtime.publish(project_id, "task", "moved", Some(task_id));
+                    }
 
                     answer_callback_query(bot_token, callback_query_id, "Tugas dikembalikan ke To Do! 📋").await;
 
@@ -489,13 +496,16 @@ pub async fn handle_telegram_callback_query(
 
                 if let Ok(Some(b_row)) = bucket_res {
                     let bucket_id: i64 = b_row.try_get("id").unwrap_or(0);
-                    let _ = crate::db::query(
+                    let moved = crate::db::query(
                         "UPDATE opentask.tasks SET bucket_id = $1, last_activity_at = NOW(), updated_at = NOW() WHERE id = $2;"
                     )
                     .bind(bucket_id)
                     .bind(task_id)
                     .execute(pool)
                     .await;
+                    if moved.is_ok() {
+                        realtime.publish(project_id, "task", "moved", Some(task_id));
+                    }
 
                     answer_callback_query(bot_token, callback_query_id, "Tugas ditandai Selesai! 🎉").await;
 
@@ -701,7 +711,7 @@ pub async fn handle_incoming_telegram_message(
                     LEFT JOIN opentask.projects p ON t.project_id = p.id
                     LEFT JOIN opentask.buckets b ON t.bucket_id = b.id
                     WHERE (t.lead_assignee_id = $1 OR $1 = ANY(COALESCE(t.assignee_ids, '{}'::BIGINT[])))
-                      AND (b.state IS NULL OR b.state != 'COMPLETED')
+                      AND (b.state IS NULL OR b.state NOT IN ('COMPLETED', 'DRAFT'))
                     ORDER BY t.updated_at DESC
                     LIMIT 10;
                     "#
@@ -770,7 +780,7 @@ pub async fn handle_incoming_telegram_message(
                     LEFT JOIN opentask.projects p ON t.project_id = p.id
                     LEFT JOIN opentask.buckets b ON t.bucket_id = b.id
                     WHERE (t.lead_assignee_id = $1 OR $1 = ANY(COALESCE(t.assignee_ids, '{}'::BIGINT[])))
-                      AND (b.state IS NULL OR b.state != 'COMPLETED')
+                      AND (b.state IS NULL OR b.state NOT IN ('COMPLETED', 'DRAFT'))
                     ORDER BY t.updated_at DESC
                     LIMIT 10;
                     "#
@@ -905,7 +915,7 @@ pub async fn handle_incoming_telegram_message(
     }
 }
 
-pub async fn run_telegram_polling(pool: PgPool, config: Config) {
+pub async fn run_telegram_polling(pool: PgPool, config: Config, realtime: crate::services::realtime::RealtimeHub) {
     let bot_token = match &config.telegram_bot_token {
         Some(t) if !t.trim().is_empty() => t.clone(),
         _ => {
@@ -997,6 +1007,7 @@ pub async fn run_telegram_polling(pool: PgPool, config: Config) {
 
                                     handle_telegram_callback_query(
                                         &pool,
+                                        &realtime,
                                         &bot_token,
                                         qid,
                                         &chat_id.to_string(),
