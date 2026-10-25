@@ -418,6 +418,7 @@ async fn meeting_flows_against_postgres() {
 
     let p = seed(&pool).await;
     text_job_to_review(&ctx, &p, &llm, &state).await;
+    approval_makes_a_todo_column_when_missing(&ctx, &llm).await;
     gate_no_ends_without_tasks(&ctx, &p, &llm).await;
     recall_bot_failure_fails_the_job(&ctx, &p, &phase).await;
     recall_bot_without_audio_fails_after_grace(&ctx, &p, &phase).await;
@@ -438,6 +439,61 @@ async fn meeting_flows_against_postgres() {
 
     let _ = std::fs::remove_dir_all(&media_dir);
     pool.close().await;
+}
+
+/// A board without a Todo column gets one on the first approval, between the drafts and the rest.
+async fn approval_makes_a_todo_column_when_missing(ctx: &WorkerContext, llm: &LlmClient) {
+    let pool = &ctx.pool;
+    let p = seed(pool).await;
+    sqlx::query("UPDATE opentask.buckets SET name = 'Doing', state = 'ONGOING' WHERE id = $1;")
+        .bind(p.todo_bucket)
+        .execute(pool)
+        .await
+        .unwrap();
+    let created = intake::create_text_job(pool, &ctx.realtime, &ctx.cfg, Some(llm), new_meeting(&p, SourceType::Text, "No Todo"), &notes(""))
+        .await
+        .unwrap();
+    let job_id = created.job.id.0;
+    for _ in 0..12 {
+        if job_status(pool, job_id).await != JobStatus::Queued || !run_next_job(ctx).await {
+            break;
+        }
+    }
+    assert_eq!(job_status(pool, job_id).await, JobStatus::DraftsReady);
+    let drafts = review::job_detail(pool, job_id).await.unwrap().drafts;
+    assert_eq!(drafts.len(), 2);
+    let item = |task_id: SafeId| ApproveDraftItem {
+        task_id,
+        title: None,
+        description: None,
+        task_type: None,
+        weight: None,
+        bucket_id: None,
+        assignee_ids: vec![],
+        due_date: None,
+        priority: None,
+    };
+
+    let first = review::approve(pool, job_id, p.id, &[item(drafts[0].task_id)]).await.unwrap();
+    let todo = first.created_bucket.expect("a Todo column was made");
+    let second = review::approve(pool, job_id, p.id, &[item(drafts[1].task_id)]).await.unwrap();
+    assert_eq!(second.created_bucket, None, "the new column is reused");
+
+    let board: Vec<(i64, String, String, bool)> = sqlx::query_as(
+        "SELECT id, name, state, COALESCE(is_system_locked, FALSE) FROM opentask.buckets WHERE project_id = $1 ORDER BY order_idx, id;",
+    )
+    .bind(p.id)
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    assert_eq!(board.iter().map(|b| b.2.as_str()).collect::<Vec<_>>(), ["DRAFT", "TODO", "ONGOING"]);
+    assert_eq!((board[1].0, board[1].1.as_str(), board[1].3), (todo, review::NEW_TODO_COLUMN, false), "an ordinary column");
+    let placed: Vec<i64> = sqlx::query_scalar("SELECT bucket_id FROM opentask.tasks WHERE id = ANY($1);")
+        .bind(vec![drafts[0].task_id.0, drafts[1].task_id.0])
+        .fetch_all(pool)
+        .await
+        .unwrap();
+    assert_eq!(placed, [todo, todo]);
 }
 
 async fn text_job_to_review(ctx: &WorkerContext, p: &Project, llm: &LlmClient, state: &Shared) {
@@ -519,17 +575,21 @@ async fn text_job_to_review(ctx: &WorkerContext, p: &Project, llm: &LlmClient, s
     let stranger = vec![ApproveDraftItem { task_id: docs.task_id, assignee_ids: vec![SafeId(next_id())], ..approve[0].clone() }];
     assert!(matches!(review::approve(pool, job_id, p.id, &stranger).await, Err(AppError::BadRequest(_))));
 
-    // Rejecting the last draft archives it, ends the review and resolves the alert.
+    // Rejecting the last draft deletes it with its evidence, ends the review and resolves the alert.
     let rejected = review::reject(pool, job_id, p.id, &[docs.task_id]).await.unwrap();
     assert_eq!((rejected.pending_drafts, rejected.job.status), (0, JobStatus::Reviewed));
-    let archived_state: String = sqlx::query_scalar(
-        "SELECT b.state FROM opentask.tasks t JOIN opentask.buckets b ON b.id = t.bucket_id WHERE t.id = $1;",
+    assert_eq!(rejected.deleted.iter().map(|(id, _)| *id).collect::<Vec<_>>(), vec![docs.task_id.0]);
+    let left: (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT (SELECT COUNT(*) FROM opentask.tasks WHERE id = $1),
+               (SELECT COUNT(*) FROM opentask.task_extraction_meta WHERE task_id = $1);
+        "#,
     )
     .bind(docs.task_id.0)
     .fetch_one(pool)
     .await
     .unwrap();
-    assert_eq!(archived_state, "ARCHIVED");
+    assert_eq!(left, (0, 0));
     let resolved: bool = sqlx::query_scalar(
         "SELECT a.is_resolved FROM opentask.alerts a JOIN opentask.meeting_jobs j ON j.alert_id = a.id WHERE j.id = $1;",
     )
@@ -538,7 +598,7 @@ async fn text_job_to_review(ctx: &WorkerContext, p: &Project, llm: &LlmClient, s
     .await
     .unwrap();
     assert!(resolved);
-    assert!(matches!(review::reject(pool, job_id, p.id, &[docs.task_id]).await, Err(AppError::Conflict(_))));
+    assert!(matches!(review::reject(pool, job_id, p.id, &[docs.task_id]).await, Err(AppError::NotFound(_))), "a rejected draft is gone");
 
     move_to_column(pool, p.id, report.task_id.0, "DRAFT").await;
     assert_eq!(review::sync_review_status(pool, Some(p.id), None).await.unwrap(), vec![job_id]);
@@ -1011,7 +1071,7 @@ async fn transcription_waits_for_tomorrow_when_minutes_run_out(ctx: &WorkerConte
 
 async fn health_retention_and_retry(ctx: &WorkerContext, p: &Project, llm: &LlmClient) {
     let pool = &ctx.pool;
-    sqlx::query("UPDATE opentask.project_member SET role = 'Owner' WHERE project_id = $1 AND user_id = $2;")
+    sqlx::query("UPDATE opentask.project_member SET role = 'MANAGER' WHERE project_id = $1 AND user_id = $2;")
         .bind(p.id)
         .bind(p.owner)
         .execute(pool)

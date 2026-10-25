@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Loader2, Quote, Archive } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Loader2, Quote, Trash2 } from "lucide-react";
 import { Badge } from "../../design-system/Badge";
 import { Button } from "../../design-system/Button";
 import { CloseButton } from "../../design-system/CloseButton";
@@ -166,7 +166,7 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
     setBusy(true);
     try {
       const result = await meetingJobService.rejectDrafts(jobId, taskIds);
-      showToast(`${taskIds.length} draft${taskIds.length === 1 ? "" : "s"} archived`, "info");
+      showToast(`${taskIds.length} draft${taskIds.length === 1 ? "" : "s"} rejected and deleted`, "info");
       await finish(result.pending_drafts);
     } catch (err) {
       showToast((err as Error).message || "Could not reject the drafts", "error");
@@ -356,7 +356,7 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
                         value={e.bucketId}
                         onChange={(ev) => update(draft.task_id, { bucketId: ev.target.value })}
                       >
-                        {targetBuckets.length === 0 && <option value="">No Todo/Pending column</option>}
+                        {targetBuckets.length === 0 && <option value="">New “Todo” column</option>}
                         {targetBuckets.map((b) => (
                           <option key={String(b.id)} value={String(b.id)}>
                             {b.name}
@@ -424,7 +424,7 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
 
                   <div className="flex justify-end gap-2 pt-1">
                     <Button variant="outline" size="sm" disabled={busy} onClick={() => void reject([draft.task_id])}>
-                      <Archive size={12} /> Reject
+                      <Trash2 size={12} /> Reject
                     </Button>
                     <Button variant="success" size="sm" disabled={busy} onClick={() => void approve([draft.task_id])}>
                       <CheckCircle2 size={12} /> Approve
@@ -447,10 +447,8 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
               <ul className="space-y-1">
                 {decided.map((d) => (
                   <li key={d.task_id} className="flex items-center gap-2 font-mono text-[11px] text-neutral-400">
-                    <Badge variant={d.bucket_state === "ARCHIVED" ? "outline" : "success"}>
-                      {d.bucket_state === "ARCHIVED"
-                        ? "Rejected"
-                        : `In ${buckets.find((b) => String(b.id) === String(d.bucket_id))?.name ?? "the board"}`}
+                    <Badge variant="success">
+                      In {buckets.find((b) => String(b.id) === String(d.bucket_id))?.name ?? "the board"}
                     </Badge>
                     <span className="truncate">{d.title}</span>
                     {d.lead_assignee_id && <span>· {memberName(d.lead_assignee_id)}</span>}
@@ -468,7 +466,7 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="md" disabled={busy || selectedPending.length === 0} onClick={() => void reject(selectedPending)}>
-                {busy ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />} Reject selected
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Reject selected
               </Button>
               <Button variant="primary" size="md" disabled={busy || selectedPending.length === 0} onClick={() => void approve(selectedPending)}>
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Approve selected

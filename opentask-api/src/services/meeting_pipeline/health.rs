@@ -67,20 +67,21 @@ fn model_health(limits: &std::collections::HashMap<String, Limits>, used: &[usag
         .collect()
 }
 
-/// Owners and admins of the project may see internal errors and retry jobs.
+pub const MANAGER_ROLES: [&str; 3] = ["owner", "manager", "admin"];
+
+pub fn is_manager_role(role: &str) -> bool {
+    MANAGER_ROLES.contains(&role.trim().to_ascii_lowercase().as_str())
+}
+
 pub async fn is_manager(pool: &PgPool, project_id: i64, user_id: i64) -> Result<bool, sqlx::Error> {
-    crate::db::query_scalar(
-        r#"
-        SELECT EXISTS (
-            SELECT 1 FROM opentask.project_member
-            WHERE project_id = $1 AND user_id = $2 AND LOWER(COALESCE(role, '')) IN ('owner', 'admin')
-        );
-        "#,
+    let roles: Vec<String> = crate::db::query_scalar(
+        "SELECT COALESCE(role, '') FROM opentask.project_member WHERE project_id = $1 AND user_id = $2;",
     )
     .bind(project_id)
     .bind(user_id)
-    .fetch_one(pool)
-    .await
+    .fetch_all(pool)
+    .await?;
+    Ok(roles.iter().any(|r| is_manager_role(r)))
 }
 
 #[derive(sqlx::FromRow)]
@@ -193,4 +194,19 @@ pub async fn retry(pool: &PgPool, job_id: i64) -> Result<MeetingJobResponse, App
         .fetch_one(pool)
         .await?;
     Ok(MeetingJobResponse::from(job))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn project_managers_can_manage_the_pipeline() {
+        for role in ["MANAGER", "Manager", "Owner", "owner", "ADMIN", " manager "] {
+            assert!(is_manager_role(role), "{role}");
+        }
+        for role in ["", "Programmer", "Designer", "QA", "member"] {
+            assert!(!is_manager_role(role), "{role}");
+        }
+    }
 }

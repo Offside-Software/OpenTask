@@ -189,6 +189,7 @@ pub async fn trigger_pr_review(
     evaluate_pull_request(
         &state.pool,
         &state.config,
+        &state.realtime,
         &repo_full_name,
         pr_number,
         installation_id,
@@ -378,10 +379,12 @@ pub async fn sync_project_prs(
                 let pool_clone = state.pool.clone();
                 let config_clone = state.config.clone();
                 let repo_clone = repo.clone();
+                let realtime_clone = state.realtime.clone();
                 tokio::spawn(async move {
                     if let Err(error) = evaluate_pull_request(
                         &pool_clone,
                         &config_clone,
+                        &realtime_clone,
                         &repo_clone,
                         number,
                         installation_id,

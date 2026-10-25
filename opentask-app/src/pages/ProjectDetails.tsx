@@ -242,6 +242,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
 
     const handleProjectEvent = useCallback((event: ProjectEvent) => {
         if (event.entity === 'task' || event.entity === 'bucket') {
+            setMeetingEventKey(k => k + 1);
             if (hasPendingReorders()) {
                 // Skip board reload while optimistic moves or network syncs are pending/in flight
                 return;
@@ -264,8 +265,6 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId })
         } else if (event.entity === 'meeting_job') {
             setMeetingEventKey(k => k + 1);
         }
-        // Drafts are tasks: a move on the board can finish or reopen a meeting's review.
-        if (event.entity === 'task') setMeetingEventKey(k => k + 1);
     }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally]);
 
     useProjectRealtime(projectId, { onEvent: handleProjectEvent });
