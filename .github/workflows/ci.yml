@@ -84,7 +84,9 @@ jobs:
             docker rm rust-api || true
             docker run -d --name rust-api --restart unless-stopped -p 80:8000 --env-file ~/OpenTask/.env \
               ghcr.io/${{ env.IMAGE_NAME }}:latest
-            docker image prune -af --filter "until=24h"
+            if [ -n "$OLD_IMAGE_ID" ] && [ "$OLD_IMAGE_ID" != "$NEW_IMAGE_ID" ]; then
+              docker rmi "$OLD_IMAGE_ID" || true
+            fi
 
   deploy-to-vercel:
     # Deploy the web app (and API rewrites) only after the Rust API is live.
