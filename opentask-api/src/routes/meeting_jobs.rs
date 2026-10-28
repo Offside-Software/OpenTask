@@ -191,7 +191,7 @@ pub struct SetAiKeyPayload {
 async fn require_manager(state: &AppState, user: &GitHubUserResponse, project_id: i64) -> Result<i64, AppError> {
     let user_id = require_project_member(&state.pool, user, project_id).await?;
     if !health::is_manager(&state.pool, project_id, user_id).await? {
-        return Err(AppError::Forbidden("Only project owners and admins can change the project's API key".to_string()));
+        return Err(AppError::Forbidden("Only project managers can change the project's Groq API key".to_string()));
     }
     Ok(user_id)
 }
@@ -267,7 +267,7 @@ pub async fn retry_job(
 ) -> Result<Json<crate::models::meeting::MeetingJobResponse>, AppError> {
     let (project_id, user_id) = member_job(&state, &user, job_id.0).await?;
     if !health::is_manager(&state.pool, project_id, user_id).await? {
-        return Err(AppError::Forbidden("Only project owners and admins can retry meeting jobs".to_string()));
+        return Err(AppError::Forbidden("Only project managers can retry meeting jobs".to_string()));
     }
     let job = health::retry(&state.pool, job_id.0).await?;
     state.realtime.publish(project_id, "meeting_job", "updated", Some(job_id.0));
@@ -314,11 +314,14 @@ pub async fn get_transcript(
 }
 
 fn after_review(state: &AppState, project_id: i64, job_id: i64, outcome: &ReviewOutcome) {
-    if let Some(bucket_id) = outcome.archived_bucket_id {
-        state.realtime.publish(project_id, "bucket", "updated", Some(bucket_id));
+    if let Some(bucket_id) = outcome.created_bucket {
+        state.realtime.publish(project_id, "bucket", "created", Some(bucket_id));
     }
     for (task_id, _, _) in &outcome.moved {
         state.realtime.publish(project_id, "task", "updated", Some(*task_id));
+    }
+    for (task_id, _) in &outcome.deleted {
+        state.realtime.publish(project_id, "task", "deleted", Some(*task_id));
     }
     state.realtime.publish(project_id, "meeting_job", "updated", Some(job_id));
 }

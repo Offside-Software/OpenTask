@@ -11,6 +11,7 @@ use crate::services::id_generator::next_id;
 pub async fn evaluate_pull_request(
     pool: &PgPool,
     config: &Config,
+    realtime: &crate::services::realtime::RealtimeHub,
     repo_full_name: &str,
     pr_number: i64,
     installation_id: u64,
@@ -190,13 +191,16 @@ pub async fn evaluate_pull_request(
         .await
         {
             if let Ok(review_bucket_id) = row.try_get::<i64, _>("id") {
-                let _ = crate::db::query(
+                let moved = crate::db::query(
                     "UPDATE opentask.tasks SET bucket_id = $1, updated_at = NOW(), last_activity_at = NOW() WHERE id = $2 AND bucket_id != $1;"
                 )
                 .bind(review_bucket_id)
                 .bind(tid)
                 .execute(pool)
                 .await;
+                if moved.is_ok_and(|r| r.rows_affected() > 0) {
+                    realtime.publish(pid, "task", "moved", Some(tid));
+                }
             }
         }
     }

@@ -4,7 +4,7 @@ import { Button } from '../../design-system/Button';
 import { Skeleton } from '../../design-system/Skeleton';
 import { TrashButton } from '../../design-system/TrashButton';
 import { useToast } from '../../design-system/Toast';
-import { Calendar, Clock, FileText, ChevronRight, Download, CheckCircle2, Loader2, Archive, ClipboardCheck } from 'lucide-react';
+import { Calendar, Clock, FileText, ChevronRight, Download, CheckCircle2, Loader2, Trash2, ClipboardCheck } from 'lucide-react';
 
 import type { Bucket, Meeting, MeetingDraftTask, MeetingJobSummary, ProjectMember } from '../../models';
 import { meetingJobService } from '../../services/meetingJobService';
@@ -95,15 +95,12 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
 
   const accept = async (draft: MeetingDraftTask) => {
     if (!jobId) return;
-    if (!effectiveTarget) {
-      showToast('Add a Todo or Pending column first', 'error');
-      return;
-    }
     const assignees = draft.assignee_ids.length > 0 ? draft.assignee_ids : draft.resolved_user_id ? [draft.resolved_user_id] : [];
     setBusyTask(draft.task_id);
     try {
-      await meetingJobService.approveDrafts(jobId, [{ task_id: draft.task_id, bucket_id: effectiveTarget, assignee_ids: assignees }]);
-      showToast(`Moved to ${bucketName(effectiveTarget)}`, 'success');
+      // No Todo/Pending column yet: the server makes a Todo column.
+      await meetingJobService.approveDrafts(jobId, [{ task_id: draft.task_id, bucket_id: effectiveTarget || undefined, assignee_ids: assignees }]);
+      showToast(effectiveTarget ? `Moved to ${bucketName(effectiveTarget)}` : 'Moved to a new Todo column', 'success');
       afterDecision();
     } catch (err) {
       showToast((err as Error).message || 'Could not accept the task', 'error');
@@ -117,7 +114,7 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
     setBusyTask(draft.task_id);
     try {
       await meetingJobService.rejectDrafts(jobId, [draft.task_id]);
-      showToast('Draft rejected and archived', 'info');
+      showToast('Draft rejected and deleted', 'info');
       afterDecision();
     } catch (err) {
       showToast((err as Error).message || 'Could not reject the draft', 'error');
@@ -143,7 +140,7 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
       lines.push('## Action items', '');
       for (const d of drafts) {
         const who = memberName(d.lead_assignee_id) ?? memberName(d.resolved_user_id) ?? d.assignee_hint;
-        const state = d.bucket_state === 'DRAFT' ? 'draft' : d.bucket_state === 'ARCHIVED' ? 'rejected' : `in ${bucketName(d.bucket_id)}`;
+        const state = d.bucket_state === 'DRAFT' ? 'draft' : `in ${bucketName(d.bucket_id)}`;
         lines.push(`- ${d.title}${who ? ` (${who})` : ''}${d.due_date ? `, due ${d.due_date}` : ''} [${state}]`);
       }
       lines.push('');
@@ -210,14 +207,12 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
                 {isDraft ? (
                   <>
                     <Button variant="outline" size="sm" disabled={busy} onClick={() => void reject(d)} aria-label={`Reject ${d.title}`}>
-                      <Archive size={12} /> Reject
+                      <Trash2 size={12} /> Reject
                     </Button>
-                    <Button variant="success" size="sm" disabled={busy} onClick={() => void accept(d)} aria-label={`Accept ${d.title} into ${bucketName(effectiveTarget)}`}>
+                    <Button variant="success" size="sm" disabled={busy} onClick={() => void accept(d)} aria-label={`Accept ${d.title} into ${effectiveTarget ? bucketName(effectiveTarget) : 'a new Todo column'}`}>
                       {busy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Accept
                     </Button>
                   </>
-                ) : d.bucket_state === 'ARCHIVED' ? (
-                  <Badge variant="outline">Rejected</Badge>
                 ) : (
                   <Badge variant="success">In {bucketName(d.bucket_id)}</Badge>
                 )}

@@ -76,7 +76,13 @@ CREATE TABLE IF NOT EXISTS opentask.task_extraction_meta (
 );
 CREATE INDEX IF NOT EXISTS idx_task_extraction_meta_job_id ON opentask.task_extraction_meta(job_id);
 
--- tasks.meeting_id becomes a real foreign key. Approved and archived tasks outlive their meeting.
+-- Rejected drafts are deleted now. Remove the locked Archived column that used to hold them.
+DELETE FROM opentask.tasks t
+USING opentask.buckets b
+WHERE t.bucket_id = b.id AND b.state = 'ARCHIVED' AND b.is_system_locked;
+DELETE FROM opentask.buckets WHERE state = 'ARCHIVED' AND is_system_locked;
+
+-- tasks.meeting_id becomes a real foreign key. Approved tasks outlive their meeting.
 DO $$
 BEGIN
     IF NOT EXISTS (
