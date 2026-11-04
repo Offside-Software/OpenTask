@@ -39,7 +39,7 @@ OpenTask implements both HTTP POST (Stateless JSON-RPC) and Server-Sent Events (
 | **Global SSE** | `GET /api/mcp/sse` | Multi-project SSE endpoint. |
 
 > [!NOTE]
-> In production, requests to `/api/*` are routed directly to the Rust backend (e.g. `https://env-opentask.user.cloudjkt02.com/api/...` or your custom domain).
+> In production, requests to `/api/*` are routed directly to the Rust backend (e.g. `https://env-opentask.user.cloudjkt02.com/api/opentask/...` or your custom domain).
 
 ---
 

@@ -84,7 +84,7 @@ jobs:
             NEW_IMAGE_ID=$(docker images -q ghcr.io/${{ env.IMAGE_NAME }}:latest)
             docker stop rust-api || true
             docker rm rust-api || true
-            docker run -d --name rust-api --restart unless-stopped -p 80:8000 --env-file ~/OpenTask/.env \
+            docker run -d --name rust-api --restart unless-stopped -p 8000:8000 --env-file ~/OpenTask/.env \
               ghcr.io/${{ env.IMAGE_NAME }}:latest
             if [ -n "$OLD_IMAGE_ID" ] && [ "$OLD_IMAGE_ID" != "$NEW_IMAGE_ID" ]; then
               docker rmi "$OLD_IMAGE_ID" || true

@@ -1,6 +1,6 @@
 import JSONBig from "json-bigint";
 
-export const DEFAULT_PRODUCTION_API_URL = "https://env-opentask.user.cloudjkt02.com";
+export const DEFAULT_PRODUCTION_API_URL = "https://env-opentask.user.cloudjkt02.com/api/opentask";
 export const DEFAULT_DEV_API_URL = "http://localhost:8000";
 
 export function isTauriEnvironment(): boolean {

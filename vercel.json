@@ -25,15 +25,15 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/opentask/$1"
     },
     {
       "source": "/github/(.*)",
-      "destination": "https://env-opentask.user.cloudjkt02.com/github/$1"
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/opentask/github/$1"
     },
     {
       "source": "/health",
-      "destination": "https://env-opentask.user.cloudjkt02.com/api/health"
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/opentask/health"
     },
     {
       "source": "/(.*)",
