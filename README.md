@@ -177,7 +177,7 @@ The frontend is deployed to Vercel and configured via [`vercel.json`](file:///ve
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://env-opentask.user.cloudjkt02.com/api/$1"
+      "destination": "https://env-opentask.user.cloudjkt02.com/api/opentask/$1"
     },
     {
       "source": "/github/(.*)",

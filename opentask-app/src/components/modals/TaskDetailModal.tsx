@@ -226,7 +226,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     };
 
     useEffect(() => {
-        loadReviews();
+        void loadReviews();
     }, [task.id]);
 
     const [triggeringReview, setTriggeringReview] = useState(false);
