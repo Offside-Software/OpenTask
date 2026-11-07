@@ -208,19 +208,25 @@ html.dark {
   transform-origin: center;
 }
 
-/* Suppress mermaid error DOM artifacts from ever creating document layout shifts or window scrollbars */
-body > div[id^="dmermaid-"],
-body > div[id^="mermaid-"],
-body > svg[id^="dmermaid-"],
+/* Suppress stray mermaid bomb icons and syntax error nodes from leaking into page flow */
+body > .error-icon,
+body > div[id^="dmermaid-"] .error-icon,
+svg.error-icon,
 #dmermaid-error,
 .mermaid-error {
   display: none !important;
+}
+
+/* Offscreen measuring helper if mermaid mounts a temporary measuring element to body */
+body > div[id^="dmermaid-"] {
+  position: fixed !important;
+  top: -99999px !important;
+  left: -99999px !important;
+  width: 1920px !important;
+  height: 1080px !important;
   visibility: hidden !important;
-  height: 0 !important;
-  width: 0 !important;
-  overflow: hidden !important;
+  opacity: 0 !important;
   pointer-events: none !important;
-  position: absolute !important;
-  top: -9999px !important;
-  left: -9999px !important;
+  overflow: hidden !important;
+  z-index: -9999 !important;
 }

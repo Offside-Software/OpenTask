@@ -77,6 +77,40 @@ export const MERMAID_TEMPLATES: MermaidTemplate[] = [
       Export PNG JPG PDF
       Attach to Tasks`,
   },
+  {
+    name: "Git Branching Model",
+    category: "Git",
+    code: `gitGraph
+    commit id: "Initial"
+    branch dev
+    checkout dev
+    commit id: "feat: setup"
+    branch feat/diagrams
+    checkout feat/diagrams
+    commit id: "feat: viewer"
+    commit id: "feat: export"
+    checkout dev
+    merge feat/diagrams
+    checkout master
+    merge dev tag: "v1.2.0"`,
+  },
+  {
+    name: "Class Diagram",
+    category: "Architecture",
+    code: `classDiagram
+    class Project {
+      +String id
+      +String name
+      +createTask()
+    }
+    class Task {
+      +String id
+      +String title
+      +String status
+      +assign()
+    }
+    Project "1" *-- "many" Task : contains`,
+  },
 ];
 
 interface MermaidEditorProps {

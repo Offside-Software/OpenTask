@@ -620,6 +620,7 @@ export const ProjectDiagramsTab: React.FC<ProjectDiagramsTabProps> = ({
                     )}
                   >
                     <MermaidViewer
+                      key={selectedDiagramId || "new"}
                       code={code}
                       title={title}
                       onSvgRendered={setRenderedSvg}

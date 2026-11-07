@@ -25,6 +25,8 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const renderSandboxRef = useRef<HTMLDivElement>(null);
+
   const [svgHtml, setSvgHtml] = useState<string>("");
   const [renderError, setRenderError] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(false);
@@ -36,15 +38,16 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Track the diagram type/header to auto-reset pan/zoom when switching diagram types
+  const lastDiagramHeaderRef = useRef<string>("");
+
   // Clean up any stray error elements Mermaid might have appended to document.body
   const cleanUpMermaidErrorElements = useCallback(() => {
     if (typeof document === "undefined") return;
     document
-      .querySelectorAll('div[id^="dmermaid-"], div[id^="mermaid-"], svg[id^="dmermaid-"]')
+      .querySelectorAll(".error-icon, #dmermaid-error, svg.error-icon")
       .forEach((el) => {
-        if (el.parentElement === document.body) {
-          el.remove();
-        }
+        el.remove();
       });
   }, []);
 
@@ -59,6 +62,10 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
           htmlLabels: false,
           useMaxWidth: true,
         },
+        mindmap: {
+          useMaxWidth: true,
+          padding: 16,
+        },
         fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         theme: isDark ? "dark" : "default",
         themeVariables: isDark
@@ -71,6 +78,10 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
               lineColor: "#94A3B8",
               secondaryColor: "#1E293B",
               tertiaryColor: "#0F172A",
+              textColor: "#F8FAFC",
+              mainBkg: "#1E293B",
+              nodeBorder: "#FFE600",
+              nodeTextColor: "#F8FAFC",
             }
           : {
               darkMode: false,
@@ -81,6 +92,10 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
               lineColor: "#475569",
               secondaryColor: "#F1F5F9",
               tertiaryColor: "#F8FAFC",
+              textColor: "#0F172A",
+              mainBkg: "#F8FAFC",
+              nodeBorder: "#000000",
+              nodeTextColor: "#000000",
             },
       });
     } catch (e) {
@@ -88,7 +103,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
     }
   }, [isDark]);
 
-  // Render diagram on code or theme change
+  // Render diagram on code or theme change with debouncing
   useEffect(() => {
     let isCancelled = false;
     const cleanCode = code?.trim();
@@ -98,13 +113,27 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
       setRenderError(null);
       onErrorChange?.(null);
       onSvgRendered?.(null);
-      cleanUpMermaidErrorElements();
+      lastDiagramHeaderRef.current = "";
       return;
     }
 
+    // Extract first line of diagram to detect diagram type switch
+    const currentHeader = cleanCode
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0 && !l.startsWith("%%")) || "";
+
+    if (lastDiagramHeaderRef.current && currentHeader && lastDiagramHeaderRef.current !== currentHeader) {
+      setPan({ x: 0, y: 0 });
+      setZoom(1);
+    }
+    lastDiagramHeaderRef.current = currentHeader;
+
     setIsRendering(true);
 
-    const runRender = async () => {
+    const debounceTimer = setTimeout(async () => {
+      if (isCancelled) return;
+
       // 1. Pre-validate syntax with parse() so invalid syntax never touches render() or document.body
       try {
         await mermaid.parse(cleanCode, { suppressErrors: true });
@@ -119,10 +148,11 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
         return;
       }
 
-      // 2. Syntax is valid, render safely
+      // 2. Syntax is valid, render safely into dedicated offscreen measuring sandbox
       const renderId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
       try {
-        const { svg } = await mermaid.render(renderId, cleanCode);
+        const sandbox = renderSandboxRef.current ?? undefined;
+        const { svg } = await mermaid.render(renderId, cleanCode, sandbox);
         if (!isCancelled) {
           setSvgHtml(svg);
           setRenderError(null);
@@ -140,12 +170,11 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
           setIsRendering(false);
         }
       }
-    };
-
-    runRender();
+    }, 150);
 
     return () => {
       isCancelled = true;
+      clearTimeout(debounceTimer);
       cleanUpMermaidErrorElements();
     };
   }, [code, isDark, onErrorChange, cleanUpMermaidErrorElements]);
@@ -160,7 +189,6 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
 
   // Pointer Drag (Pan) Handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Only drag on primary mouse button or touch
     if (e.button !== 0 && e.pointerType === "mouse") return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
@@ -204,12 +232,30 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
     if (!svg) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
-    const svgRect = svg.getBoundingClientRect();
+    const viewBox = svg.getAttribute("viewBox");
 
-    if (svgRect.width > 0 && svgRect.height > 0) {
-      const scaleX = (containerRect.width - 60) / (svgRect.width / zoom);
-      const scaleY = (containerRect.height - 60) / (svgRect.height / zoom);
-      const fitZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.25), 2.5);
+    let naturalWidth = 0;
+    let naturalHeight = 0;
+
+    if (viewBox) {
+      const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+      if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+        naturalWidth = parts[2];
+        naturalHeight = parts[3];
+      }
+    }
+
+    if (!naturalWidth || !naturalHeight) {
+      const svgRect = svg.getBoundingClientRect();
+      naturalWidth = svgRect.width / zoom;
+      naturalHeight = svgRect.height / zoom;
+    }
+
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      const padding = 60;
+      const scaleX = (containerRect.width - padding) / naturalWidth;
+      const scaleY = (containerRect.height - padding) / naturalHeight;
+      const fitZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.2), 2.5);
 
       setZoom(fitZoom);
       setPan({ x: 0, y: 0 });
@@ -236,11 +282,29 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
       onPointerCancel={handlePointerUp}
       onWheel={handleWheel}
     >
+      {/* Offscreen sandbox container for Mermaid layout and measurement */}
+      <div
+        ref={renderSandboxRef}
+        style={{
+          position: "fixed",
+          top: -99999,
+          left: -99999,
+          width: 1920,
+          height: 1080,
+          visibility: "hidden",
+          opacity: 0,
+          pointerEvents: "none",
+          overflow: "hidden",
+          zIndex: -9999,
+        }}
+        aria-hidden="true"
+      />
+
       {/* Moveable Graph Viewport */}
       <div
         ref={viewportRef}
         className={cn(
-          "w-full h-full flex items-center justify-center transition-transform duration-75 ease-out",
+          "w-full h-full flex items-center justify-center transition-transform duration-75 ease-out [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:h-auto",
           isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
         style={{
@@ -278,7 +342,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
       {showControls && (
         <div
           className="absolute bottom-4 right-4 z-20 flex items-center gap-1 bg-card/90 border border-border rounded-lg p-1 shadow-md backdrop-blur-sm"
-          onPointerDown={(e) => e.stopPropagation()} // Prevent canvas pan when clicking buttons
+          onPointerDown={(e) => e.stopPropagation()}
         >
           <button
             type="button"
