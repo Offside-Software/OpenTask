@@ -10,16 +10,16 @@ import { JOB_STATUS_LABEL, JOB_STATUS_VARIANT, SOURCE_LABEL, describeJob, isJobA
 interface MeetingJobsPanelProps {
   jobs: MeetingJobSummary[];
   loading: boolean;
-  isRefreshing: boolean,
+  isRefreshing: boolean;
   onRefresh: () => void;
   onReview: (jobId: string) => void;
   className?: string;
 }
 
 const SourceIcon: React.FC<{ source: string }> = ({ source }) => {
-  if (source === "RECALL_BOT") return <Mic size={14} strokeWidth={2.5} aria-label="Meeting bot" />;
-  if (source === "MEDIA") return <Video size={14} strokeWidth={2.5} aria-label="Recording" />;
-  return <FileText size={14} strokeWidth={2.5} aria-label="Notes" />;
+  if (source === "RECALL_BOT") return <Mic size={14} aria-label="Meeting bot" />;
+  if (source === "MEDIA") return <Video size={14} aria-label="Recording" />;
+  return <FileText size={14} aria-label="Notes" />;
 };
 
 const isCurrent = (job: MeetingJobSummary) => isJobActive(job.status) || job.status === "DRAFTS_READY";
@@ -28,20 +28,20 @@ const JobRow: React.FC<{ job: MeetingJobSummary; onReview: (jobId: string) => vo
   const reviewable = job.status === "DRAFTS_READY";
   return (
     <li
-      className={`border-2 p-3 flex flex-col md:flex-row md:items-center gap-3 ${
-        reviewable ? "border-black bg-[#181B20] shadow-[3px_3px_0px_0px_#000000]" : "border-neutral-700 bg-[#121417]"
+      className={`border rounded-xl p-3.5 flex flex-col md:flex-row md:items-center gap-3 transition-colors ${
+        reviewable ? "border-primary/40 bg-primary/5 shadow-xs" : "border-border bg-card/60"
       }`}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
-          <span className="text-neutral-300" title={SOURCE_LABEL[job.source_type] ?? job.source_type}>
+          <span className="text-muted-foreground" title={SOURCE_LABEL[job.source_type] ?? job.source_type}>
             <SourceIcon source={job.source_type} />
           </span>
-          <span className="text-white font-mono font-bold text-[13px] truncate max-w-[22rem]">
+          <span className="text-foreground font-semibold text-xs truncate max-w-[22rem]">
             {job.meeting_title || "Untitled meeting"}
           </span>
           <Badge variant={JOB_STATUS_VARIANT[job.status]}>
-            {isJobActive(job.status) && <span className="w-1.5 h-1.5 bg-current animate-pulse" />}
+            {isJobActive(job.status) && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
             {JOB_STATUS_LABEL[job.status]}
           </Badge>
           {job.gate?.failed_open && (
@@ -50,7 +50,7 @@ const JobRow: React.FC<{ job: MeetingJobSummary; onReview: (jobId: string) => vo
             </Badge>
           )}
         </div>
-        <p className="text-neutral-400 font-mono text-[11px] leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-relaxed">
           {SOURCE_LABEL[job.source_type] ?? job.source_type} · {job.meeting_date.slice(0, 10)} ·{" "}
           {describeJob(job, job.source_type)}
         </p>
@@ -94,23 +94,27 @@ export const MeetingJobsPanel: React.FC<MeetingJobsPanelProps> = ({ jobs, loadin
       icon={showHistory ? History : ListChecks}
       rightElement={
         <div className="flex items-center gap-2">
-          <button
-            className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowHistory((v) => !v)}
             aria-pressed={showHistory}
             title={showHistory ? "Back to the jobs in progress" : "Show completed and failed jobs"}
           >
-            <History size={13} strokeWidth={2.5} />
-            {showHistory ? "Current" : `History (${history.length})`}
-          </button>
-          <button 
-            className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
+            <History size={13} />
+            <span>{showHistory ? "Current" : `History (${history.length})`}</span>
+          </Button>
+          <Button 
+            variant="outline"
+            size="sm"
             onClick={onRefresh}
             aria-label="Refresh meeting jobs"
-            title="Refresh">
-            <RefreshCw size={13} strokeWidth={2.5} className={isRefreshing ? "animate-spin text-black" : "text-[#FFE600]"} />
-            <span>{isRefreshing ? 'SYNCING...' : 'REFRESH HISTORY'}</span>
-          </button>
+            title="Refresh"
+            disabled={isRefreshing}
+          >
+            <RefreshCw size={13} className={isRefreshing ? "animate-spin text-primary" : ""} />
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          </Button>
         </div>
       }
     >
@@ -120,7 +124,7 @@ export const MeetingJobsPanel: React.FC<MeetingJobsPanelProps> = ({ jobs, loadin
           <Skeleton height={56} />
         </div>
       ) : shown.length === 0 ? (
-        <p className="text-neutral-400 font-mono text-[12px] py-6 text-center border-2 border-dashed border-neutral-700">
+        <p className="text-muted-foreground text-xs py-8 text-center border border-dashed border-border rounded-xl">
           {showHistory
             ? "No completed or failed jobs yet."
             : history.length > 0

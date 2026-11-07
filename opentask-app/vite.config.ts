@@ -49,6 +49,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        "@": path.resolve(import.meta.dirname, "./src"),
+      },
+    },
     // Load .env files from the repo root instead of the frontend/ folder
     envDir: "../",
     define: {

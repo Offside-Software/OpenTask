@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { X, Briefcase } from 'lucide-react';
+import { Briefcase } from 'lucide-react';
+import { Button } from '../../design-system/Button';
+import { CloseButton } from '../../design-system/CloseButton';
 import type { Project } from '../../models';
 
 interface ProjectFormModalProps {
@@ -14,6 +16,7 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
 }) => {
   const [name, setName] = useState(initial.name ?? '');
   const [saving, setSaving] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -26,52 +29,56 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
-      <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-md shadow-[8px_8px_0px_0px_#000000]" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 select-none animate-in fade-in duration-150">
+      <div
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b-2 border-black bg-[#181B20]">
+        <div className="flex items-center justify-between p-5 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-              <Briefcase size={16} strokeWidth={2.5} />
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <Briefcase size={18} />
             </div>
-            <h2 className="text-white font-mono font-black uppercase tracking-wider text-[15px]">{title}</h2>
+            <h2 className="text-foreground font-semibold text-base">{title}</h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer">
-            <X size={16} strokeWidth={3} />
-          </button>
+          <CloseButton onClick={onClose} size="md" />
         </div>
 
-        {/* Form Project Name */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 font-mono">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2">
-              PROJECT NAME <span className="text-[#EF4444]">*</span>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Project name <span className="text-destructive">*</span>
             </label>
             <input
               autoFocus
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Project Alpha"
-              className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+              className="w-full bg-background border border-input rounded-lg px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors"
             />
           </div>
 
-          {/* Cancel / Create Button */}
-          <div className="flex gap-3 pt-3 border-t-2 border-neutral-800">
-            <button 
+          <div className="flex gap-2.5 pt-3 border-t border-border">
+            <Button 
               type="button" 
+              variant="outline" 
+              size="md"
               onClick={onClose} 
-              className="flex-1 py-2.5 rounded-none text-[12px] font-mono font-black uppercase tracking-wider text-neutral-300 bg-[#1E2227] border-2 border-black shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+              className="flex-1"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
               disabled={saving || !name.trim()}
-              className="flex-1 py-2.5 rounded-none text-[12px] font-mono font-black uppercase tracking-wider bg-[#FFE600] text-black border-2 border-black shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+              className="flex-1"
             >
-              {saving ? 'SAVING…' : title}
-            </button>
+              {saving ? 'Saving…' : title}
+            </Button>
           </div>
         </form>
       </div>

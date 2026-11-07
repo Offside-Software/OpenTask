@@ -29,11 +29,11 @@ interface DraftEdit {
   priority: string;
 }
 
-const CONFIDENCE_VARIANT = { high: "success", medium: "warning", low: "outline" } as const;
+const CONFIDENCE_VARIANT = { high: "success", medium: "warning", low: "neutral" } as const;
 
 const inputClass =
-  "w-full bg-[#0B0E14] border-2 border-neutral-700 rounded-none px-2.5 py-1.5 text-white font-mono text-[12px] focus:outline-none focus:border-[#FFE600]";
-const labelClass = "block text-neutral-400 font-mono text-[10px] font-bold uppercase tracking-wider mb-1";
+  "w-full bg-background border border-input rounded-md px-2.5 py-1.5 text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring transition-colors";
+const labelClass = "block text-muted-foreground text-[11px] font-medium mb-1";
 
 export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, members, buckets, onClose, onChanged }) => {
   const { showToast } = useToast();
@@ -200,24 +200,24 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
   const selectedPending = pending.map((d) => d.task_id).filter((id) => selected.has(id));
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-100" onClick={onClose}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-100" onClick={onClose}>
       <div
-        className="bg-[#121417] border-2 border-black rounded-none w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[8px_8px_0px_0px_#000000]"
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-xl overflow-hidden animate-in zoom-in-95 duration-100"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="draft-review-title"
       >
-        <div className="p-5 border-b-2 border-black flex items-start justify-between gap-4">
+        <div className="p-5 border-b border-border flex items-start justify-between gap-4 bg-card">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-              <ClipboardCheck size={18} strokeWidth={2.5} />
+            <div className="p-2 bg-primary/10 text-primary border border-primary/20 rounded-lg">
+              <ClipboardCheck size={18} />
             </div>
             <div>
-              <h2 id="draft-review-title" className="text-white font-mono font-black uppercase tracking-wide text-[16px]">
-                Review meeting tasks
+              <h2 id="draft-review-title" className="text-foreground font-semibold text-base">
+                Review Meeting Tasks
               </h2>
-              <p className="text-neutral-400 font-mono text-[11px] uppercase tracking-wider mt-0.5">
+              <p className="text-muted-foreground text-xs mt-0.5">
                 {detail ? `${detail.meeting.title ?? "Meeting"} · ${pending.length} waiting · ${decided.length} decided` : "Loading…"}
               </p>
             </div>
@@ -227,7 +227,9 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {loadError && (
-            <p className="border-2 border-black bg-[#FF3333] text-white font-mono text-[12px] p-3">{loadError}</p>
+            <div className="border border-destructive/20 bg-destructive/10 text-destructive text-xs rounded-lg p-3">
+              {loadError}
+            </div>
           )}
           {!detail && !loadError && (
             <div className="space-y-3">
@@ -237,9 +239,9 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
           )}
 
           {detail?.meeting.mom_summary && (
-            <div className="border-2 border-neutral-700 bg-[#141619] p-3">
+            <div className="border border-border rounded-lg bg-muted/30 p-3.5">
               <p className={labelClass}>Summary</p>
-              <p className="text-neutral-300 font-mono text-[12px] leading-relaxed">{detail.meeting.mom_summary}</p>
+              <p className="text-foreground text-xs leading-relaxed">{detail.meeting.mom_summary}</p>
             </div>
           )}
 
@@ -253,18 +255,18 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
                 ? transcript.slice(Math.max(0, draft.evidence_segment - 2), draft.evidence_segment + 3)
                 : null;
             return (
-              <div key={draft.task_id} className="border-2 border-black bg-[#141619] shadow-[3px_3px_0px_0px_#000000]">
-                <div className="flex items-start gap-3 p-3 border-b-2 border-neutral-800">
+              <div key={draft.task_id} className="border border-border rounded-xl bg-card shadow-xs overflow-hidden">
+                <div className="flex items-start gap-3 p-3.5 border-b border-border bg-muted/20">
                   <input
                     type="checkbox"
                     checked={selected.has(draft.task_id)}
                     onChange={() => toggle(draft.task_id)}
-                    className="mt-2 w-4 h-4 accent-[#FFE600] cursor-pointer"
+                    className="mt-2 w-4 h-4 rounded text-primary focus:ring-ring cursor-pointer"
                     aria-label={`Select ${draft.title}`}
                   />
                   <div className="flex-1 min-w-0 space-y-2">
                     <input
-                      className={`${inputClass} font-bold text-[13px]`}
+                      className={`${inputClass} font-semibold text-sm`}
                       value={e.title}
                       maxLength={200}
                       onChange={(ev) => update(draft.task_id, { title: ev.target.value })}
@@ -273,12 +275,12 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={CONFIDENCE_VARIANT[draft.confidence]}>{draft.confidence} confidence</Badge>
                       {!draft.evidence_verified && (
-                        <Badge variant="critical">
-                          <AlertTriangle size={10} /> Unverified evidence
+                        <Badge variant="danger">
+                          <AlertTriangle size={11} className="mr-1" /> Unverified evidence
                         </Badge>
                       )}
                       {heardAs && (
-                        <span className="text-neutral-400 font-mono text-[11px]">
+                        <span className="text-muted-foreground text-xs">
                           Heard as “{heardAs}”{draft.resolved_user_id ? ` → ${memberName(draft.resolved_user_id)}` : " (no unique match)"}
                         </span>
                       )}
@@ -286,30 +288,30 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
                   </div>
                 </div>
 
-                <div className="p-3 space-y-3">
-                  <div className="flex gap-2 items-start bg-[#0B0E14] border-l-4 border-[#FFE600] p-2.5">
-                    <Quote size={14} className="text-[#FFE600] shrink-0 mt-0.5" />
-                    <p className="text-neutral-300 font-mono text-[12px] leading-relaxed flex-1">
-                      {ts && <span className="text-[#FFE600] font-bold mr-1.5">[{ts}]</span>}
+                <div className="p-4 space-y-3">
+                  <div className="flex gap-2.5 items-start bg-muted/40 border-l-2 border-primary rounded-r-md p-2.5">
+                    <Quote size={14} className="text-primary shrink-0 mt-0.5" />
+                    <p className="text-foreground text-xs leading-relaxed flex-1">
+                      {ts && <span className="text-primary font-medium mr-1.5">[{ts}]</span>}
                       {draft.evidence_quote}
                     </p>
                     {draft.evidence_segment != null && (
                       <button
                         type="button"
                         onClick={() => void showContext(draft)}
-                        className="text-neutral-400 hover:text-white font-mono text-[10px] uppercase tracking-wider underline shrink-0 cursor-pointer"
+                        className="text-muted-foreground hover:text-foreground text-xs underline shrink-0 cursor-pointer transition-colors"
                       >
                         {contextFor === draft.task_id ? "Hide context" : "Context"}
                       </button>
                     )}
                   </div>
                   {context && (
-                    <div className="border-2 border-neutral-700 p-2 space-y-1">
+                    <div className="border border-border rounded-lg p-2.5 bg-muted/20 space-y-1">
                       {context.map((s) => (
                         <p
                           key={s.index}
-                          className={`font-mono text-[11px] leading-relaxed ${
-                            s.index === draft.evidence_segment ? "text-white font-bold" : "text-neutral-400"
+                          className={`text-xs leading-relaxed ${
+                            s.index === draft.evidence_segment ? "text-foreground font-semibold" : "text-muted-foreground"
                           }`}
                         >
                           {formatTimestamp(s.start_sec) && <span className="mr-1">[{formatTimestamp(s.start_sec)}]</span>}
@@ -422,12 +424,14 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-1">
+                  <div className="flex justify-end gap-2 pt-2">
                     <Button variant="outline" size="sm" disabled={busy} onClick={() => void reject([draft.task_id])}>
-                      <Trash2 size={12} /> Reject
+                      <Trash2 size={13} />
+                      <span>Reject</span>
                     </Button>
                     <Button variant="success" size="sm" disabled={busy} onClick={() => void approve([draft.task_id])}>
-                      <CheckCircle2 size={12} /> Approve
+                      <CheckCircle2 size={13} />
+                      <span>Approve</span>
                     </Button>
                   </div>
                 </div>
@@ -436,7 +440,7 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
           })}
 
           {detail && pending.length === 0 && (
-            <p className="text-neutral-300 font-mono text-[12px] border-2 border-dashed border-neutral-700 p-4 text-center">
+            <p className="text-muted-foreground text-xs border border-dashed border-border rounded-lg p-6 text-center">
               Nothing left to review for this meeting.
             </p>
           )}
@@ -446,11 +450,11 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
               <p className={labelClass}>Decided</p>
               <ul className="space-y-1">
                 {decided.map((d) => (
-                  <li key={d.task_id} className="flex items-center gap-2 font-mono text-[11px] text-neutral-400">
+                  <li key={d.task_id} className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Badge variant="success">
                       In {buckets.find((b) => String(b.id) === String(d.bucket_id))?.name ?? "the board"}
                     </Badge>
-                    <span className="truncate">{d.title}</span>
+                    <span className="truncate text-foreground font-medium">{d.title}</span>
                     {d.lead_assignee_id && <span>· {memberName(d.lead_assignee_id)}</span>}
                   </li>
                 ))}
@@ -460,16 +464,18 @@ export const DraftReviewModal: React.FC<DraftReviewModalProps> = ({ jobId, membe
         </div>
 
         {pending.length > 0 && (
-          <div className="p-4 border-t-2 border-black flex flex-wrap items-center justify-between gap-3">
-            <span className="text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
+          <div className="p-4 border-t border-border flex flex-wrap items-center justify-between gap-3 bg-card">
+            <span className="text-muted-foreground text-xs">
               {selectedPending.length} of {pending.length} selected
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="md" disabled={busy || selectedPending.length === 0} onClick={() => void reject(selectedPending)}>
-                {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Reject selected
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                <span>Reject selected</span>
               </Button>
               <Button variant="primary" size="md" disabled={busy || selectedPending.length === 0} onClick={() => void approve(selectedPending)}>
-                {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Approve selected
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                <span>Approve selected</span>
               </Button>
             </div>
           </div>

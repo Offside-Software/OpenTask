@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { CheckSquare, Plus } from 'lucide-react';
 import { Badge } from '../../design-system/Badge';
+import { Button } from '../../design-system/Button';
+import { CloseButton } from '../../design-system/CloseButton';
 import type { Task, TaskType } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
-import { CloseButton } from '../../design-system/CloseButton';
 
 interface TaskFormModalProps {
   projectId: number | string;
@@ -29,7 +30,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const handleToggleType = (t: string) => {
     setSelectedTypes(prev => {
       if (prev.includes(t)) {
-        if (prev.length === 1) return prev; // keep at least 1 type
+        if (prev.length === 1) return prev;
         return prev.filter(item => item !== t);
       } else {
         return [...prev, t];
@@ -56,61 +57,65 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
-      <div className="bg-[#121417] border-3 border-black rounded-none w-full max-w-md shadow-[8px_8px_0px_0px_#000000]" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 select-none animate-in fade-in duration-150">
+      <div
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b-2 border-black bg-[#181B20]">
+        <div className="flex items-center justify-between p-5 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-              <CheckSquare size={16} strokeWidth={2.5} />
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <CheckSquare size={18} />
             </div>
-            <h2 className="text-white font-mono font-black uppercase tracking-wider text-[15px]">{title}</h2>
+            <h2 className="text-foreground font-semibold text-base">{title}</h2>
           </div>
-          <CloseButton onClick={onClose}></CloseButton>
+          <CloseButton onClick={onClose} size="md" />
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 font-mono">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2">
-              TASK TITLE <span className="text-[#EF4444]">*</span>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Task title <span className="text-destructive">*</span>
             </label>
             <input
               autoFocus
               value={taskTitle}
               onChange={e => setTaskTitle(e.target.value)}
               placeholder="e.g. Refactor authentication module"
-              className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+              className="w-full bg-background border border-input rounded-lg px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider">TYPE</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-muted-foreground">Type</label>
                 {!isAddingType && (
                   <button
                     type="button"
                     onClick={() => setIsAddingType(true)}
-                    className="text-[10px] text-[#FFE600] hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                    className="text-xs text-primary hover:underline font-medium flex items-center gap-0.5 cursor-pointer"
                   >
-                    <Plus size={10} strokeWidth={3} /> NEW
+                    <Plus size={11} /> New
                   </button>
                 )}
               </div>
+
               {/* Selected Type Badges */}
-              <div className="flex flex-wrap gap-1.5 min-h-[28px] mb-2 p-1.5 bg-[#0B0E14] border-2 border-black">
+              <div className="flex flex-wrap gap-1.5 min-h-[32px] mb-2 p-1.5 bg-muted/20 border border-border rounded-lg">
                 {selectedTypes.map(t => (
-                  
-                  <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.5 !px-1.5 !text-[11px]">
+                  <Badge key={t} variant={getTaskTypeVariant(t)} className="py-0.5 px-2 text-xs">
                     {t}
                     {selectedTypes.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleToggleType(t)}
-                        className="hover:text-[#FF3333] cursor-pointer ml-0.5"
+                        className="hover:text-destructive cursor-pointer ml-1"
                         title={`Remove ${t}`}
-                      >✕
+                      >
+                        ✕
                       </button>
                     )}
                   </Badge>
@@ -121,7 +126,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 <div className="flex gap-1.5">
                   <input
                     autoFocus
-                    placeholder="CUSTOM TAG..."
+                    placeholder="Custom tag…"
                     value={customTypeInput}
                     onChange={(e) => setCustomTypeInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => {
@@ -132,23 +137,25 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         setIsAddingType(false);
                       }
                     }}
-                    className="flex-1 min-w-0 bg-[#0B0E14] border-2 border-[#FFE600] rounded-none px-2 py-1.5 text-[11px] font-mono uppercase text-white focus:outline-none"
+                    className="flex-1 min-w-0 bg-background border border-primary rounded-lg px-2.5 py-1 text-xs uppercase text-foreground focus:outline-none"
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="primary"
+                    size="sm"
                     onClick={handleAddCustomType}
                     disabled={!customTypeInput.trim()}
-                    className="px-2 py-1.5 bg-[#FFE600] text-black font-black text-[10px] rounded-none border border-black disabled:opacity-50 cursor-pointer shrink-0"
                   >
-                    ADD
-                  </button>
-                  <button
+                    Add
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setIsAddingType(false)}
-                    className="px-2 py-1.5 bg-[#1E2227] text-neutral-400 hover:text-white text-[10px] rounded-none border border-neutral-700 cursor-pointer shrink-0"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <select
@@ -161,45 +168,50 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       handleToggleType(val);
                     }
                   }}
-                  className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono uppercase text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                  className="w-full bg-background border border-input rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors"
                 >
-                  <option value="">+ APPEND / TOGGLE TYPE...</option>
+                  <option value="">+ Toggle type…</option>
                   {availableTypes.map(t => (
                     <option key={t} value={t}>
                       {selectedTypes.includes(t) ? `✓ ${t}` : `+ ${t}`}
                     </option>
                   ))}
-                  <option value="__ADD_NEW__">+ ADD CUSTOM TYPE...</option>
+                  <option value="__ADD_NEW__">+ Add custom type…</option>
                 </select>
               )}
             </div>
+
             <div>
-              <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2">WEIGHT (1–5)</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Weight (1–5)</label>
               <input
                 type="number"
                 min={1} max={5}
                 value={weight}
                 onChange={e => setWeight(Number(e.target.value))}
-                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2.5 text-[13px] font-mono text-white focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                className="w-full bg-background border border-input rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors"
               />
             </div>
           </div>
 
-          <div className="flex gap-3 pt-3 border-t-2 border-neutral-800">
-            <button 
+          <div className="flex gap-2.5 pt-3 border-t border-border">
+            <Button 
               type="button" 
+              variant="outline" 
+              size="md"
               onClick={onClose} 
-              className="flex-1 py-2.5 rounded-none text-[12px] font-mono font-black uppercase tracking-wider text-neutral-300 bg-[#1E2227] border-2 border-black shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+              className="flex-1"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
               disabled={!taskTitle.trim()}
-              className="flex-1 py-2.5 rounded-none text-[12px] font-mono font-black uppercase tracking-wider bg-[#FFE600] text-black border-2 border-black shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+              className="flex-1"
             >
               {title}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

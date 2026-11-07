@@ -25,16 +25,16 @@ const UploadRow: React.FC<{ upload: MeetingUpload }> = ({ upload }) => {
   const active = upload.stage === "extracting" || upload.stage === "uploading" || upload.stage === "finishing";
   const percent = Math.round(upload.progress * 100);
   return (
-    <li className="p-3 border-t-2 border-black first:border-t-0 space-y-2">
+    <li className="p-3 border-t border-border first:border-t-0 space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-white font-mono font-bold text-[12px] truncate" title={upload.fileName}>
+          <p className="text-foreground font-semibold text-xs truncate" title={upload.fileName}>
             {upload.title}
           </p>
-          <p className="text-neutral-400 font-mono text-[10px] uppercase tracking-wider flex items-center gap-1.5">
-            {active && <Loader2 size={10} className="animate-spin" />}
-            {upload.stage === "done" && <CheckCircle2 size={10} className="text-[#00FF66]" />}
-            {upload.stage === "failed" && <AlertTriangle size={10} className="text-[#FF3333]" />}
+          <p className="text-muted-foreground text-[11px] flex items-center gap-1.5 mt-0.5">
+            {active && <Loader2 size={11} className="animate-spin text-primary" />}
+            {upload.stage === "done" && <CheckCircle2 size={11} className="text-emerald-500" />}
+            {upload.stage === "failed" && <AlertTriangle size={11} className="text-destructive" />}
             {STAGE_LABEL[upload.stage]}
             {upload.stage === "uploading" && ` · ${formatSize(upload.bytes)}${upload.extracted ? " of audio" : ""}`}
           </p>
@@ -51,9 +51,9 @@ const UploadRow: React.FC<{ upload: MeetingUpload }> = ({ upload }) => {
         <ProgressBar value={percent} label={upload.stage === "extracting" ? "Audio" : "Sent"} />
       )}
       {upload.stage === "done" && (
-        <p className="text-neutral-300 font-mono text-[11px]">Transcription has started. The draft tasks appear in the meeting.</p>
+        <p className="text-muted-foreground text-xs">Transcription has started. The draft tasks appear in the meeting.</p>
       )}
-      {upload.error && <p className="border-2 border-black bg-[#FF3333] text-white font-mono text-[11px] p-2">{upload.error}</p>}
+      {upload.error && <p className="rounded-lg border border-destructive/30 bg-destructive/15 text-destructive text-xs p-2 font-medium">{upload.error}</p>}
     </li>
   );
 };
@@ -64,12 +64,12 @@ export const MeetingUploadTray: React.FC = () => {
   if (uploads.length === 0) return null;
   return (
     <div
-      className="fixed bottom-4 right-4 z-[90] w-[min(22rem,calc(100vw-2rem))] bg-[#121417] border-2 border-black rounded-none shadow-[4px_4px_0px_0px_#000000]"
+      className="fixed bottom-4 right-4 z-[90] w-[min(22rem,calc(100vw-2rem))] bg-card text-card-foreground border border-border rounded-xl shadow-lg overflow-hidden"
       role="status"
       aria-live="polite"
     >
-      <div className="px-3 py-2 bg-[#FFE600] text-black border-b-2 border-black flex items-center gap-2 font-mono font-black uppercase text-[11px] tracking-wider">
-        <UploadCloud size={14} strokeWidth={2.5} /> Meeting recordings
+      <div className="px-3.5 py-2.5 bg-primary/10 text-primary border-b border-border flex items-center gap-2 font-medium text-xs">
+        <UploadCloud size={14} /> Meeting recordings
       </div>
       <ul className="max-h-[50vh] overflow-y-auto">
         {uploads.map((u) => (

@@ -35,7 +35,8 @@ const binding = (m: ModelUsageToday): [number, number, string] | null => {
 const time = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
-const sectionLabel = "text-neutral-400 font-mono text-[10px] font-bold uppercase tracking-wider mb-2";
+const sectionLabel = "text-muted-foreground text-xs font-medium uppercase tracking-wider mb-2";
+
 const UsageBars: React.FC<{ title: string; models: ModelUsageToday[] }> = ({ title, models }) => {
   const shown = models.filter((m) => binding(m) !== null);
   if (shown.length === 0) return null;
@@ -50,7 +51,7 @@ const UsageBars: React.FC<{ title: string; models: ModelUsageToday[] }> = ({ tit
               key={m.model}
               value={percent(used, limit)}
               label={`${modelLabel(m.model)} · ${used.toLocaleString()} of ${limit.toLocaleString()} ${unit}`}
-              colorClass={percent(used, limit) >= 90 ? "bg-[#FF3333]" : "bg-[#FFE600]"}
+              colorClass={percent(used, limit) >= 90 ? "bg-destructive" : "bg-primary"}
             />
           );
         })}
@@ -118,7 +119,7 @@ export const PipelineHealthPanel: React.FC<PipelineHealthPanelProps> = ({ projec
   if (!health && failed) {
     return (
       <SurfaceCard title="Pipeline Health" subtitle="Today (UTC) · free tier" icon={Activity}>
-        <p className="text-neutral-400 font-mono text-[12px]">Could not load the pipeline health. It refreshes with the meeting list.</p>
+        <p className="text-muted-foreground text-xs">Could not load the pipeline health. It refreshes with the meeting list.</p>
       </SurfaceCard>
     );
   }
@@ -143,7 +144,7 @@ export const PipelineHealthPanel: React.FC<PipelineHealthPanelProps> = ({ projec
     <SurfaceCard title="Pipeline Health" subtitle="Today (UTC) · free tier" icon={Activity}>
       <div className="space-y-5">
         {quota.exempt ? (
-          <p className="text-neutral-300 font-mono text-[12px]">
+          <p className="text-muted-foreground text-xs">
             {quota.jobs_today} meeting job{quota.jobs_today === 1 ? "" : "s"} today. This project uses its own Groq key (set in Settings), so the daily quotas don't apply.
           </p>
         ) : (
@@ -166,21 +167,21 @@ export const PipelineHealthPanel: React.FC<PipelineHealthPanelProps> = ({ projec
         <div>
           <p className={sectionLabel}>Failed or waiting jobs</p>
           {health.jobs.length === 0 ? (
-            <p className="text-neutral-400 font-mono text-[12px]">None.</p>
+            <p className="text-muted-foreground text-xs">None.</p>
           ) : (
             <ul className="space-y-2">
               {health.jobs.map(({ job, meeting_title, problem, can_retry }) => {
                 const waiting = job.status !== "FAILED";
                 return (
-                  <li key={job.id} className="border-2 border-neutral-700 bg-[#121417] p-3 flex flex-col md:flex-row md:items-center gap-3">
+                  <li key={job.id} className="border border-border bg-card/60 rounded-xl p-3 flex flex-col md:flex-row md:items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-mono font-bold text-[12px] truncate max-w-[20rem]">{meeting_title || "Untitled meeting"}</span>
-                        <Badge variant={waiting ? "warning" : "critical"}>
+                        <span className="text-foreground font-semibold text-xs truncate max-w-[20rem]">{meeting_title || "Untitled meeting"}</span>
+                        <Badge variant={waiting ? "warning" : "danger"}>
                           {waiting ? `Waiting until ${time(job.next_attempt_at)}` : `Failed after ${job.attempts} tries`}
                         </Badge>
                       </div>
-                      {problem && <p className="text-neutral-400 font-mono text-[11px] mt-1 break-words">{problem}</p>}
+                      {problem && <p className="text-muted-foreground text-xs mt-1 break-words">{problem}</p>}
                     </div>
                     {can_retry && (
                       <Button variant="outline" size="sm" disabled={retrying === job.id} onClick={() => void retry(job.id)} className="shrink-0">

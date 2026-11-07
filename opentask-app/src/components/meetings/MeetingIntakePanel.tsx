@@ -18,8 +18,8 @@ interface MeetingIntakePanelProps {
 }
 
 const inputClass =
-  "w-full bg-[#0B0E14] border-2 border-neutral-700 rounded-none px-3 py-2 text-white font-mono text-[12px] placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600]";
-const labelClass = "block text-neutral-400 font-mono text-[10px] font-bold uppercase tracking-wider mb-1";
+  "w-full bg-background border border-input rounded-md px-3 py-2 text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors";
+const labelClass = "block text-muted-foreground text-xs font-medium mb-1.5";
 
 const SOURCES: { id: Source; label: string; hint: string; icon: React.ElementType }[] = [
   { id: "link", label: "Meeting link", hint: "Send a bot to Zoom, Meet or Teams", icon: LinkIcon },
@@ -133,15 +133,15 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
               role="radio"
               aria-checked={source === id}
               onClick={() => setSource(id)}
-              className={`text-left p-3 border-2 rounded-none transition-all cursor-pointer ${
+              className={`text-left p-3 border rounded-xl transition-all cursor-pointer ${
                 source === id
-                  ? "border-black bg-[#FFE600] text-black shadow-[3px_3px_0px_0px_#000000]"
-                  : "border-neutral-700 bg-[#121417] text-white hover:border-white"
+                  ? "border-primary bg-primary/10 text-primary shadow-xs"
+                  : "border-border bg-card/60 text-card-foreground hover:bg-accent/40 hover:border-border"
               }`}
             >
-              <Icon size={16} strokeWidth={2.5} />
-              <span className="block font-mono font-black uppercase text-[12px] mt-1.5">{label}</span>
-              <span className={`block font-mono text-[10px] ${source === id ? "text-black" : "text-neutral-400"}`}>{hint}</span>
+              <Icon size={16} />
+              <span className="block font-medium text-xs mt-1.5">{label}</span>
+              <span className="block text-[11px] text-muted-foreground mt-0.5">{hint}</span>
             </button>
           ))}
         </div>
@@ -157,7 +157,7 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
               value={meetingUrl}
               onChange={(e) => setMeetingUrl(e.target.value)}
             />
-            <p className="text-neutral-400 font-mono text-[10px] mt-1">
+            <p className="text-muted-foreground text-[11px] mt-1">
               The bot records the meeting audio. When it leaves, the audio is transcribed and tasks are drafted.
             </p>
           </div>
@@ -169,10 +169,10 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
             <button
               type="button"
               onClick={() => recordingInput.current?.click()}
-              className="w-full border-2 border-dashed border-neutral-700 hover:border-[#FFE600] bg-[#121417] p-5 flex items-center gap-3 cursor-pointer"
+              className="w-full border border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 rounded-xl p-5 flex items-center gap-3 cursor-pointer transition-colors"
             >
-              <Upload size={18} className="text-neutral-300" />
-              <span className="font-mono text-[12px] text-white truncate">
+              <Upload size={18} className="text-muted-foreground" />
+              <span className="text-xs text-foreground truncate">
                 {recording ? `${recording.name} · ${(recording.size / 1024 / 1024).toFixed(1)} MB` : "Choose an audio or video file (mp3, m4a, wav, mp4, mov, webm…)"}
               </span>
             </button>
@@ -184,7 +184,7 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
               accept={RECORDING_ACCEPT}
               onChange={(e) => setRecording(e.target.files?.[0] ?? null)}
             />
-            <p className="text-neutral-400 font-mono text-[10px] mt-1">
+            <p className="text-muted-foreground text-[11px] mt-1">
               The audio is pulled out in your browser first, so an hour of video uploads as about 15 MB. It is transcribed, checked
               for follow-ups and drafted into tasks; the file is deleted once transcribed.
             </p>
@@ -197,10 +197,10 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
-              className="w-full border-2 border-dashed border-neutral-700 hover:border-[#FFE600] bg-[#121417] p-5 flex items-center gap-3 cursor-pointer"
+              className="w-full border border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 rounded-xl p-5 flex items-center gap-3 cursor-pointer transition-colors"
             >
-              <Upload size={18} className="text-neutral-300" />
-              <span className="font-mono text-[12px] text-white truncate">{file ? file.name : "Choose a .txt, .md, .docx or .pdf file"}</span>
+              <Upload size={18} className="text-muted-foreground" />
+              <span className="text-xs text-foreground truncate">{file ? file.name : "Choose a .txt, .md, .docx or .pdf file"}</span>
             </button>
             <input
               id="meeting-file"
@@ -224,7 +224,7 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
               maxLength={MAX_TEXT_CHARS}
               onChange={(e) => setPasted(e.target.value)}
             />
-            <p className="text-neutral-400 font-mono text-[10px] mt-1">{pasted.trim().length.toLocaleString()} characters</p>
+            <p className="text-muted-foreground text-[11px] mt-1">{pasted.trim().length.toLocaleString()} characters</p>
           </div>
         )}
 
@@ -259,8 +259,10 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
                     type="button"
                     aria-pressed={on}
                     onClick={() => toggleAttendee(id)}
-                    className={`px-2 py-1 border-2 rounded-none font-mono text-[11px] cursor-pointer ${
-                      on ? "border-black bg-[#00FF66] text-black" : "border-neutral-700 bg-[#121417] text-neutral-300 hover:border-white"
+                    className={`px-2.5 py-1 border rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      on 
+                        ? "border-primary bg-primary text-primary-foreground" 
+                        : "border-border bg-card text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                     }`}
                   >
                     {m.display_name || m.gh_username || id}
@@ -271,7 +273,7 @@ export const MeetingIntakePanel: React.FC<MeetingIntakePanelProps> = ({ projectI
           </div>
         )}
 
-        {error && <p className="border-2 border-black bg-[#FF3333] text-white font-mono text-[12px] p-2.5">{error}</p>}
+        {error && <p className="rounded-lg border border-destructive/30 bg-destructive/15 text-destructive text-xs p-2.5 font-medium">{error}</p>}
 
         <div className="flex justify-end">
           <Button type="submit" variant="primary" size="md" disabled={busy}>

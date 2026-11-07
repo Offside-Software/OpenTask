@@ -222,11 +222,11 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
     >
       {children}
 
-      {/* Neo-brutalist Update Notification Modal */}
+      {/* Modern shadcn Update Notification Modal */}
       {updateInfo && isDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs animate-in fade-in duration-150">
           <div
-            className="w-full max-w-lg bg-[var(--cmd-surface,#141619)] border-2 border-black dark:border-neutral-700 shadow-[8px_8px_0px_0px_#000000] p-6 relative flex flex-col gap-5 text-[var(--cmd-text-body,#E5E7EB)]"
+            className="w-full max-w-lg bg-card text-card-foreground border border-border rounded-xl shadow-xl p-6 relative flex flex-col gap-5"
             role="dialog"
             aria-modal="true"
           >
@@ -240,34 +240,32 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
 
             {/* Header */}
             <div className="flex items-start gap-3 pr-10">
-              <div className="p-2.5 bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0">
-                <Sparkles size={20} strokeWidth={2.5} />
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+                <Sparkles size={20} />
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-mono font-black uppercase tracking-wider bg-black text-[#FFE600] px-1.5 py-0.5 border border-neutral-700">
-                    DESKTOP UPDATE
-                  </span>
+                  <Badge variant="primary">Desktop Update</Badge>
                   <Badge variant="warning">v{updateInfo.version}</Badge>
                 </div>
-                <h3 className="text-lg font-black tracking-tight uppercase font-mono text-[var(--cmd-text-body,#FFFFFF)]">
+                <h3 className="text-base font-semibold text-foreground">
                   New Version Ready
                 </h3>
               </div>
             </div>
 
             {/* Description & Release Notes */}
-            <div className="bg-[var(--cmd-app-bg,#0E1012)] border-2 border-black p-3.5 max-h-48 overflow-y-auto no-scrollbar font-mono text-xs">
-              <div className="text-neutral-400 font-bold uppercase text-[10px] mb-1.5 flex items-center justify-between">
+            <div className="bg-muted/30 border border-border rounded-lg p-3.5 max-h-48 overflow-y-auto no-scrollbar text-xs">
+              <div className="text-muted-foreground font-medium text-[11px] mb-1.5 flex items-center justify-between">
                 <span>Release Notes</span>
                 {currentVersion && <span>Current: {currentVersion}</span>}
               </div>
               {updateInfo.body ? (
-                <div className="text-neutral-200 whitespace-pre-line leading-relaxed">
+                <div className="text-foreground/90 whitespace-pre-line leading-relaxed">
                   {updateInfo.body}
                 </div>
               ) : (
-                <p className="text-neutral-400 italic">
+                <p className="text-muted-foreground italic">
                   A new release of OpenTask Desktop is ready to install with performance enhancements and updates.
                 </p>
               )}
@@ -278,21 +276,21 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
               <div className="space-y-2">
                 <ProgressBar
                   value={progress ?? 10}
-                  label={progress !== null ? "DOWNLOADING BINARY" : "PREPARING INSTALLATION"}
-                  colorClass="bg-[#00FF66]"
+                  label={progress !== null ? "Downloading update..." : "Preparing installation..."}
+                  colorClass="bg-primary"
                 />
               </div>
             )}
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-2 border-t-2 border-black dark:border-neutral-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
               {!isDownloading && (
                 <Button
                   variant="outline"
                   size="md"
                   onClick={() => setIsDialogOpen(false)}
                 >
-                  LATER
+                  Later
                 </Button>
               )}
               <Button
@@ -304,12 +302,12 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
                 {isDownloading ? (
                   <>
                     <RefreshCw size={14} className="animate-spin" />
-                    <span>INSTALLING...</span>
+                    <span>Installing...</span>
                   </>
                 ) : (
                   <>
                     <Download size={14} />
-                    <span>UPDATE & RESTART</span>
+                    <span>Update & Restart</span>
                   </>
                 )}
               </Button>

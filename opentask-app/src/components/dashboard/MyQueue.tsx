@@ -22,38 +22,38 @@ export const MyQueue: React.FC<{ className?: string }> = ({ className = "" }) =>
 
   return (
     <SurfaceCard 
-      title="MY QUEUE" 
+      title="My Queue" 
       icon={Target} 
       className={className} 
-      rightElement={tasks.length > 0 ? <Badge variant="primary">{tasks.length} TASKS</Badge> : null}
+      rightElement={tasks.length > 0 ? <Badge variant="primary">{tasks.length} Tasks</Badge> : null}
     >
       <div className="space-y-2.5 flex-1 overflow-y-auto no-scrollbar pr-1 min-h-0">
         {loading ? (
-          <div className="text-neutral-500 font-mono text-[11px] py-4 text-center">// LOADING QUEUE...</div>
+          <div className="text-muted-foreground text-xs py-4 text-center">Loading queue...</div>
         ) : tasks.length === 0 ? (
-          <div className="text-neutral-500 font-mono text-[11px] py-8 text-center border-2 border-dashed border-neutral-700 rounded-none uppercase">
-            // QUEUE EMPTY • NO PENDING ASSIGNMENTS
+          <div className="text-muted-foreground text-xs py-8 text-center border border-dashed border-border rounded-xl">
+            Queue empty • No pending assignments
           </div>
         ) : tasks.map(task => (
           <div 
             key={task.id} 
-            className="p-3.5 rounded-none bg-[#141619] border-2 border-black hover:border-white shadow-[2px_2px_0px_0px_#000000] transition-all flex justify-between items-center group"
+            className="p-3.5 rounded-lg bg-card/60 border border-border hover:border-primary/40 shadow-xs transition-all flex justify-between items-center group"
           >
             <div>
               <div className="flex gap-1.5 mb-1.5 flex-wrap items-center">
                 {parseTaskTypes(task.type).map((t) => (
-                  <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.2 !px-1.5 !text-[9px]">
-                    {t === 'CODE' ? <Code size={9} /> : <GitMerge size={9} />}
+                  <Badge key={t} variant={getTaskTypeVariant(t)} className="py-0.5 px-1.5 text-[10px]">
+                    {t === 'CODE' ? <Code size={10} /> : <GitMerge size={10} />}
                     {t}
                   </Badge>
                 ))}
-                <span className="text-[10px] text-neutral-400 font-mono font-bold">#TASK-{task.id}</span>
+                <span className="text-[10px] text-muted-foreground font-mono font-medium">#{task.id}</span>
               </div>
-              <h5 className="text-white text-[13px] font-bold line-clamp-1">{task.title}</h5>
-              <p className="text-neutral-500 font-mono text-[10px] mt-0.5 uppercase tracking-wider">// {task.status}</p>
+              <h5 className="text-foreground text-xs font-semibold line-clamp-1">{task.title}</h5>
+              <p className="text-muted-foreground text-[11px] mt-0.5 capitalize">{task.status?.toLowerCase()}</p>
             </div>
-            <Button variant="success" size="sm" className="!p-2 flex-shrink-0">
-              <Play size={14} strokeWidth={3} />
+            <Button variant="outline" size="sm" className="p-2 shrink-0 h-8 w-8 rounded-lg hover:bg-primary hover:text-primary-foreground hover:border-primary">
+              <Play size={13} fill="currentColor" />
             </Button>
           </div>
         ))}

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { CloseButton } from '../../design-system/CloseButton';
+import { Button } from '../../design-system/Button';
 import { Badge } from '../../design-system/Badge';
 import { Copy, Check, Key, Layers, Sparkles, Cpu } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { getBaseUrl } from '../../services/apiClient';
 import { useToast } from '../../design-system/Toast';
+import { cn } from '@/lib/utils';
 
 interface McpConfigModalProps {
   isOpen: boolean;
@@ -155,69 +157,71 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_tasks","arguments":{}}}'`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-[#0E1012] border-2 border-black rounded-none shadow-[8px_8px_0px_0px_#000000] text-white my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+      <div className="relative w-full max-w-4xl bg-card text-card-foreground border border-border rounded-xl shadow-2xl my-8 overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b-2 border-black bg-[#141619]">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#FFE600] border-2 border-black flex items-center justify-center text-black font-black shadow-[2px_2px_0px_0px_#000000]">
-              <Cpu size={20} strokeWidth={2.5} />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Cpu size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-[16px] font-black font-mono tracking-wider text-white uppercase">
+                <h2 className="text-base font-semibold text-foreground">
                   AI Model Context Protocol (MCP)
                 </h2>
-                <Badge variant="warning" className="!py-0.5 !px-1.5 !text-[10px]">
-                  ID: {String(projectId).slice(-6)}
+                <Badge variant="primary" className="text-[10px]">
+                  #{String(projectId).slice(-6)}
                 </Badge>
               </div>
-              <p className="text-[11px] font-mono text-neutral-400 mt-0.5">
-                Connect {projectName} tasks directly to your AI IDE (Antigravity, Cursor, VS Code, Zed, Claude)
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Connect {projectName} tasks directly to your AI IDE (Antigravity, Cursor, VS Code, Claude, Zed)
               </p>
             </div>
           </div>
-          <CloseButton onClick={onClose} />
+          <CloseButton onClick={onClose} size="md" />
         </div>
 
         {/* API Key Status Banner */}
-        <div className="px-5 py-3 border-b-2 border-black bg-[#16191D] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Key size={14} className={apiKey ? 'text-[#00FF66]' : 'text-[#FFE600]'} />
-            <span className="font-mono text-[11px] uppercase text-neutral-300">
-              PROJECT AI SECRET KEY:
+        <div className="px-5 py-3 border-b border-border bg-muted/20 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Key size={14} className={apiKey ? 'text-emerald-500' : 'text-amber-500'} />
+            <span className="text-xs font-medium text-muted-foreground">
+              Project AI Secret Key:
             </span>
             {apiKey ? (
-              <code className="font-mono text-[11px] text-[#FFE600] bg-black px-2 py-0.5 border border-neutral-700">
+              <code className="font-mono text-xs text-foreground bg-muted px-2 py-0.5 rounded-md border border-border">
                 {apiKey.slice(0, 10)}...{apiKey.slice(-6)}
               </code>
             ) : (
-              <span className="font-mono text-[11px] text-[#FF3333] font-bold">
-                [NOT GENERATED YET]
+              <span className="text-xs text-destructive font-medium">
+                Not generated yet
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-2">
             {apiKey ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => copyToClipboard(apiKey, 'API Key')}
-                className="px-3 py-1 bg-[#1E2227] hover:bg-neutral-800 text-neutral-300 border border-black font-mono text-[10px] font-bold uppercase flex items-center gap-1.5 cursor-pointer"
               >
-                {copiedSection === 'API Key' ? <Check size={12} className="text-[#00FF66]" /> : <Copy size={12} />}
-                <span>{copiedSection === 'API Key' ? 'COPIED' : 'COPY KEY'}</span>
-              </button>
+                {copiedSection === 'API Key' ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                <span>{copiedSection === 'API Key' ? 'Copied' : 'Copy Key'}</span>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="sm"
                 onClick={handleGenerateKey}
                 disabled={loadingKey}
-                className="px-3.5 py-1 bg-[#FFE600] text-black border-2 border-black font-mono text-[10px] font-black uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-[2px_2px_0px_0px_#000000]"
               >
                 <Sparkles size={12} />
-                <span>{loadingKey ? 'GENERATING...' : 'GENERATE API KEY'}</span>
-              </button>
+                <span>{loadingKey ? 'Generating…' : 'Generate Key'}</span>
+              </Button>
             )}
           </div>
         </div>
@@ -226,16 +230,16 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
         <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Endpoints overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="bg-[#0B0E14] border-2 border-black p-3 shadow-[2px_2px_0px_0px_#000000]">
-              <div className="text-[10px] font-black text-neutral-400 uppercase font-mono mb-1">
-                // HTTP JSON-RPC 2.0 ENDPOINT
+            <div className="bg-muted/20 border border-border rounded-lg p-3 shadow-xs">
+              <div className="text-[11px] font-medium text-muted-foreground mb-1">
+                HTTP JSON-RPC 2.0 Endpoint
               </div>
               <div className="flex items-center justify-between gap-2">
-                <code className="font-mono text-[11px] text-[#FFE600] truncate select-all">{mcpHttpUrl}</code>
+                <code className="font-mono text-xs text-foreground truncate select-all">{mcpHttpUrl}</code>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(mcpHttpUrl, 'HTTP URL')}
-                  className="p-1 text-neutral-400 hover:text-white cursor-pointer shrink-0"
+                  className="p-1 text-muted-foreground hover:text-foreground cursor-pointer shrink-0 rounded-md"
                   title="Copy HTTP Endpoint"
                 >
                   <Copy size={13} />
@@ -243,16 +247,16 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
               </div>
             </div>
 
-            <div className="bg-[#0B0E14] border-2 border-black p-3 shadow-[2px_2px_0px_0px_#000000]">
-              <div className="text-[10px] font-black text-neutral-400 uppercase font-mono mb-1">
-                // SERVER-SENT EVENTS (SSE) ENDPOINT
+            <div className="bg-muted/20 border border-border rounded-lg p-3 shadow-xs">
+              <div className="text-[11px] font-medium text-muted-foreground mb-1">
+                Server-Sent Events (SSE) Endpoint
               </div>
               <div className="flex items-center justify-between gap-2">
-                <code className="font-mono text-[11px] text-cyan-700 dark:text-[#00E5FF] truncate select-all">{mcpSseUrl}</code>
+                <code className="font-mono text-xs text-primary truncate select-all">{mcpSseUrl}</code>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(mcpSseUrl, 'SSE URL')}
-                  className="p-1 text-neutral-400 hover:text-white cursor-pointer shrink-0"
+                  className="p-1 text-muted-foreground hover:text-foreground cursor-pointer shrink-0 rounded-md"
                   title="Copy SSE Endpoint"
                 >
                   <Copy size={13} />
@@ -263,23 +267,25 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 
           {/* IDE Selection Tabs */}
           <div>
-            <div className="flex items-center gap-1 border-b-2 border-black overflow-x-auto pb-3">
+            <div className="flex items-center gap-1.5 border-b border-border overflow-x-auto pb-2.5">
               {[
-                { id: 'antigravity', label: 'ANTIGRAVITY' },
-                { id: 'cursor', label: 'CURSOR' },
-                { id: 'vscode', label: 'VS CODE / CLINE' },
-                { id: 'claude', label: 'CLAUDE DESKTOP' },
-                { id: 'zed', label: 'ZED EDITOR' },
-                { id: 'curl', label: 'CURL / API' },
+                { id: 'antigravity', label: 'Antigravity' },
+                { id: 'cursor', label: 'Cursor' },
+                { id: 'vscode', label: 'VS Code / Cline' },
+                { id: 'claude', label: 'Claude Desktop' },
+                { id: 'zed', label: 'Zed Editor' },
+                { id: 'curl', label: 'cURL / API' },
               ].map(tab => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id as IdeTab)}
-                  className={`px-3.5 py-1.5 font-mono text-[11px] font-black uppercase tracking-wider border-2 border-black transition-all cursor-pointer ${activeTab === tab.id
-                    ? 'bg-[#FFE600] text-black shadow-[2px_2px_0px_0px_#000000] py-1'
-                    : 'bg-[#141619] text-neutral-400 hover:text-white hover:bg-neutral-800'
-                    }`}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer",
+                    activeTab === tab.id
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
                 >
                   {tab.label}
                 </button>
@@ -287,19 +293,21 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
             </div>
 
             {/* Tab Panels */}
-            <div className="mt-4 bg-[#0B0E14] border-2 border-black p-4 shadow-[4px_4px_0px_0px_#000000]">
+            <div className="mt-3 bg-muted/20 border border-border rounded-xl p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-[10px] text-neutral-400 font-black uppercase">
-                  {activeTab === 'antigravity' && '// GOOGLE ANTIGRAVITY MCP CONFIGURATION'}
-                  {activeTab === 'cursor' && '// CURSOR .cursor/mcp.json CONFIGURATION'}
-                  {activeTab === 'vscode' && '// VS CODE CLINE / ROO-CODE / COPILOT CONFIG'}
-                  {activeTab === 'claude' && '// CLAUDE DESKTOP claude_desktop_config.json'}
-                  {activeTab === 'zed' && '// ZED settings.json context_servers'}
-                  {activeTab === 'curl' && '// RAW JSON-RPC 2.0 PROTOCOL USAGE'}
+                <span className="text-xs text-muted-foreground font-medium">
+                  {activeTab === 'antigravity' && 'Google Antigravity MCP Configuration'}
+                  {activeTab === 'cursor' && 'Cursor .cursor/mcp.json Configuration'}
+                  {activeTab === 'vscode' && 'VS Code Cline / Roo-Code Configuration'}
+                  {activeTab === 'claude' && 'Claude Desktop claude_desktop_config.json'}
+                  {activeTab === 'zed' && 'Zed settings.json context_servers'}
+                  {activeTab === 'curl' && 'Raw JSON-RPC 2.0 Protocol Usage'}
                 </span>
 
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     const text =
                       activeTab === 'antigravity' ? antigravityConfig :
@@ -309,23 +317,22 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                               activeTab === 'zed' ? zedConfig : curlExample;
                     copyToClipboard(text, activeTab.toUpperCase());
                   }}
-                  className="px-3 py-1 bg-[#FFE600] text-black font-mono text-[10px] font-black uppercase border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
                 >
                   {copiedSection === activeTab.toUpperCase() ? (
                     <>
-                      <Check size={12} strokeWidth={3} />
-                      <span>COPIED CONFIG</span>
+                      <Check size={12} className="text-emerald-500" />
+                      <span>Copied</span>
                     </>
                   ) : (
                     <>
                       <Copy size={12} />
-                      <span>COPY CONFIG</span>
+                      <span>Copy Config</span>
                     </>
                   )}
-                </button>
+                </Button>
               </div>
 
-              <pre className="font-mono text-[12px] text-neutral-200 overflow-x-auto p-3 bg-[#F0F0EB] dark:bg-black border border-neutral-800 leading-relaxed select-text">
+              <pre className="font-mono text-xs text-foreground overflow-x-auto p-3.5 bg-background border border-border rounded-lg leading-relaxed select-text">
                 {activeTab === 'antigravity' && antigravityConfig}
                 {activeTab === 'cursor' && cursorConfig}
                 {activeTab === 'vscode' && vscodeClineConfig}
@@ -334,7 +341,7 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                 {activeTab === 'curl' && curlExample}
               </pre>
 
-              <div className="mt-3 text-[11px] font-mono text-neutral-400 space-y-1">
+              <div className="mt-2.5 text-xs text-muted-foreground space-y-1">
                 {activeTab === 'antigravity' && (
                   <p>
                     Add this to your workspace or user Antigravity configuration. Antigravity can immediately browse task backlogs, implement features according to descriptions, and mark tasks complete.
@@ -342,22 +349,22 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                 )}
                 {activeTab === 'cursor' && (
                   <p>
-                    Place in <code className="text-[#FFE600]">~/.cursor/mcp.json</code> or project <code className="text-[#FFE600]">.cursor/mcp.json</code>. Restart Cursor or reload MCP servers in Settings.
+                    Place in <code className="text-primary font-mono">~/.cursor/mcp.json</code> or project <code className="text-primary font-mono">.cursor/mcp.json</code>. Restart Cursor or reload MCP servers in Settings.
                   </p>
                 )}
                 {activeTab === 'vscode' && (
                   <p>
-                    Add to Cline/Roo Code settings under <code className="text-[#FFE600]">cline_mcp_settings.json</code>. Your assistant can read tasks, update branches, and track progress.
+                    Add to Cline/Roo Code settings under <code className="text-primary font-mono">cline_mcp_settings.json</code>. Your assistant can read tasks, update branches, and track progress.
                   </p>
                 )}
                 {activeTab === 'claude' && (
                   <p>
-                    Add to <code className="text-[#FFE600]">claude_desktop_config.json</code> under the <code className="text-[#FFE600]">mcpServers</code> dictionary and restart Claude Desktop.
+                    Add to <code className="text-primary font-mono">claude_desktop_config.json</code> under the <code className="text-primary font-mono">mcpServers</code> dictionary and restart Claude Desktop.
                   </p>
                 )}
                 {activeTab === 'zed' && (
                   <p>
-                    Insert under <code className="text-[#FFE600]">context_servers</code> in your Zed <code className="text-[#FFE600]">settings.json</code> to provide project awareness to the Zed assistant.
+                    Insert under <code className="text-primary font-mono">context_servers</code> in your Zed <code className="text-primary font-mono">settings.json</code> to provide project awareness to the Zed assistant.
                   </p>
                 )}
               </div>
@@ -366,11 +373,11 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 
           {/* Supported MCP Tools Summary */}
           <div>
-            <div className="font-mono text-[11px] font-black text-white uppercase mb-2 flex items-center gap-2">
-              <Layers size={14} className="text-[#FFE600]" />
-              <span>// AVAILABLE PROJECT MCP TOOLS (7)</span>
+            <div className="text-xs font-semibold text-foreground mb-2 flex items-center gap-2">
+              <Layers size={14} className="text-primary" />
+              <span>Available Project MCP Tools (7)</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 font-mono text-[11px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
               {[
                 { name: 'list_projects', desc: 'List all accessible projects in session with Snowflake IDs and stats' },
                 { name: 'list_tasks', desc: 'List tasks in project board; supports target project_id filter' },
@@ -380,9 +387,9 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
                 { name: 'complete_task', desc: 'Mark a task completed and archive it to the Done column' },
                 { name: 'get_project_summary', desc: 'Live markdown overview of pipeline stages, team, and projects' },
               ].map(tool => (
-                <div key={tool.name} className="p-2.5 bg-[#141619] border border-neutral-800">
-                  <div className="text-[#FFE600] font-bold">⚙ {tool.name}</div>
-                  <div className="text-neutral-400 text-[10px] mt-1 leading-snug">{tool.desc}</div>
+                <div key={tool.name} className="p-3 bg-muted/20 border border-border rounded-lg shadow-xs">
+                  <div className="text-primary font-mono font-semibold text-xs">{tool.name}</div>
+                  <div className="text-muted-foreground text-[11px] mt-1 leading-snug">{tool.desc}</div>
                 </div>
               ))}
             </div>
@@ -390,14 +397,15 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t-2 border-black bg-[#141619] flex justify-end">
-          <button
+        <div className="p-4 border-t border-border bg-muted/30 flex justify-end">
+          <Button
             type="button"
+            variant="outline"
+            size="md"
             onClick={onClose}
-            className="px-5 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-300 font-mono text-[11px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
           >
-            CLOSE
-          </button>
+            Close
+          </Button>
         </div>
       </div>
     </div>

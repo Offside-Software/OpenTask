@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
@@ -14,24 +15,29 @@ export const Button: React.FC<ButtonProps> = ({
   ...props 
 }) => {
   const variantStyles = {
-    primary: "bg-[#FFE600] text-black border-2 border-black hover:bg-[#FFF066] shadow-[3px_3px_0px_0px_#000000]",
-    success: "bg-[#00FF66] text-black border-2 border-black hover:bg-[#33FF85] shadow-[3px_3px_0px_0px_#000000]",
-    outline: "bg-[#141619] text-white border-2 border-neutral-700 hover:border-white hover:bg-[#1E2227] shadow-[3px_3px_0px_0px_#000000]",
-    danger: "bg-[#FF3333] text-white border-2 border-black hover:bg-[#FF5555] shadow-[3px_3px_0px_0px_#000000]",
-    ghost: "bg-transparent text-neutral-300 hover:text-white hover:bg-[#1E2227] border-2 border-transparent hover:border-neutral-700",
-    white: "bg-white text-black border-2 border-black hover:bg-neutral-100 shadow-[3px_3px_0px_0px_#000000]"
+    primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs active:opacity-90",
+    success: "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs dark:bg-emerald-600 dark:hover:bg-emerald-500",
+    outline: "border border-border bg-background/50 hover:bg-muted text-foreground shadow-xs",
+    danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xs",
+    ghost: "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/70",
+    white: "bg-background text-foreground border border-border hover:bg-muted shadow-xs"
   };
 
   const sizeStyles = {
-    sm: "px-2.5 py-1 text-[11px]",
-    md: "px-4 py-2 text-[12px]",
-    lg: "px-6 py-3 text-[14px]"
+    sm: "h-8 px-2.5 text-xs rounded-md gap-1.5",
+    md: "h-9 px-3.5 text-sm rounded-md gap-2",
+    lg: "h-10 px-5 text-sm rounded-lg gap-2.5"
   };
 
   return (
     <button 
       {...props}
-      className={`rounded-none font-bold uppercase tracking-wider transition-all duration-75 flex items-center justify-center gap-2 cursor-pointer select-none active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
+      className={cn(
+        "inline-flex items-center justify-center font-medium transition-colors select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
+        sizeStyles[size],
+        variantStyles[variant],
+        className
+      )}
     >
       {children}
     </button>

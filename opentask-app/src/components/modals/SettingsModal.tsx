@@ -4,504 +4,505 @@ import { useAuth } from '../../auth/useAuth';
 import { updateTelegramChatId } from '../../auth/api';
 import { useTheme } from '../../context/themeContext';
 import { CloseButton } from '../../design-system/CloseButton';
+import { Button } from '../../design-system/Button';
+import { Badge } from '../../design-system/Badge';
 import { aiKeyService, type UserAiKeyResponse } from '../../services/aiKeyService';
 import { useUpdater } from '../updater/UpdateChecker';
+import { cn } from '@/lib/utils';
 
 interface SettingsModalProps {
-    isOpen: boolean;
-    onClose: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-    const { user, refreshUser } = useAuth();
-    const { theme, setTheme } = useTheme();
-    const { currentVersion, checkForUpdates, isChecking: isCheckingUpdates } = useUpdater();
-    const [chatId, setChatId] = useState(user?.db_user?.telegram_chat_id || '');
-    const [isSaving, setIsSaving] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-    const [isWaitingForLink, setIsWaitingForLink] = useState(false);
+  const { user, refreshUser } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { currentVersion, checkForUpdates, isChecking: isCheckingUpdates } = useUpdater();
+  const [chatId, setChatId] = useState(user?.db_user?.telegram_chat_id || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isWaitingForLink, setIsWaitingForLink] = useState(false);
 
-    // Sync chatId when user updates
-    useEffect(() => {
-        if (user?.db_user?.telegram_chat_id) {
-            setChatId(user.db_user.telegram_chat_id);
-            if (isWaitingForLink) {
-                setIsWaitingForLink(false);
-                setMessage({ type: 'success', text: 'Telegram account successfully linked!' });
-                setTimeout(() => setMessage(null), 4000);
-            }
-        }
-    }, [user?.db_user?.telegram_chat_id]);
+  useEffect(() => {
+    if (user?.db_user?.telegram_chat_id) {
+      setChatId(user.db_user.telegram_chat_id);
+      if (isWaitingForLink) {
+        setIsWaitingForLink(false);
+        setMessage({ type: 'success', text: 'Telegram account successfully linked!' });
+        setTimeout(() => setMessage(null), 4000);
+      }
+    }
+  }, [user?.db_user?.telegram_chat_id]);
 
-    // Polling effect while waiting for bot link
-    useEffect(() => {
-        if (!isOpen || !isWaitingForLink) return;
+  useEffect(() => {
+    if (!isOpen || !isWaitingForLink) return;
 
-        const interval = setInterval(async () => {
-            try {
-                await refreshUser();
-            } catch {
-                // ignore
-            }
-        }, 2000);
+    const interval = setInterval(async () => {
+      try {
+        await refreshUser();
+      } catch {
+        // ignore
+      }
+    }, 2000);
 
-        const timeout = setTimeout(() => {
-            setIsWaitingForLink(false);
-        }, 60000);
+    const timeout = setTimeout(() => {
+      setIsWaitingForLink(false);
+    }, 60000);
 
-        return () => {
-            clearInterval(interval);
-            clearTimeout(timeout);
-        };
-    }, [isOpen, isWaitingForLink, refreshUser]);
-
-    // Personal AI Key State
-    const [userAiKeyInfo, setUserAiKeyInfo] = useState<UserAiKeyResponse | null>(null);
-    const [userAiKeyInput, setUserAiKeyInput] = useState('');
-    const [showUserAiKey, setShowUserAiKey] = useState(false);
-    const [isTestingUserKey, setIsTestingUserKey] = useState(false);
-    const [isSavingUserKey, setIsSavingUserKey] = useState(false);
-    const [userKeyTestResult, setUserKeyTestResult] = useState<{ valid: boolean; model?: string; error?: string | null } | null>(null);
-
-    useEffect(() => {
-        if (isOpen) {
-            aiKeyService.getUserAiKey()
-                .then(res => setUserAiKeyInfo(res))
-                .catch(() => setUserAiKeyInfo(null));
-        }
-    }, [isOpen]);
-
-    if (!isOpen) return null;
-
-    const handleTestUserAiKey = async () => {
-        const key = userAiKeyInput.trim();
-        if (!key) return;
-        setIsTestingUserKey(true);
-        setUserKeyTestResult(null);
-        try {
-            const res = await aiKeyService.testApiKey(key);
-            setUserKeyTestResult(res);
-        } catch (e: any) {
-            setUserKeyTestResult({ valid: false, error: e.message || 'Key test failed' });
-        } finally {
-            setIsTestingUserKey(false);
-        }
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
     };
+  }, [isOpen, isWaitingForLink, refreshUser]);
 
-    const handleSaveUserAiKey = async () => {
-        const key = userAiKeyInput.trim();
-        if (!key) return;
-        setIsSavingUserKey(true);
-        try {
-            const res = await aiKeyService.saveUserAiKey(key, true);
-            setUserAiKeyInfo(res);
-            setUserAiKeyInput('');
-            setUserKeyTestResult(null);
-            setShowUserAiKey(false);
-            setMessage({ type: 'success', text: 'Personal AI key verified and saved!' });
-            setTimeout(() => setMessage(null), 3000);
-        } catch (e: any) {
-            setMessage({ type: 'error', text: e.message || 'Failed to save personal AI key.' });
-        } finally {
-            setIsSavingUserKey(false);
-        }
-    };
+  const [userAiKeyInfo, setUserAiKeyInfo] = useState<UserAiKeyResponse | null>(null);
+  const [userAiKeyInput, setUserAiKeyInput] = useState('');
+  const [showUserAiKey, setShowUserAiKey] = useState(false);
+  const [isTestingUserKey, setIsTestingUserKey] = useState(false);
+  const [isSavingUserKey, setIsSavingUserKey] = useState(false);
+  const [userKeyTestResult, setUserKeyTestResult] = useState<{ valid: boolean; model?: string; error?: string | null } | null>(null);
 
-    const handleRemoveUserAiKey = async () => {
-        try {
-            await aiKeyService.deleteUserAiKey();
-            setUserAiKeyInfo({ user_id: '', has_custom_key: false, masked_key: null });
-            setUserAiKeyInput('');
-            setUserKeyTestResult(null);
-            setMessage({ type: 'success', text: 'Personal AI key removed. Reverted to system key.' });
-            setTimeout(() => setMessage(null), 3000);
-        } catch (e: any) {
-            setMessage({ type: 'error', text: e.message || 'Failed to remove AI key.' });
-        }
-    };
+  useEffect(() => {
+    if (isOpen) {
+      aiKeyService.getUserAiKey()
+        .then(res => setUserAiKeyInfo(res))
+        .catch(() => setUserAiKeyInfo(null));
+    }
+  }, [isOpen]);
 
-    const handleSave = async () => {
-        if (!user?.db_user?.id) return;
-        setIsSaving(true);
-        setMessage(null);
-        try {
-            await updateTelegramChatId(user.db_user.id, chatId);
-            await refreshUser();
-            setMessage({ type: 'success', text: 'Settings updated successfully!' });
-            setTimeout(() => setMessage(null), 3000);
-        } catch {
-            setMessage({ type: 'error', text: 'Failed to update settings. Please try again.' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
+  if (!isOpen) return null;
 
-    const handleUnlink = async () => {
-        if (!user?.db_user?.id) return;
-        setIsSaving(true);
-        try {
-            await updateTelegramChatId(user.db_user.id, '');
-            setChatId('');
-            await refreshUser();
-            setMessage({ type: 'success', text: 'Telegram unlinked successfully.' });
-            setTimeout(() => setMessage(null), 3000);
-        } catch {
-            setMessage({ type: 'error', text: 'Failed to unlink Telegram.' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
+  const handleTestUserAiKey = async () => {
+    const key = userAiKeyInput.trim();
+    if (!key) return;
+    setIsTestingUserKey(true);
+    setUserKeyTestResult(null);
+    try {
+      const res = await aiKeyService.testApiKey(key);
+      setUserKeyTestResult(res);
+    } catch (e: any) {
+      setUserKeyTestResult({ valid: false, error: e.message || 'Key test failed' });
+    } finally {
+      setIsTestingUserKey(false);
+    }
+  };
 
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-100">
-            <div
-                className="bg-[#121417] border-3 border-black rounded-none w-full max-w-lg shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono"
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div className="p-6 border-b-2 border-black flex justify-between items-center bg-[#181B20]">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] flex items-center justify-center">
-                            <Shield size={20} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 className="text-white text-[16px] font-mono font-black uppercase tracking-wider">ACCOUNT SETTINGS</h2>
-                            <p className="text-neutral-400 text-[11px] uppercase tracking-wider">// PROFILE & DISPATCH CHANNELS</p>
-                        </div>
-                    </div>
-                    <CloseButton onClick={onClose} size='md'/>
-                </div>
+  const handleSaveUserAiKey = async () => {
+    const key = userAiKeyInput.trim();
+    if (!key) return;
+    setIsSavingUserKey(true);
+    try {
+      const res = await aiKeyService.saveUserAiKey(key, true);
+      setUserAiKeyInfo(res);
+      setUserAiKeyInput('');
+      setUserKeyTestResult(null);
+      setShowUserAiKey(false);
+      setMessage({ type: 'success', text: 'Personal AI key verified and saved!' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message || 'Failed to save personal AI key.' });
+    } finally {
+      setIsSavingUserKey(false);
+    }
+  };
 
-                {/* Body */}
-                <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-                    {/* User Info Section */}
-                    <section>
-                        <h4 className="text-white text-[13px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <User size={12} /> 
-                            <span className="text-[#FFE600] mr-1.5">//</span>PROFILE SPECIFICATION
-                        </h4>
-                        <div className="bg-[#0B0E14] border-2 border-black rounded-none p-4 flex items-center gap-4 shadow-[2px_2px_0px_0px_#000000]">
-                            <img src={user?.avatar_url} alt="Avatar" className="w-12 h-12 rounded-none border-2 border-black" />
-                            <div className="min-w-0">
-                                <h3 className="text-white font-black uppercase truncate text-[14px]">{user?.name || user?.login}</h3>
-                                <p className="text-neutral-400 text-[11px] truncate mt-0.5">{user?.email || 'NO EMAIL CONFIGURED'}</p>
-                            </div>
-                        </div>
-                    </section>
+  const handleRemoveUserAiKey = async () => {
+    try {
+      await aiKeyService.deleteUserAiKey();
+      setUserAiKeyInfo({ user_id: '', has_custom_key: false, masked_key: null });
+      setUserAiKeyInput('');
+      setUserKeyTestResult(null);
+      setMessage({ type: 'success', text: 'Personal AI key removed. Reverted to system key.' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message || 'Failed to remove AI key.' });
+    }
+  };
 
-                    {/* Theme Section */}
-                    <section>
-                        <h4 className="text-white text-[13px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Sun size={12} />
-                            <div>
-                                <span className="text-[#FFE600] mr-1.5">//</span>INTERFACE THEME
-                            </div>
-                        </h4>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setTheme('dark')}
-                                className={`p-3 rounded-none border-2 flex items-center justify-center gap-2 text-[11px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                    theme === 'dark'
-                                        ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
-                                        : 'bg-[#0B0E14] text-neutral-400 border-neutral-800 hover:border-white hover:text-white'
-                                }`}
-                            >
-                                <Moon size={14} strokeWidth={2.5} /> DARK MODE
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setTheme('light')}
-                                className={`p-3 rounded-none border-2 flex items-center justify-center gap-2 text-[11px] font-mono font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                    theme === 'light'
-                                        ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
-                                        : 'bg-[#0B0E14] text-neutral-400 border-neutral-800 hover:border-white hover:text-white'
-                                }`}
-                            >
-                                <Sun size={14} strokeWidth={2.5} /> LIGHT MODE
-                            </button>
-                        </div>
-                    </section>
+  const handleSave = async () => {
+    if (!user?.db_user?.id) return;
+    setIsSaving(true);
+    setMessage(null);
+    try {
+      await updateTelegramChatId(user.db_user.id, chatId);
+      await refreshUser();
+      setMessage({ type: 'success', text: 'Settings updated successfully!' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to update settings. Please try again.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-                    {/* Telegram Section */}
-                    <section>
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-white text-[13px] font-black uppercase tracking-widest flex items-center gap-2">
-                                <Bell size={12} />
-                                <span className="text-[#FFE600] mr-1.5">//</span>TELEGRAM DISPATCH PIPELINE
-                            </h4>
-                            {user?.db_user?.telegram_chat_id ? (
-                                <span className="px-2 py-0.5 bg-[#00FF66] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000] flex items-center gap-1">
-                                    <CheckCircle2 size={10} /> CONNECTED
-                                </span>
-                            ) : (
-                                <span className="px-2 py-0.5 bg-[#FFE600] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000]">
-                                    NOT CONNECTED
-                                </span>
-                            )}
-                        </div>
+  const handleUnlink = async () => {
+    if (!user?.db_user?.id) return;
+    setIsSaving(true);
+    try {
+      await updateTelegramChatId(user.db_user.id, '');
+      setChatId('');
+      await refreshUser();
+      setMessage({ type: 'success', text: 'Telegram unlinked successfully.' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to unlink Telegram.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-                        <div className="space-y-4">
-                            {/* Auto-Link Button */}
-                            <a
-                                href={user?.db_user?.id ? `https://t.me/OffsideOpenTaskBot?start=link_${user.db_user.id}` : (user?.login ? `https://t.me/OffsideOpenTaskBot?start=link_${user.login}` : 'https://t.me/OffsideOpenTaskBot')}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() => setIsWaitingForLink(true)}
-                                className={`flex items-center justify-between p-4 border-2 border-black rounded-none group transition-all cursor-pointer shadow-[3px_3px_0px_0px_#000000] ${
-                                    user?.db_user?.telegram_chat_id 
-                                        ? 'bg-[#141619] hover:bg-[#1E2227]' 
-                                        : 'bg-[#FFE600] text-black hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_0px_#000000]'
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-none border border-black flex items-center justify-center ${
-                                        user?.db_user?.telegram_chat_id ? 'bg-black text-[#00FF66]' : 'bg-black text-[#FFE600]'
-                                    }`}>
-                                        <Send size={14} />
-                                    </div>
-                                    <div>
-                                        <span className={`text-[12px] font-black uppercase block ${
-                                            user?.db_user?.telegram_chat_id ? 'text-white' : 'text-black'
-                                        }`}>
-                                            {user?.db_user?.telegram_chat_id ? 'OPEN BOT CHAT' : '⚡ AUTO-LINK VIA TELEGRAM'}
-                                        </span>
-                                        <span className={`text-[10px] ${
-                                            user?.db_user?.telegram_chat_id ? 'text-neutral-400' : 'text-neutral-800 font-bold'
-                                        }`}>
-                                            {user?.db_user?.telegram_chat_id ? '@OffsideOpenTaskBot (Active)' : 'Tap to open bot & auto-connect with 1 click'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <ExternalLink size={14} className={user?.db_user?.telegram_chat_id ? 'text-neutral-400 group-hover:text-white' : 'text-black'} />
-                            </a>
-
-                            {/* Waiting indicator */}
-                            {isWaitingForLink && !user?.db_user?.telegram_chat_id && (
-                                <div className="p-3 bg-[#1A1F26] border-2 border-[#FFE600] flex items-center gap-3 animate-pulse">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-[#FFE600] animate-ping" />
-                                    <p className="text-[#FFE600] text-[11px] font-mono leading-tight">
-                                        Menunggu konfirmasi bot... Silakan tap <span className="font-bold underline">START</span> di Telegram kamu.
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Manual ID Input & Unlink */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="text-neutral-300 text-[11px] font-bold uppercase">
-                                        CHAT ID (MANUAL EDIT)
-                                    </label>
-                                    {user?.db_user?.telegram_chat_id && (
-                                        <button
-                                            type="button"
-                                            onClick={handleUnlink}
-                                            className="text-red-400 hover:text-red-300 text-[10px] font-bold uppercase underline cursor-pointer"
-                                        >
-                                            UNLINK ACCOUNT
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="relative group">
-                                    <input
-                                        type="text"
-                                        value={chatId}
-                                        onChange={(e) => setChatId(e.target.value)}
-                                        placeholder="ENTER TELEGRAM CHAT ID"
-                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none py-2.5 px-4 text-white text-[13px] font-mono focus:outline-none focus:border-[#FFE600] transition-all placeholder:text-neutral-600 shadow-[2px_2px_0px_0px_#000000]"
-                                    />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-[#FFE600] transition-colors">
-                                        <Send size={15} />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Personal AI Key Section */}
-                    <section>
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-white text-[13px] font-black uppercase tracking-widest flex items-center gap-2">
-                                <Sparkles size={12} />
-                                <span className="text-[#FFE600] mr-1.5">//</span>PERSONAL INTEGRATED AI KEY
-                            </h4>
-                            {userAiKeyInfo?.has_custom_key ? (
-                                <span className="px-2 py-0.5 bg-[#00FF66] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000]">
-                                    ACTIVE
-                                </span>
-                            ) : (
-                                <span className="px-2 py-0.5 bg-[#1E2227] text-neutral-400 border border-neutral-700 font-mono text-[9px] font-black uppercase">
-                                    SYSTEM KEY
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="space-y-3">
-                            <p className="text-neutral-400 text-[11px] leading-relaxed">
-                                Provide your Google Gemini API key to use your personal quotas and token limits across all projects you interact with when no project key is configured.
-                            </p>
-
-                            <div className="flex items-center justify-between text-[11px]">
-                                <span className="text-neutral-500">// GOOGLE AI STUDIO</span>
-                                <a
-                                    href="https://aistudio.google.com/app/apikey"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[#FFE600] hover:underline font-bold"
-                                >
-                                    <span>GET FREE KEY</span>
-                                    <ExternalLink size={11} />
-                                </a>
-                            </div>
-
-                            {userAiKeyInfo?.has_custom_key && (
-                                <div className="p-3 bg-[#0B0E14] border-2 border-black rounded-none flex items-center justify-between gap-3 shadow-[2px_2px_0px_0px_#000000]">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <div className="p-1 bg-[#00FF66] text-black border border-black shrink-0">
-                                            <CheckCircle2 size={12} strokeWidth={2.5} />
-                                        </div>
-                                        <div className="min-w-0 font-mono">
-                                            <div className="text-[9px] font-bold text-neutral-400 uppercase">// CURRENT KEY</div>
-                                            <div className="text-[12px] font-bold text-white tracking-wider truncate">{userAiKeyInfo.masked_key}</div>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleRemoveUserAiKey}
-                                        className="px-2.5 py-1 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border border-black font-mono text-[10px] font-black uppercase transition-all shrink-0 cursor-pointer"
-                                    >
-                                        REMOVE
-                                    </button>
-                                </div>
-                            )}
-
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative flex-1">
-                                        <input
-                                            type={showUserAiKey ? "text" : "password"}
-                                            value={userAiKeyInput}
-                                            onChange={(e) => {
-                                                setUserAiKeyInput(e.target.value);
-                                                setUserKeyTestResult(null);
-                                            }}
-                                            placeholder={userAiKeyInfo?.has_custom_key ? "REPLACE KEY (AIzaSy...)" : "ENTER KEY (AIzaSy...)"}
-                                            className="w-full bg-[#0B0E14] border-2 border-black rounded-none py-2 px-3 text-white text-[12px] font-mono focus:outline-none focus:border-[#FFE600] transition-all placeholder:text-neutral-600 shadow-[2px_2px_0px_0px_#000000]"
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowUserAiKey(!showUserAiKey)}
-                                        className="p-2 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
-                                        title={showUserAiKey ? "Hide Key" : "Reveal Key"}
-                                    >
-                                        {showUserAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleTestUserAiKey}
-                                        disabled={isTestingUserKey || !userAiKeyInput.trim()}
-                                        className="px-3 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0"
-                                    >
-                                        {isTestingUserKey ? "TESTING..." : "TEST"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveUserAiKey}
-                                        disabled={isSavingUserKey || !userAiKeyInput.trim()}
-                                        className="px-3.5 py-2 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0"
-                                    >
-                                        {isSavingUserKey ? "SAVING..." : "SAVE"}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {userKeyTestResult && (
-                                <div
-                                    className={`p-2.5 border-2 border-black rounded-none font-mono text-[10px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${
-                                        userKeyTestResult.valid
-                                            ? "bg-[#00FF66] text-black font-bold"
-                                            : "bg-[#FF3333] text-white font-bold"
-                                    }`}
-                                >
-                                    {userKeyTestResult.valid ? (
-                                        <>
-                                            <CheckCircle2 size={13} strokeWidth={2.5} />
-                                            <span>KEY VALID! VERIFIED WITH {userKeyTestResult.model?.toUpperCase()}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <AlertTriangle size={13} strokeWidth={2.5} />
-                                            <span>ERROR: {userKeyTestResult.error || "INVALID KEY"}</span>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </section>
-
-                    {/* Desktop Application & Auto-Updater Section */}
-                    <section>
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-white text-[13px] font-black uppercase tracking-widest flex items-center gap-2">
-                                <Monitor size={14} />
-                                <span className="text-[#FFE600] mr-1.5">//</span>DESKTOP APPLICATION & UPDATES
-                            </h4>
-                            <span className="px-2 py-0.5 bg-[#FFE600] text-black border-2 border-black font-mono text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_#000000]">
-                                {currentVersion || "WEB"}
-                            </span>
-                        </div>
-
-                        <div className="p-4 bg-[#141619] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div>
-                                <div className="text-white text-[12px] font-black uppercase tracking-wider mb-0.5">
-                                    TAURI DESKTOP PLATFORM
-                                </div>
-                                <div className="text-neutral-400 text-[10px] font-mono">
-                                    {currentVersion && currentVersion !== "web"
-                                        ? `INSTALLED DESKTOP BINARY: ${currentVersion}`
-                                        : "RUNNING IN WEB / BROWSER RUNTIME"}
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => checkForUpdates(false)}
-                                disabled={isCheckingUpdates}
-                                className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider transition-all disabled:opacity-50 shadow-[2px_2px_0px_0px_#000000] cursor-pointer flex items-center justify-center gap-2"
-                            >
-                                <RefreshCw size={12} className={isCheckingUpdates ? "animate-spin" : ""} />
-                                <span>{isCheckingUpdates ? "CHECKING..." : "CHECK FOR UPDATES"}</span>
-                            </button>
-                        </div>
-                    </section>
-
-                    {message && (
-                        <div className={`p-3 rounded-none text-[11px] font-black uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000000] ${
-                            message.type === 'success' ? 'bg-[#22C55E] text-black' : 'bg-[#EF4444] text-white'
-                        }`}>
-                            {message.text}
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="p-4 bg-[#0E1012] border-t-2 border-black flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-none text-neutral-300 border-2 border-black bg-[#1E2227] text-[12px] font-black uppercase tracking-wider hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="px-5 py-2 rounded-none bg-[#FFE600] text-black border-2 border-black text-[12px] font-black uppercase tracking-wider hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[3px_3px_0px_0px_#000000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                    >
-                        {isSaving ? 'SAVING...' : 'SAVE CHANGES'}
-                    </button>
-                </div>
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-xs select-none animate-in fade-in duration-150">
+      <div
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-5 border-b border-border flex justify-between items-center bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <Shield size={20} />
             </div>
+            <div>
+              <h2 className="text-foreground text-base font-semibold">Account Settings</h2>
+              <p className="text-muted-foreground text-xs">Profile & Dispatch Channels</p>
+            </div>
+          </div>
+          <CloseButton onClick={onClose} size="md" />
         </div>
-    );
+
+        {/* Body */}
+        <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* User Info Section */}
+          <section>
+            <h4 className="text-foreground text-xs font-semibold uppercase tracking-wider mb-2.5 flex items-center gap-2">
+              <User size={13} className="text-primary" /> 
+              <span>Profile</span>
+            </h4>
+            <div className="bg-muted/30 border border-border rounded-xl p-3.5 flex items-center gap-3.5 shadow-xs">
+              <img src={user?.avatar_url} alt="Avatar" className="w-11 h-11 rounded-full border border-border object-cover" />
+              <div className="min-w-0">
+                <h3 className="text-foreground font-semibold text-sm truncate">{user?.name || user?.login}</h3>
+                <p className="text-muted-foreground text-xs truncate mt-0.5">{user?.email || 'No email configured'}</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Theme Section */}
+          <section>
+            <h4 className="text-foreground text-xs font-semibold uppercase tracking-wider mb-2.5 flex items-center gap-2">
+              <Sun size={13} className="text-primary" />
+              <span>Interface Theme</span>
+            </h4>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={cn(
+                  "p-3 rounded-lg border flex items-center justify-center gap-2 text-xs font-medium transition-colors cursor-pointer shadow-xs",
+                  theme === 'dark'
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-muted"
+                )}
+              >
+                <Moon size={14} /> Dark Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={cn(
+                  "p-3 rounded-lg border flex items-center justify-center gap-2 text-xs font-medium transition-colors cursor-pointer shadow-xs",
+                  theme === 'light'
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-muted"
+                )}
+              >
+                <Sun size={14} /> Light Mode
+              </button>
+            </div>
+          </section>
+
+          {/* Telegram Section */}
+          <section>
+            <div className="flex items-center justify-between mb-2.5">
+              <h4 className="text-foreground text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                <Bell size={13} className="text-primary" />
+                <span>Telegram Dispatch</span>
+              </h4>
+              {user?.db_user?.telegram_chat_id ? (
+                <Badge variant="success" className="text-[10px]">
+                  <CheckCircle2 size={11} /> Connected
+                </Badge>
+              ) : (
+                <Badge variant="warning" className="text-[10px]">
+                  Not Connected
+                </Badge>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <a
+                href={user?.db_user?.id ? `https://t.me/OffsideOpenTaskBot?start=link_${user.db_user.id}` : (user?.login ? `https://t.me/OffsideOpenTaskBot?start=link_${user.login}` : 'https://t.me/OffsideOpenTaskBot')}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsWaitingForLink(true)}
+                className={cn(
+                  "flex items-center justify-between p-3.5 border rounded-xl transition-all cursor-pointer shadow-xs",
+                  user?.db_user?.telegram_chat_id 
+                    ? "bg-muted/30 border-border hover:bg-muted/50 text-foreground" 
+                    : "bg-primary text-primary-foreground border-primary hover:opacity-90"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-background/20 flex items-center justify-center shrink-0">
+                    <Send size={15} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold block">
+                      {user?.db_user?.telegram_chat_id ? 'Open Bot Chat' : 'Auto-Link via Telegram'}
+                    </span>
+                    <span className="text-[11px] opacity-80">
+                      {user?.db_user?.telegram_chat_id ? '@OffsideOpenTaskBot (Active)' : 'Tap to open bot & auto-connect'}
+                    </span>
+                  </div>
+                </div>
+                <ExternalLink size={14} className="shrink-0 opacity-80" />
+              </a>
+
+              {isWaitingForLink && !user?.db_user?.telegram_chat_id && (
+                <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg flex items-center gap-3">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary animate-ping shrink-0" />
+                  <p className="text-primary text-xs leading-tight">
+                    Waiting for bot confirmation… Please tap <span className="font-semibold underline">START</span> in Telegram.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-muted-foreground text-xs font-medium">
+                    Chat ID (Manual edit)
+                  </label>
+                  {user?.db_user?.telegram_chat_id && (
+                    <button
+                      type="button"
+                      onClick={handleUnlink}
+                      className="text-destructive hover:underline text-[11px] font-medium cursor-pointer"
+                    >
+                      Unlink Account
+                    </button>
+                  )}
+                </div>
+                <div className="relative group">
+                  <input
+                    type="text"
+                    value={chatId}
+                    onChange={(e) => setChatId(e.target.value)}
+                    placeholder="Enter Telegram Chat ID"
+                    className="w-full bg-background border border-input rounded-lg py-2 px-3 text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring transition-colors shadow-xs"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <Send size={14} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Personal AI Key Section */}
+          <section>
+            <div className="flex items-center justify-between mb-2.5">
+              <h4 className="text-foreground text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                <Sparkles size={13} className="text-primary" />
+                <span>Personal AI Key</span>
+              </h4>
+              {userAiKeyInfo?.has_custom_key ? (
+                <Badge variant="success" className="text-[10px]">Active</Badge>
+              ) : (
+                <Badge variant="neutral" className="text-[10px]">System Key</Badge>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Provide your Google Gemini API key to use your personal quotas and token limits across all projects you interact with.
+              </p>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Google AI Studio</span>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                >
+                  <span>Get Free Key</span>
+                  <ExternalLink size={11} />
+                </a>
+              </div>
+
+              {userAiKeyInfo?.has_custom_key && (
+                <div className="p-3 bg-muted/30 border border-border rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-1 rounded-md bg-emerald-500/15 text-emerald-500 shrink-0">
+                      <CheckCircle2 size={14} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-muted-foreground">Current key</div>
+                      <div className="text-xs font-mono font-medium text-foreground tracking-wider truncate">{userAiKeyInfo.masked_key}</div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={handleRemoveUserAiKey}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              )}
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type={showUserAiKey ? "text" : "password"}
+                      value={userAiKeyInput}
+                      onChange={(e) => {
+                        setUserAiKeyInput(e.target.value);
+                        setUserKeyTestResult(null);
+                      }}
+                      placeholder={userAiKeyInfo?.has_custom_key ? "Replace key (AIzaSy...)" : "Enter key (AIzaSy...)"}
+                      className="w-full bg-background border border-input rounded-lg py-2 px-3 text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowUserAiKey(!showUserAiKey)}
+                    title={showUserAiKey ? "Hide key" : "Reveal key"}
+                  >
+                    {showUserAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestUserAiKey}
+                    disabled={isTestingUserKey || !userAiKeyInput.trim()}
+                  >
+                    {isTestingUserKey ? "Testing…" : "Test"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveUserAiKey}
+                    disabled={isSavingUserKey || !userAiKeyInput.trim()}
+                  >
+                    {isSavingUserKey ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </div>
+
+              {userKeyTestResult && (
+                <div
+                  className={cn(
+                    "p-2.5 rounded-lg border text-xs flex items-center gap-2 font-medium shadow-xs",
+                    userKeyTestResult.valid
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      : "bg-destructive/15 text-destructive border-destructive/30"
+                  )}
+                >
+                  {userKeyTestResult.valid ? (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span>Key valid! Verified with {userKeyTestResult.model?.toUpperCase()}</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle size={14} />
+                      <span>Error: {userKeyTestResult.error || "Invalid key"}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Desktop Application Section */}
+          <section>
+            <div className="flex items-center justify-between mb-2.5">
+              <h4 className="text-foreground text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                <Monitor size={14} className="text-primary" />
+                <span>Desktop Platform & Updates</span>
+              </h4>
+              <Badge variant="primary" className="text-[10px]">
+                {currentVersion || "Web"}
+              </Badge>
+            </div>
+
+            <div className="p-3.5 bg-muted/30 border border-border rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-foreground text-xs font-semibold mb-0.5">
+                  Tauri Desktop Platform
+                </div>
+                <div className="text-muted-foreground text-[11px]">
+                  {currentVersion && currentVersion !== "web"
+                    ? `Installed desktop binary: ${currentVersion}`
+                    : "Running in web browser runtime"}
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => checkForUpdates(false)}
+                disabled={isCheckingUpdates}
+              >
+                <RefreshCw size={12} className={isCheckingUpdates ? "animate-spin" : ""} />
+                <span>{isCheckingUpdates ? "Checking…" : "Check for updates"}</span>
+              </Button>
+            </div>
+          </section>
+
+          {message && (
+            <div className={cn(
+              "p-3 rounded-lg text-xs font-medium border shadow-xs",
+              message.type === 'success'
+                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                : "bg-destructive/15 text-destructive border-destructive/30"
+            )}>
+              {message.text}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-muted/30 border-t border-border flex justify-end gap-2.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="md"
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 };

@@ -3,7 +3,8 @@ import './LoginPage.css';
 import logo from '../assets/logo.svg';
 import { resolveApiUrl, isTauriEnvironment } from '../services/apiClient';
 import { useAuth } from './useAuth';
-import { RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
+import { RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
+import { Button } from '../design-system/Button';
 
 function GitHubMark() {
   return (
@@ -42,58 +43,35 @@ export function LoginPage() {
   return (
     <div className="login-root">
       <div className="login-card">
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
-          <div style={{
-            width: '3.5rem',
-            height: '3.5rem',
-            border: '2px solid #000',
-            backgroundColor: '#FFE600',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '3px 3px 0px 0px #000'
-          }}>
-            <img src={logo} alt="OpenTask Logo" style={{ width: '2.25rem', height: '2.25rem', objectFit: 'contain' }} />
+        <div className="flex justify-center mb-1">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center p-2.5">
+            <img src={logo} alt="OpenTask Logo" className="w-full h-full object-contain" />
           </div>
         </div>
+
         <div className="login-title">
-          <h2>ACCESS CONTROL // SIGN IN</h2>
-          <p>{isTauri ? 'SIGN IN VIA DEFAULT SYSTEM BROWSER' : 'AUTHENTICATE VIA GITHUB OAUTH PROTOCOL'}</p>
+          <h2>Welcome to OpenTask</h2>
+          <p>{isTauri ? 'Sign in using your system browser' : 'Authenticate with your GitHub account'}</p>
         </div>
 
         {isTauri ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className="flex flex-col gap-3">
             {isWaitingForBrowser ? (
-              <div style={{
-                background: '#0B0E14',
-                border: '2px solid #FFE600',
-                padding: '1.25rem',
-                textAlign: 'center',
-                boxShadow: '3px 3px 0px 0px #000',
-                fontFamily: 'monospace'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FFE600', fontWeight: 'bold', fontSize: '12px', marginBottom: '0.5rem' }}>
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
+                <div className="flex items-center justify-center gap-2 text-primary font-medium text-xs mb-2">
                   <RefreshCw size={14} className="animate-spin" />
-                  <span>WAITING FOR BROWSER AUTH...</span>
+                  <span>Waiting for browser authorization...</span>
                 </div>
-                <p style={{ color: '#9CA3AF', fontSize: '11px', margin: '0 0 1rem' }}>
+                <p className="text-muted-foreground text-xs mb-3">
                   Complete authorization in your browser where you are already signed into GitHub.
                 </p>
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIsWaitingForBrowser(false)}
-                  style={{
-                    background: '#1E2227',
-                    color: '#FFF',
-                    border: '2px solid #000',
-                    padding: '0.4rem 1rem',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer'
-                  }}
                 >
-                  CANCEL
-                </button>
+                  Cancel
+                </Button>
               </div>
             ) : (
               <button
@@ -102,25 +80,14 @@ export function LoginPage() {
                 className="login-btn"
               >
                 <GitHubMark />
-                <span>CONTINUE IN BROWSER</span>
+                <span>Continue with GitHub</span>
                 <ExternalLink size={14} />
               </button>
             )}
 
             {loginError && (
-              <div style={{
-                background: '#FF3333',
-                color: '#FFF',
-                border: '2px solid #000',
-                padding: '0.6rem 0.8rem',
-                fontSize: '11px',
-                fontFamily: 'monospace',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                boxShadow: '2px 2px 0px 0px #000'
-              }}>
-                <AlertTriangle size={14} />
+              <div className="rounded-lg border border-destructive/30 bg-destructive/15 text-destructive p-3 text-xs flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
                 <span>{loginError}</span>
               </div>
             )}
@@ -135,14 +102,14 @@ export function LoginPage() {
             className="login-btn"
           >
             <GitHubMark />
-            CONTINUE WITH GITHUB
+            <span>Continue with GitHub</span>
           </a>
         )}
 
         <p className="login-footer">
           {isTauri
-            ? 'OPENTASK DESKTOP // ZERO PASSWORD RETYPING VIA SEAMLESS LOOPBACK PROTOCOL'
-            : 'NOTICE: AUTHORIZED DEVELOPERS ONLY. BY CONNECTING YOU BIND TO THE OPENTASK REPOSITORY SPECIFICATION SYSTEM.'}
+            ? 'OpenTask Desktop: Seamless login via secure browser loopback.'
+            : 'By connecting, you agree to access OpenTask project repositories and workflows.'}
         </p>
       </div>
     </div>

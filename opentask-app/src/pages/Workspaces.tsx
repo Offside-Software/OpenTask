@@ -4,6 +4,7 @@ import { ProjectCard } from '../components/dashboard/ProjectCard';
 import { useProjects } from '../controllers/useProjects';
 import { ProjectFormModal } from '../components/modals/ProjectFormModal';
 import { LoadingScreen } from '../components/ui/LoadingScreen';
+import { Button } from '../design-system/Button';
 import type { Project } from '../models';
 
 import { useNavigate } from 'react-router-dom';
@@ -26,49 +27,52 @@ export const WorkspacesPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-200 max-w-[1400px] mx-auto w-full select-none">
-
+    <div className="space-y-8 animate-in fade-in duration-200 max-w-[1400px] mx-auto w-full select-none">
       {/* Header */}
-      <div className="flex justify-between items-end border-b-2 border-neutral-800 pb-6">
+      <div className="flex justify-between items-end border-b border-border pb-5">
         <div>
-          <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[10px] font-black uppercase tracking-wider mb-2 inline-block">
-            // WORKSPACES HUB
+          <span className="text-xs font-semibold uppercase tracking-wider text-primary mb-1 inline-block">
+            Workspaces Hub
           </span>
-          <h1 className="text-[32px] font-black text-white font-mono uppercase tracking-tight leading-tight">WORKSPACES</h1>
-          <p className="text-[12px] font-mono text-neutral-400 uppercase tracking-wider mt-1">
-            MANAGED PROJECTS & CODE REVIEW PIPELINES
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight leading-tight">Workspaces</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Managed projects & code review pipelines
           </p>
         </div>
-        <button
+        <Button
+          variant="primary"
           onClick={openCreate}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-none bg-[#FFE600] text-black border-2 border-black font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000000] transition-all cursor-pointer"
+          className="flex items-center gap-2"
         >
-          <Plus size={16} strokeWidth={3} /> NEW PROJECT
-        </button>
+          <Plus size={15} /> <span>New Project</span>
+        </Button>
       </div>
 
       {/* Projects */}
       <section>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-black text-[#FFE600] border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
-            <Briefcase size={16} strokeWidth={2.5} />
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="p-1.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+            <Briefcase size={16} />
           </div>
-          <h2 className="text-white font-mono font-black text-[14px] uppercase tracking-wider">
-            // ACTIVE PROJECTS
+          <h2 className="text-foreground text-sm font-semibold">
+            Active Projects
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-5">
           {loading ? (
-            <div className="col-span-2 py-12 flex items-center justify-center">
+            <div className="col-span-3 py-12 flex items-center justify-center">
               <LoadingScreen
                 fullscreen={false}
-                message="LOADING WORKSPACES…"
-                subtext="// DISCOVERING ACTIVE PIPELINES & REPOSITORIES"
+                message="Loading workspaces…"
+                subtext="Discovering active pipelines & repositories"
               />
             </div>
           ) : projects.length === 0 ? (
-            <div className="col-span-2 text-center py-16 text-neutral-400 font-mono text-[13px] border-2 border-dashed border-black bg-[#121417] rounded-none shadow-[4px_4px_0px_0px_#000000]">
-              NO PROJECTS FOUND. <button onClick={openCreate} className="text-[#FFE600] hover:underline font-bold ml-1">CREATE ONE NOW.</button>
+            <div className="col-span-3 text-center py-16 text-muted-foreground text-xs border border-dashed border-border bg-card/50 rounded-xl shadow-xs">
+              No projects found.{' '}
+              <button onClick={openCreate} className="text-primary hover:underline font-medium ml-1 cursor-pointer">
+                Create one now.
+              </button>
             </div>
           ) : projects.map(p => (
             <ProjectCard
@@ -81,7 +85,6 @@ export const WorkspacesPage: React.FC = () => {
           ))}
         </div>
       </section>
-
 
       {/* Modal */}
       {modalMode === 'create' && (

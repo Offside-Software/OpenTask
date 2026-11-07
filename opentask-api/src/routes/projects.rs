@@ -207,7 +207,6 @@ pub async fn get_project(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Project {project_id} not found")))?;
 
-    state.realtime.publish(project_id.0, "project", "updated", Some(project_id.0));
     Ok(Json(row))
 }
 
@@ -237,6 +236,7 @@ pub async fn update_project(
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Project {project_id} not found")))?;
 
+    state.realtime.publish(project_id.0, "project", "updated", Some(project_id.0));
     Ok(Json(row))
 }
 

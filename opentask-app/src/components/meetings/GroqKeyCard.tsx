@@ -15,7 +15,7 @@ interface GroqKeyCardProps {
 }
 
 const inputClass =
-  "w-full bg-[#0B0E14] border-2 border-neutral-700 rounded-none px-3 py-2 text-white font-mono text-[12px] placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600]";
+  "w-full bg-background border border-input rounded-md px-3 py-2 text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors";
 
 /** The project's own Groq key for the meeting pipeline. Managers set or remove it; the key never comes back. */
 export const GroqKeyCard: React.FC<GroqKeyCardProps> = ({ projectId, className = "" }) => {
@@ -103,28 +103,29 @@ export const GroqKeyCard: React.FC<GroqKeyCardProps> = ({ projectId, className =
           <Skeleton height={44} />
         </div>
       ) : !info ? (
-        <p className="text-neutral-400 font-mono text-[12px]">Could not load the key settings. Reload the page to try again.</p>
+        <p className="text-muted-foreground text-xs">Could not load the key settings. Reload the page to try again.</p>
       ) : (
         <div className="space-y-4">
-          <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             Without a project key, meeting jobs use the shared Groq key and this project's daily quotas. With one, the quotas stop
             applying and usage counts against the key's own Groq limits.
           </p>
 
-          <div className="border-2 border-neutral-700 bg-[#121417] p-3 flex flex-col md:flex-row md:items-center gap-3">
-            <p className="flex-1 text-neutral-300 font-mono text-[12px] flex items-center gap-2 flex-wrap">
+          <div className="border border-border bg-card/60 rounded-xl p-3.5 flex flex-col md:flex-row md:items-center gap-3">
+            <div className="flex-1 text-foreground text-xs flex items-center gap-2 flex-wrap">
               {info.configured ? (
                 <>
-                  Key ending <span className="text-white font-bold">····{info.hint}</span>
+                  <span className="text-muted-foreground">Key ending</span>
+                  <span className="font-mono font-semibold text-foreground">····{info.hint}</span>
                   <Badge variant={info.tier === "developer" ? "primary" : "default"}>
                     {info.tier === "developer" ? "Developer tier" : "Free tier"}
                   </Badge>
-                  {info.updated_at && <span className="text-neutral-400">set {new Date(info.updated_at).toLocaleDateString()}</span>}
+                  {info.updated_at && <span className="text-muted-foreground">set {new Date(info.updated_at).toLocaleDateString()}</span>}
                 </>
               ) : (
-                "No project key. Meeting jobs use the shared key."
+                <span className="text-muted-foreground">No project key configured. Meeting jobs use the shared key.</span>
               )}
-            </p>
+            </div>
             {info.can_manage && !editing && (
               <div className="flex gap-2 shrink-0">
                 {info.configured && (
@@ -139,19 +140,19 @@ export const GroqKeyCard: React.FC<GroqKeyCardProps> = ({ projectId, className =
             )}
           </div>
 
-          {!info.can_manage && <p className="text-neutral-400 font-mono text-[11px]">Only project managers can change this key.</p>}
+          {!info.can_manage && <p className="text-muted-foreground text-[11px]">Only project managers can change this key.</p>}
 
           {editing && (
-            <form onSubmit={save} className="space-y-2">
+            <form onSubmit={save} className="space-y-3">
               <div className="flex items-center justify-between">
-                <label htmlFor="groq-key" className="text-[11px] font-bold uppercase text-neutral-400 font-mono">
-                  // Groq API key
+                <label htmlFor="groq-key" className="text-xs font-medium text-foreground">
+                  Groq API Key
                 </label>
                 <a
                   href="https://console.groq.com/keys"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#FFE600] hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                 >
                   Get a key <ExternalLink size={11} />
                 </a>
@@ -172,8 +173,8 @@ export const GroqKeyCard: React.FC<GroqKeyCardProps> = ({ projectId, className =
                   <option value="developer">Developer tier</option>
                 </select>
               </div>
-              <p className="text-neutral-400 font-mono text-[10px]">Checked with Groq before it is saved, stored encrypted, and never shown again.</p>
-              {error && <p className="border-2 border-black bg-[#FF3333] text-white font-mono text-[11px] p-2">{error}</p>}
+              <p className="text-muted-foreground text-[11px]">Checked with Groq before it is saved, stored encrypted, and never shown again.</p>
+              {error && <p className="rounded-lg border border-destructive/30 bg-destructive/15 text-destructive text-xs p-2.5 font-medium">{error}</p>}
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" type="button" disabled={busy} onClick={closeForm}>
                   Cancel

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -36,35 +37,58 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 5000);
   }, [removeToast]);
 
+  const typeConfig = {
+    success: {
+      icon: CheckCircle2,
+      iconColor: 'text-emerald-500',
+      border: 'border-emerald-500/20'
+    },
+    error: {
+      icon: AlertCircle,
+      iconColor: 'text-destructive',
+      border: 'border-destructive/20'
+    },
+    warning: {
+      icon: AlertTriangle,
+      iconColor: 'text-amber-500',
+      border: 'border-amber-500/20'
+    },
+    info: {
+      icon: Info,
+      iconColor: 'text-primary',
+      border: 'border-primary/20'
+    }
+  };
+
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-8 right-8 z-[9999] flex flex-col gap-3 max-w-md w-full sm:w-auto">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`flex items-center gap-3 p-4 rounded-none border-2 border-black shadow-[4px_4px_0px_0px_#000000] font-mono animate-in slide-in-from-right-full duration-150 ${
-              toast.type === 'success' ? 'bg-[#00FF66] text-black' :
-              toast.type === 'error' ? 'bg-[#FF3333] text-white' :
-              toast.type === 'warning' ? 'bg-[#FFE600] text-black' :
-              'bg-[#00E5FF] text-black'
-            }`}
-          >
-            {toast.type === 'success' && <CheckCircle2 size={18} strokeWidth={2.5} />}
-            {toast.type === 'error' && <AlertCircle size={18} strokeWidth={2.5} />}
-            {toast.type === 'warning' && <AlertCircle size={18} strokeWidth={2.5} />}
-            {toast.type === 'info' && <Info size={18} strokeWidth={2.5} />}
+      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        {toasts.map((toast) => {
+          const config = typeConfig[toast.type] || typeConfig.info;
+          const Icon = config.icon;
 
-            <p className="text-[12px] font-bold uppercase tracking-wider flex-1">{toast.message}</p>
-
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="p-1 border border-black hover:bg-black hover:text-white transition-colors cursor-pointer"
+          return (
+            <div
+              key={toast.id}
+              className={cn(
+                "pointer-events-auto flex items-center gap-3 p-3.5 rounded-lg border bg-card/95 text-card-foreground shadow-lg backdrop-blur-sm animate-in slide-in-from-bottom-2 fade-in duration-200",
+                config.border
+              )}
             >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
+              <Icon size={18} className={cn("shrink-0", config.iconColor)} strokeWidth={2} />
+              <p className="text-sm font-medium flex-1 text-foreground">{toast.message}</p>
+              <button
+                type="button"
+                onClick={() => removeToast(toast.id)}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                aria-label="Dismiss toast"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

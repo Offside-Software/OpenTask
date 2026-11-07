@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SurfaceCard } from '../../design-system/SurfaceCard';
 import { Badge } from '../../design-system/Badge';
+import { Button } from '../../design-system/Button';
 import { Settings, Users, Plus, Search, Save, X, AlertTriangle, Github, GitBranch, Trash2, ExternalLink, Bot, Key, Copy, Check, Eye, EyeOff, Sparkles, CheckCircle2, RefreshCw, Cpu } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { projectMemberService } from '../../services/projectMemberService';
@@ -476,58 +477,59 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
     ) : false;
 
     return (
-        <div className="space-y-6 select-none font-mono">
-            <div className="grid grid-cols-5 gap-6">
+        <div className="space-y-6 select-none">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 {/* General Settings */}
-                <SurfaceCard className="col-span-2" title="Project Details" subtitle="Update basic project information" icon={Settings} rightElement={null}>
+                <SurfaceCard className="lg:col-span-2" title="Project Details" subtitle="Update basic project information" icon={Settings} rightElement={null}>
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// PROJECT TITLE</label>
+                            <label className="block text-xs font-medium text-foreground mb-1.5">Project Title</label>
                             <input
                                 type="text"
                                 value={name}
                                 onChange={e => setName(e.target.value)}
-                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                className="w-full bg-background border border-input rounded-md px-3 py-2 text-xs text-foreground focus:ring-1 focus:ring-ring focus:outline-none transition-colors"
                             />
                         </div>
                         <div>
-                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1.5">// DESCRIPTION</label>
+                            <label className="block text-xs font-medium text-foreground mb-1.5">Description</label>
                             <textarea
                                 value={description}
                                 onChange={e => setDescription(e.target.value)}
-                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none min-h-[100px] shadow-[2px_2px_0px_0px_#000000]"
+                                className="w-full bg-background border border-input rounded-md px-3 py-2 text-xs text-foreground focus:ring-1 focus:ring-ring focus:outline-none min-h-[100px] transition-colors resize-y"
                             />
                         </div>
 
-                        <button
+                        <Button
+                            variant="primary"
                             onClick={handleUpdateProject}
                             disabled={!isProjectDirty || !name.trim()}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+                            className="flex items-center gap-2"
                         >
-                            <Save size={14} strokeWidth={2.5} /> Save Changes
-                        </button>
+                            <Save size={14} /> <span>Save Changes</span>
+                        </Button>
                     </div>
                 </SurfaceCard>
 
                 {/* Member Management */}
-                <SurfaceCard className="col-span-2" title="Project Members" subtitle={`${members.length} members in project`} icon={Users} rightElement={null}>
-                    <div className="space-y-6">
+                <SurfaceCard className="lg:col-span-2" title="Project Members" subtitle={`${members.length} members in project`} icon={Users} rightElement={null}>
+                    <div className="space-y-5">
                         {/* Existing Members Search Filter */}
                         <div>
                             <div className="relative mb-3">
                                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                    <Search size={13} className="text-neutral-500" />
+                                    <Search size={13} className="text-muted-foreground" />
                                 </div>
                                 <input
                                     type="text"
-                                    placeholder="FILTER CURRENT MEMBERS..."
+                                    placeholder="Filter current members..."
                                     value={memberFilter}
                                     onChange={(e) => setMemberFilter(e.target.value)}
-                                    className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-8 pr-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                    className="w-full bg-background border border-input rounded-md pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none transition-colors"
                                 />
                             </div>
 
-                            <div className="space-y-2.5 max-h-[204px] overflow-y-auto no-scrollbar">
+                            <div className="space-y-2 max-h-[220px] overflow-y-auto">
                                 {members
                                     .filter(m =>
                                         (m.display_name || '').toLowerCase().includes(memberFilter.toLowerCase()) ||
@@ -535,47 +537,51 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                         (m.role || '').toLowerCase().includes(memberFilter.toLowerCase())
                                     )
                                     .map(m => (
-                                        <div key={m.id} className="flex items-center justify-between p-3 rounded-none border-2 border-black bg-[#121417] shadow-[2px_2px_0px_0px_#000000]">
+                                        <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card shadow-xs">
                                             <div>
-                                                <div className="text-[13px] font-bold text-white uppercase tracking-wider">{m.display_name || m.gh_username || `User #${m.user_id}`}</div>
+                                                <div className="text-xs font-semibold text-foreground">{m.display_name || m.gh_username || `User #${m.user_id}`}</div>
                                                 {editingMemberId === m.id ? (
                                                     <select
                                                         value={editingRole}
                                                         onChange={(e) => setEditingRole(e.target.value)}
-                                                        className="mt-1 bg-[#0B0E14] border-2 border-black rounded-none px-2 py-1 text-[11px] font-mono text-white focus:border-[#FFE600] focus:outline-none"
+                                                        className="mt-1 bg-background border border-input rounded-md px-2 py-1 text-xs text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
                                                     >
                                                         {DEFAULT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                                                     </select>
                                                 ) : (
-                                                    <div className="text-[11px] text-[#FFE600] font-bold mt-0.5 uppercase">// {m.role}</div>
+                                                    <div className="text-[11px] text-primary font-medium mt-0.5">{m.role}</div>
                                                 )}
                                             </div>
 
                                             {isManager && (
-                                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                                <div className="flex items-center gap-2">
                                                     {editingMemberId === m.id ? (
-                                                        <button
+                                                        <Button
+                                                            variant="success"
+                                                            size="sm"
                                                             type="button"
                                                             onClick={() => handleSaveMember(m)}
-                                                            className="px-4 py-2 bg-[#00FF66] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
                                                         >
                                                             Save
-                                                        </button>
+                                                        </Button>
                                                     ) : (
-                                                        <button
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
                                                             type="button"
                                                             onClick={() => handleEditMember(m)}
-                                                            className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
                                                         >
                                                             Edit
-                                                        </button>
+                                                        </Button>
                                                     )}
 
                                                     {(m.role.toUpperCase() !== "MANAGER" && m.role.toUpperCase() !== "OWNER" &&
                                                         <button
-                                                            onClick={() => m.id !== undefined && handleRemoveMember(m.id) }
-                                                            className={`p-1 rounded-none bg-black border-2 border-neutral-700 text-neutral-400 hover:text-black hover:bg-[#FF0000] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer`}>
-                                                            <X size={18} strokeWidth={3}/>
+                                                            onClick={() => m.id !== undefined && handleRemoveMember(m.id)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                                                            title="Remove member"
+                                                        >
+                                                            <X size={15} />
                                                         </button>
                                                     )}
                                                 </div>
@@ -591,39 +597,39 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                         </div>
 
                         {isManager && (
-                            <div className="pt-4 border-t-2 border-neutral-800">
-                                <h4 className="text-[13px] font-black uppercase tracking-wider text-white mb-4">// ADD NEW MEMBER</h4>
+                            <div className="pt-4 border-t border-border">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground mb-3">Add New Member</h4>
                                 {!selectedUser ? (
                                     <div className="space-y-2 relative">
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                                <Search size={14} className="text-neutral-400" />
+                                                <Search size={14} className="text-muted-foreground" />
                                             </div>
                                             <input
                                                 type="text"
-                                                placeholder="SEARCH USERNAME (LOCAL OR GITHUB)..."
+                                                placeholder="Search username (local or GitHub)..."
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                                className="w-full bg-background border border-input rounded-md pl-9 pr-4 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none transition-colors"
                                             />
                                             {isSearching && (
                                                 <div className="absolute inset-y-0 right-3 flex items-center">
-                                                    <div className="w-4 h-4 rounded-none border-2 border-black border-t-[#FFE600] animate-spin"></div>
+                                                    <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
                                                 </div>
                                             )}
                                         </div>
 
                                         {searchQuery.length >= 2 && searchResults.length > 0 && (
-                                            <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none overflow-hidden z-10 shadow-[4px_4px_0px_0px_#000000] max-h-60 overflow-y-auto">
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg overflow-hidden z-10 shadow-lg max-h-60 overflow-y-auto divide-y divide-border">
                                                 {searchResults.map(u => (
                                                     <button
                                                         key={u.id || u.gh_username}
                                                         onClick={() => setSelectedUser(u)}
-                                                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#FFE600] hover:text-black transition-colors text-left font-mono text-[12px] font-bold uppercase text-white cursor-pointer border-b border-neutral-800 last:border-0"
+                                                        className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-muted/50 transition-colors text-left text-xs font-medium text-foreground cursor-pointer"
                                                     >
                                                         <span>{u.gh_username}</span>
                                                         {u.display_name && (
-                                                            <span className="text-[10px] text-neutral-400 opacity-80 normal-case">{u.display_name}</span>
+                                                            <span className="text-[11px] text-muted-foreground">{u.display_name}</span>
                                                         )}
                                                     </button>
                                                 ))}
@@ -631,42 +637,44 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                         )}
 
                                         {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
-                                            <div className="absolute top-full left-0 right-0 mt-1 bg-[#121417] border-2 border-black rounded-none p-3 text-[12px] font-mono text-neutral-400 text-center z-10 shadow-[4px_4px_0px_0px_#000000]">
-                                                NO USERS MATCHING QUERY
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg p-3 text-xs text-muted-foreground text-center z-10 shadow-lg">
+                                                No users matching query
                                             </div>
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="bg-[#121417] border-2 border-black rounded-none p-4 space-y-4 shadow-[3px_3px_0px_0px_#000000]">
+                                    <div className="bg-muted/30 border border-border rounded-lg p-3.5 space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[13px] font-bold text-white uppercase">// TARGET: {selectedUser.gh_username}</span>
-                                            <button onClick={() => setSelectedUser(null)} className="text-neutral-400 hover:text-white transition-colors cursor-pointer">
-                                                <X size={16} strokeWidth={3} />
+                                            <span className="text-xs font-semibold text-foreground">Target: {selectedUser.gh_username}</span>
+                                            <button onClick={() => setSelectedUser(null)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                                                <X size={15} />
                                             </button>
                                         </div>
 
                                         <div>
-                                            <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5">// ASSIGN ROLE</label>
+                                            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Assign Role</label>
                                             <select
                                                 value={selectedRole}
                                                 onChange={(e) => setSelectedRole(e.target.value)}
-                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[13px] font-mono text-white focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                                className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
                                             >
-                                                <option value="" disabled>SELECT A ROLE...</option>
+                                                <option value="" disabled>Select a role...</option>
                                                 {DEFAULT_ROLES.map(r => (
                                                     <option key={r} value={r}>{r}</option>
                                                 ))}
                                             </select>
                                         </div>
 
-                                        <div className="flex justify-end pt-2">
-                                            <button
+                                        <div className="flex justify-end pt-1">
+                                            <Button
+                                                variant="primary"
+                                                size="sm"
                                                 onClick={handleAddMember}
                                                 disabled={!selectedRole}
-                                                className="flex items-center gap-2 px-5 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
+                                                className="flex items-center gap-1.5"
                                             >
-                                                <Plus size={14} strokeWidth={3} /> Add to Project
-                                            </button>
+                                                <Plus size={14} /> <span>Add to Project</span>
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
@@ -679,10 +687,10 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                 <SurfaceCard title="Connected Repositories" subtitle={`${repoUrls.length} repo${repoUrls.length !== 1 ? 's' : ''} linked`} icon={GitBranch} rightElement={null}>
                     <div className="space-y-4">
                         {repoUrls.length === 0 ? (
-                            <div className="py-6 text-center border-2 border-dashed border-neutral-700 rounded-none">
-                                <Github size={24} className="text-neutral-600 mx-auto mb-2" />
-                                <p className="text-neutral-500 font-mono text-[11px] uppercase">// NO REPOSITORIES CONNECTED</p>
-                                <p className="text-neutral-600 font-mono text-[10px] mt-1">Connect repos to enable AI code review</p>
+                            <div className="py-6 text-center border border-dashed border-border rounded-lg bg-card/50">
+                                <Github size={22} className="text-muted-foreground mx-auto mb-2" />
+                                <p className="text-muted-foreground text-xs font-medium">No repositories connected</p>
+                                <p className="text-muted-foreground text-[11px] mt-0.5">Connect repos to enable AI code review</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
@@ -690,25 +698,25 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                     const repoName = url.replace('https://github.com/', '');
                                     const [orgName, repoShortName] = repoName.split('/');
                                     return (
-                                        <div key={url} className="flex items-center justify-between p-3 bg-[#121417] border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
+                                        <div key={url} className="flex items-center justify-between p-3 bg-card border border-border rounded-lg shadow-xs">
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <div className="p-1.5 bg-[#FFE600] border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000]">
-                                                    <Github size={12} strokeWidth={2.5} className="text-black" />
+                                                <div className="p-1.5 bg-primary/10 text-primary border border-primary/20 rounded-md">
+                                                    <Github size={13} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="text-[13px] font-bold text-white font-mono uppercase truncate">{repoShortName || repoName}</div>
-                                                    <div className="text-[12px] text-white font-mono">{orgName}</div>
+                                                    <div className="text-xs font-semibold text-foreground truncate">{repoShortName || repoName}</div>
+                                                    <div className="text-[11px] text-muted-foreground">{orgName}</div>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-[#FFE600] transition-colors">
-                                                    <ExternalLink size={13} strokeWidth={2} />
+                                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors p-1">
+                                                    <ExternalLink size={13} />
                                                 </a>
                                                 <button
                                                     onClick={() => handleRemoveRepo(url)}
-                                                    className="text-neutral-500 hover:text-[#EF4444] transition-colors cursor-pointer"
+                                                    className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-1"
                                                 >
-                                                    <Trash2 size={13} strokeWidth={2} />
+                                                    <Trash2 size={13} />
                                                 </button>
                                             </div>
                                         </div>
@@ -716,12 +724,13 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                 })}
                             </div>
                         )}
-                        <button
+                        <Button
+                            variant="primary"
                             onClick={() => setIsRepoPicker(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none text-[11px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                            className="w-full flex items-center justify-center gap-2"
                         >
-                            <Github size={13} strokeWidth={2.5} /> Connect Repository
-                        </button>
+                            <Github size={14} /> <span>Connect Repository</span>
+                        </Button>
                     </div>
                 </SurfaceCard>
             </div>
@@ -750,47 +759,51 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                         </p>
 
                         {hasCustomAiKey && !isReplacingKey ? (
-                            <div className="p-4 bg-[#121417] border-2 border-black rounded-none flex items-center justify-between gap-4 shadow-[3px_3px_0px_0px_#000000] flex-wrap">
+                            <div className="p-4 bg-muted/30 border border-border rounded-lg flex items-center justify-between gap-4 shadow-xs flex-wrap">
                                 <div className="flex items-center gap-3.5 min-w-0">
-                                    <div className="p-2 bg-[#00FF66] text-black border-2 border-black rounded-none shadow-[1px_1px_0px_0px_#000000] shrink-0">
-                                        <CheckCircle2 size={16} strokeWidth={2.5} />
+                                    <div className="p-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg shrink-0">
+                                        <CheckCircle2 size={16} />
                                     </div>
-                                    <div className="min-w-0 font-mono">
+                                    <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-[#00FF66] bg-black px-1.5 py-0.5 border border-neutral-700">
-                                                // ACTIVE PROJECT KEY
+                                            <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                                Active Project Key
                                             </span>
                                         </div>
-                                        <div className="text-[14px] font-bold text-white tracking-widest mt-1 truncate">
+                                        <div className="text-sm font-semibold text-foreground tracking-widest mt-1 truncate">
                                             {displayMaskedAiKey}
                                         </div>
-                                        <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">
                                             Dedicated quotas active for PR reviews, MoM parser, and task automation.
                                         </p>
                                     </div>
                                 </div>
                                 {isManager && (
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <button
+                                        <Button
+                                            variant="primary"
+                                            size="sm"
                                             type="button"
                                             onClick={() => {
                                                 setIsReplacingKey(true);
                                                 setCustomAiInput('');
                                                 setAiKeyTestResult(null);
                                             }}
-                                            className="px-4 py-2 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            className="flex items-center gap-1.5"
                                         >
-                                            <RefreshCw size={12} strokeWidth={2.5} />
-                                            <span>REPLACE KEY</span>
-                                        </button>
-                                        <button
+                                            <RefreshCw size={12} />
+                                            <span>Replace Key</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             type="button"
                                             onClick={() => setIsRemoveProjectAiKeyModalOpen(true)}
-                                            className="px-3.5 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            className="flex items-center gap-1.5 hover:text-destructive hover:bg-destructive/10"
                                         >
                                             <Trash2 size={12} />
-                                            <span>REMOVE</span>
-                                        </button>
+                                            <span>Remove</span>
+                                        </Button>
                                     </div>
                                 )}
                             </div>
@@ -798,21 +811,21 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                             <div className="space-y-3">
                                 <div>
                                     <div className="flex items-center justify-between mb-1.5">
-                                        <label className="block text-[11px] font-bold uppercase text-neutral-400 font-mono">
-                                            // {isReplacingKey ? "ENTER REPLACEMENT GEMINI API KEY" : "ENTER GOOGLE GEMINI API KEY"}
+                                        <label className="block text-xs font-medium text-foreground">
+                                            {isReplacingKey ? "Enter replacement Gemini API key" : "Enter Google Gemini API key"}
                                         </label>
                                         <a
                                             href="https://aistudio.google.com/app/apikey"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#FFE600] hover:underline"
+                                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                                         >
-                                            <span>GET FREE KEY (AI STUDIO)</span>
+                                            <span>Get free key (AI Studio)</span>
                                             <ExternalLink size={11} />
                                         </a>
                                     </div>
 
-                                    <div className="flex items-center gap-4 flex-wrap sm:flex-wrap">
+                                    <div className="flex items-center gap-2.5 flex-wrap">
                                         <div className="relative flex-1 min-w-[280px]">
                                             <input
                                                 type={showCustomAiKey ? "text" : "password"}
@@ -822,70 +835,74 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                                     setAiKeyTestResult(null);
                                                 }}
                                                 placeholder={isReplacingKey ? "Enter new API key (AIzaSy...)" : "AIzaSy..."}
-                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-white tracking-wider focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000]"
+                                                className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-xs text-foreground tracking-wider focus:ring-1 focus:ring-ring focus:outline-none"
                                             />
                                         </div>
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             type="button"
                                             onClick={() => setShowCustomAiKey(!showCustomAiKey)}
-                                            className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                             title={showCustomAiKey ? "Hide Key" : "Reveal Key"}
                                         >
-                                            {showCustomAiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                                            <span>{showCustomAiKey ? "HIDE" : "REVEAL"}</span>
-                                        </button>
+                                            {showCustomAiKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                                            <span>{showCustomAiKey ? "Hide" : "Reveal"}</span>
+                                        </Button>
                                         {isReplacingKey && (
-                                            <button
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
                                                 type="button"
                                                 onClick={() => {
                                                     setIsReplacingKey(false);
                                                     setCustomAiInput('');
                                                     setAiKeyTestResult(null);
                                                 }}
-                                                className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-400 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                             >
-                                                <X size={14} />
-                                                <span>CANCEL</span>
-                                            </button>
+                                                <X size={13} />
+                                                <span>Cancel</span>
+                                            </Button>
                                         )}
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             type="button"
                                             onClick={handleTestCustomAiKey}
                                             disabled={aiKeyTesting || !customAiInput.trim()}
-                                            className="px-4 py-2.5 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-200 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                                         >
-                                            <Bot size={14} />
-                                            <span>{aiKeyTesting ? "TESTING..." : "TEST KEY"}</span>
-                                        </button>
-                                        <button
+                                            <Bot size={13} />
+                                            <span>{aiKeyTesting ? "Testing..." : "Test Key"}</span>
+                                        </Button>
+                                        <Button
+                                            variant="primary"
+                                            size="sm"
                                             type="button"
                                             onClick={handleSaveCustomAiKey}
                                             disabled={aiKeySaving || !customAiInput.trim()}
-                                            className="px-4 py-2.5 bg-[#FFE600] hover:bg-[#FFF066] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                                         >
-                                            <Save size={14} strokeWidth={2.5} />
-                                            <span>{aiKeySaving ? "SAVING..." : "SAVE KEY"}</span>
-                                        </button>
+                                            <Save size={13} />
+                                            <span>{aiKeySaving ? "Saving..." : "Save Key"}</span>
+                                        </Button>
                                     </div>
                                 </div>
 
                                 {/* Test Feedback banner */}
                                 {aiKeyTestResult && (
                                     <div
-                                        className={`p-3 border-2 border-black rounded-none font-mono text-[11px] flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] ${aiKeyTestResult.valid
-                                                ? "bg-[#00FF66] text-black font-bold"
-                                                : "bg-[#FF3333] text-white font-bold"
+                                        className={`p-3 rounded-lg text-xs flex items-center gap-2 border ${aiKeyTestResult.valid
+                                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-medium"
+                                                : "bg-destructive/10 text-destructive border-destructive/20 font-medium"
                                             }`}
                                     >
                                         {aiKeyTestResult.valid ? (
                                             <>
-                                                <CheckCircle2 size={15} strokeWidth={2.5} />
-                                                <span>KEY VALID & READY! PING VERIFIED WITH MODEL: {aiKeyTestResult.model?.toUpperCase()}</span>
+                                                <CheckCircle2 size={15} />
+                                                <span>Key valid & ready! Verified with model: {aiKeyTestResult.model}</span>
                                             </>
                                         ) : (
                                             <>
-                                                <AlertTriangle size={15} strokeWidth={2.5} />
-                                                <span>VALIDATION ERROR: {aiKeyTestResult.error || "INVALID KEY"}</span>
+                                                <AlertTriangle size={15} />
+                                                <span>Validation error: {aiKeyTestResult.error || "Invalid key"}</span>
                                             </>
                                         )}
                                     </div>
@@ -901,27 +918,26 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                 {/* AI Native Agent Access Card */}
                 <SurfaceCard
                     title="AI Agent Access"
-                    subtitle="PROGRAMMATIC API FOR CODE AGENTS (CURSOR, ANTIGRAVITY, CLAUDE, AIDER)"
+                    subtitle="Programmatic API for code agents (Cursor, Antigravity, Claude, Aider)"
                     icon={Bot}
                     rightElement={
                         apiKey && (
-                            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#00FF66] text-black border-2 border-black font-mono text-[10px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000]">
-                                <span className="w-2 h-2 bg-black rounded-full animate-pulse"></span>
-                                ACTIVE
-                            </span>
+                            <Badge variant="success">
+                                Active
+                            </Badge>
                         )
                     }
                 >
-                    <div className="space-y-5">
-                        <p className="text-[12px] font-mono text-neutral-400 leading-relaxed">
+                    <div className="space-y-4">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                             Authorize external AI coding agents to interact directly with this project. Agents can look up tasks using copied IDs, mark tasks complete, move tasks between pipeline stages, and fetch project status summaries.
                         </p>
 
                         {apiKey ? (
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-[11px] font-bold uppercase text-neutral-400 mb-1.5 font-mono">
-                                        // PROJECT API KEY (SECRET)
+                                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                                        Project API Key (Secret)
                                     </label>
                                     <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                                         <div className="relative flex-1 min-w-[280px]">
@@ -929,91 +945,100 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
                                                 type={showApiKey ? "text" : "password"}
                                                 readOnly
                                                 value={apiKey}
-                                                className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3.5 py-2.5 text-[13px] font-mono text-[#FFE600] tracking-wider focus:outline-none shadow-[2px_2px_0px_0px_#000000] select-all"
+                                                className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-xs text-primary font-mono tracking-wider focus:outline-none select-all"
                                             />
                                         </div>
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             type="button"
                                             onClick={() => setShowApiKey(!showApiKey)}
-                                            className="px-3.5 py-2.5 bg-[#141619] hover:bg-neutral-800 text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                             title={showApiKey ? "Hide Key" : "Reveal Key"}
                                         >
-                                            {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                                            <span>{showApiKey ? "HIDE" : "REVEAL"}</span>
-                                        </button>
-                                        <button
+                                            {showApiKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                                            <span>{showApiKey ? "Hide" : "Reveal"}</span>
+                                        </Button>
+                                        <Button
+                                            variant="primary"
+                                            size="sm"
                                             type="button"
                                             onClick={handleCopyApiKey}
-                                            className="px-4 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                         >
-                                            {copiedKey ? <Check size={14} strokeWidth={3} /> : <Copy size={14} />}
-                                            <span>{copiedKey ? "COPIED!" : "COPY KEY"}</span>
-                                        </button>
+                                            {copiedKey ? <Check size={13} /> : <Copy size={13} />}
+                                            <span>{copiedKey ? "Copied!" : "Copy"}</span>
+                                        </Button>
                                     </div>
                                 </div>
                                 {isManager && (
-                                    <div className="flex items-center gap-3 pt-1 flex-wrap">
-                                        <button
+                                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             type="button"
                                             onClick={handleGenerateApiKey}
                                             disabled={apiKeyLoading}
-                                            className="px-4 py-2 bg-[#1E2227] hover:bg-white hover:text-black text-neutral-300 border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
                                         >
                                             <Key size={13} />
-                                            <span>{apiKeyLoading ? "REGENERATING..." : "REGENERATE KEY"}</span>
-                                        </button>
-                                        <button
+                                            <span>{apiKeyLoading ? "Regenerating..." : "Regenerate Key"}</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             type="button"
                                             onClick={() => setIsRevokeModalOpen(true)}
                                             disabled={apiKeyLoading}
-                                            className="px-4 py-2 bg-[#1E2227] hover:bg-[#FF3333] hover:text-white text-[#FF6666] border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px]"
+                                            className="hover:text-destructive hover:bg-destructive/10"
                                         >
                                             <Trash2 size={13} />
-                                            <span>REVOKE KEY</span>
-                                        </button>
+                                            <span>Revoke Key</span>
+                                        </Button>
                                     </div>
                                 )}
 
                                 {/* MCP IDE Integration Box */}
-                                <div className="p-4 bg-[#141619] border-2 border-black rounded-none shadow-[3px_3px_0px_0px_#000000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="p-3.5 bg-muted/30 border border-border rounded-lg shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                     <div>
-                                        <div className="flex items-center gap-2 text-white font-mono text-[12px] font-black uppercase tracking-wider">
-                                            <Cpu size={14} className="text-[#FFE600]" />
-                                            <span>// MODEL CONTEXT PROTOCOL (MCP) INTEGRATION</span>
+                                        <div className="flex items-center gap-2 text-foreground text-xs font-semibold">
+                                            <Cpu size={14} className="text-primary" />
+                                            <span>Model Context Protocol (MCP) Integration</span>
                                         </div>
-                                        <p className="text-[11px] font-mono text-neutral-400 mt-1">
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">
                                             Expose project tasks directly to Antigravity, Cursor, VS Code (Cline/Copilot), Zed, and Claude Desktop.
                                         </p>
                                     </div>
-                                    <button
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         type="button"
                                         onClick={() => setIsMcpModalOpen(true)}
-                                        className="px-4 py-2 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000000] cursor-pointer shrink-0 active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                                        className="shrink-0"
                                     >
-                                        <Cpu size={13} strokeWidth={2.5} />
-                                        <span>VIEW MCP CONFIGS</span>
-                                    </button>
+                                        <Cpu size={13} />
+                                        <span>View MCP Configs</span>
+                                    </Button>
                                 </div>
                             </div>
                         ) : (
-                            <div className="p-5 bg-[#121417] border-2 border-dashed border-neutral-700 rounded-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="p-4 bg-muted/20 border border-dashed border-border rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div>
-                                    <div className="text-white font-bold text-[13px] uppercase font-mono tracking-wider">
+                                    <div className="text-foreground font-semibold text-xs">
                                         No API Key Generated
                                     </div>
-                                    <div className="text-neutral-400 font-mono text-[11px] mt-1">
+                                    <div className="text-muted-foreground text-[11px] mt-0.5">
                                         Create a secure token to enable IDE AI assistants and background agents to manage project tasks.
                                     </div>
                                 </div>
-                                <button
+                                <Button
+                                    variant="primary"
+                                    size="sm"
                                     type="button"
                                     onClick={handleGenerateApiKey}
                                     disabled={apiKeyLoading}
-                                    className="px-5 py-2.5 bg-[#FFE600] text-black border-2 border-black rounded-none font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] cursor-pointer transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    className="shrink-0"
                                 >
-                                    <Key size={14} />
-                                    <span>{apiKeyLoading ? "GENERATING..." : "GENERATE API KEY"}</span>
-                                </button>
+                                    <Key size={13} />
+                                    <span>{apiKeyLoading ? "Generating..." : "Generate API Key"}</span>
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -1022,34 +1047,36 @@ export const ProjectSettingsTab: React.FC<ProjectSettingsTabProps> = ({
 
             {/* GitHub-style Danger Zone */}
             {isManager && (
-                <div className="border-2 border-[#EF4444] bg-[#121417] rounded-none p-6 shadow-[4px_4px_0px_0px_#EF4444]">
+                <div className="border border-destructive/30 bg-destructive/5 rounded-xl p-6 shadow-xs">
                     <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-[#EF4444] text-white border-2 border-black rounded-none shadow-[2px_2px_0px_0px_#000000]">
-                            <AlertTriangle size={18} strokeWidth={2.5} />
+                        <div className="p-2 bg-destructive/10 text-destructive border border-destructive/20 rounded-lg">
+                            <AlertTriangle size={18} />
                         </div>
                         <div>
-                            <h3 className="text-white font-mono font-black text-[15px] uppercase tracking-wider">
-                                // DANGER ZONE
+                            <h3 className="text-destructive font-semibold text-sm">
+                                Danger Zone
                             </h3>
-                            <p className="text-neutral-400 font-mono text-[11px] uppercase tracking-wider">
-                                IRREVERSIBLE ACTIONS
+                            <p className="text-muted-foreground text-xs">
+                                Irreversible project actions
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t-2 border-neutral-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-destructive/20">
                         <div>
-                            <h4 className="text-white text-[13px] font-bold uppercase tracking-wider">Delete this project</h4>
-                            <p className="text-neutral-400 text-[11px] max-w-xl mt-1 leading-relaxed">
+                            <h4 className="text-foreground text-xs font-semibold">Delete this project</h4>
+                            <p className="text-muted-foreground text-xs max-w-xl mt-0.5 leading-relaxed">
                                 Once you delete a project, there is no going back. All tasks, buckets, meetings, and data associated with this project will be permanently erased.
                             </p>
                         </div>
-                        <button
+                        <Button
+                            variant="danger"
+                            size="md"
                             onClick={() => setIsDeleteModalOpen(true)}
-                            className="px-5 py-2.5 bg-[#EF4444] hover:bg-[#DC2626] text-white border-2 border-black rounded-none text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer whitespace-nowrap self-start sm:self-center"
+                            className="whitespace-nowrap self-start sm:self-center"
                         >
                             Delete Project
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

@@ -1,31 +1,40 @@
 import { X } from "lucide-react";
 import React from "react";
+import { cn } from "@/lib/utils";
 
 interface CloseButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export const CloseButton: React.FC<CloseButtonProps> = ({
-    size = 'md',
-    ...props
+  size = 'md',
+  className = '',
+  ...props
 }) => {
-    const sizePaddingStyles = {
-        sm: 'p-0.5',
-        md: 'p-1',
-        lg: 'p-2'
-    }
+  const sizeStyles = {
+    sm: 'p-1 size-6',
+    md: 'p-1.5 size-7',
+    lg: 'p-2 size-8'
+  };
 
-    const xSizeStyles = {
-        sm: 12,
-        md: 18,
-        lg: 24
-    }
+  const iconSizes = {
+    sm: 13,
+    md: 15,
+    lg: 18
+  };
 
-    return (
-        <button
-            {...props} 
-            className={`${sizePaddingStyles[size]} rounded-none bg-black border-2 border-neutral-700 text-neutral-400 hover:text-black hover:bg-[#FF0000] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer`}>
-            <X size={xSizeStyles[size]} strokeWidth={3}/>
-        </button>
-    );
+  return (
+    <button
+      type="button"
+      {...props} 
+      className={cn(
+        "inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        sizeStyles[size],
+        className
+      )}
+      aria-label="Close"
+    >
+      <X size={iconSizes[size]} strokeWidth={2} />
+    </button>
+  );
 };

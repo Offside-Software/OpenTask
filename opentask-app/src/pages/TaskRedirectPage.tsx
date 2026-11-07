@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { taskService } from '../services/taskService';
 import { LoadingScreen } from '../components/ui/LoadingScreen';
+import { Button } from '../design-system/Button';
 import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const TaskRedirectPage: React.FC = () => {
@@ -38,33 +39,37 @@ export const TaskRedirectPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="max-w-[540px] mx-auto mt-20 p-8 bg-[#121417] border-3 border-black shadow-[6px_6px_0px_0px_#000000] font-mono text-center select-none">
-        <div className="w-14 h-14 mx-auto mb-4 bg-black border-2 border-black text-[#EF4444] flex items-center justify-center shadow-[2px_2px_0px_0px_#000000]">
-          <AlertTriangle size={28} strokeWidth={2.5} />
+      <div className="max-w-[500px] mx-auto mt-20 p-6 sm:p-8 bg-card text-card-foreground border border-border rounded-xl shadow-xl text-center select-none animate-in zoom-in-95 duration-100">
+        <div className="w-14 h-14 mx-auto mb-4 bg-destructive/10 text-destructive rounded-full flex items-center justify-center">
+          <AlertTriangle size={28} />
         </div>
-        <div className="text-[#EF4444] text-[11px] font-black uppercase tracking-wider mb-1">
-          // TASK REDIRECT FAILED
+        <div className="text-destructive text-xs font-semibold uppercase tracking-wider mb-1">
+          Task Redirect Failed
         </div>
-        <h2 className="text-white text-[20px] font-black uppercase mb-3">TASK NOT FOUND</h2>
-        <p className="text-neutral-400 text-[12px] mb-6 leading-relaxed">
+        <h2 className="text-foreground text-xl font-bold tracking-tight mb-2">Task Not Found</h2>
+        <p className="text-muted-foreground text-xs mb-6 leading-relaxed">
           {error}
         </p>
         <div className="flex items-center justify-center gap-3">
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => resolveRedirect()}
             disabled={isRetrying}
-            className="px-4 py-2 border-2 border-black bg-[#FFE600] text-black text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5"
+            className="flex items-center gap-1.5"
           >
             <RefreshCw size={13} className={isRetrying ? 'animate-spin' : ''} />
-            <span>RETRY</span>
-          </button>
-          <button
+            <span>Retry</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 border-2 border-black bg-[#1E2227] text-white text-[11px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5"
+            className="flex items-center gap-1.5"
           >
             <ArrowLeft size={13} />
-            <span>DASHBOARD</span>
-          </button>
+            <span>Dashboard</span>
+          </Button>
         </div>
       </div>
     );
@@ -74,8 +79,8 @@ export const TaskRedirectPage: React.FC = () => {
     <div className="min-h-[60vh] flex items-center justify-center">
       <LoadingScreen
         fullscreen={false}
-        message={`REDIRECTING TO TASK #${taskId || '…'}`}
-        subtext="// LOCATING PROJECT BOARD & OPENING WORKSPACE"
+        message={`Redirecting to task #${taskId || '…'}`}
+        subtext="Locating project board & opening workspace"
       />
     </div>
   );

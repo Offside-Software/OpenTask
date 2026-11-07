@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertOctagon, LayoutDashboard, Briefcase, RefreshCw } from 'lucide-react';
+import { Button } from '../design-system/Button';
+import { Badge } from '../design-system/Badge';
 
 interface NotFoundProps {
   type?: 'project' | 'page';
@@ -17,8 +19,8 @@ export const NotFoundPage: React.FC<NotFoundProps> = ({
 
   const title =
     type === 'project'
-      ? 'PROJECT NOT FOUND'
-      : 'PAGE NOT FOUND';
+      ? 'Project Not Found'
+      : 'Page Not Found';
 
   const description =
     type === 'project'
@@ -26,61 +28,68 @@ export const NotFoundPage: React.FC<NotFoundProps> = ({
       : 'The route or resource you attempted to reach is invalid, deprecated, or offline.';
 
   return (
-    <div className="min-h-[calc(100vh-10rem)] w-full flex items-center justify-center p-4 font-mono select-none">
-      <div className="w-full max-w-lg bg-[#121417] border-3 border-black rounded-none shadow-[8px_8px_0px_0px_#000000] p-6 sm:p-8 flex flex-col items-center text-center">
+    <div className="min-h-[calc(100vh-10rem)] w-full flex items-center justify-center p-4 select-none">
+      <div className="w-full max-w-lg bg-card text-card-foreground border border-border rounded-xl shadow-xl p-6 sm:p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-100">
         {/* Error Code Pill */}
-        <div className="flex items-center gap-2 mb-6 px-3 py-1 bg-[#FFE600] text-black border-2 border-black text-[11px] font-black uppercase tracking-widest shadow-[2px_2px_0px_0px_#000000]">
-          <span className="w-2 h-2 bg-black animate-pulse" />
-          // ERROR // 404_NOT_FOUND
+        <div className="mb-5">
+          <Badge variant="danger">
+            Error 404
+          </Badge>
         </div>
 
-        {/* Brutalist Warning Icon */}
-        <div className="w-16 h-16 bg-black text-[#FFE600] border-3 border-black flex items-center justify-center shadow-[4px_4px_0px_0px_#000000] mb-6">
-          <AlertOctagon size={32} strokeWidth={2.5} />
+        {/* Warning Icon */}
+        <div className="w-14 h-14 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-5">
+          <AlertOctagon size={28} />
         </div>
 
         {/* Title */}
-        <h1 className="text-white font-black text-[22px] sm:text-[24px] uppercase tracking-tight mb-2">
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight mb-2">
           {title}
         </h1>
 
         {/* Description */}
-        <p className="text-neutral-400 text-[12px] leading-relaxed mb-8 max-w-sm uppercase tracking-wide">
+        <p className="text-muted-foreground text-xs leading-relaxed mb-6 max-w-sm">
           {description}
         </p>
 
         {/* Action Buttons */}
-        <div className="w-full flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="w-full flex flex-col sm:flex-row gap-2.5 justify-center">
           {onRetry && (
-            <button
+            <Button
+              variant="outline"
+              size="md"
               onClick={onRetry}
-              className="px-4 py-2.5 bg-[#141619] hover:bg-neutral-800 text-white border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+              className="flex items-center justify-center gap-2"
             >
-              <RefreshCw size={14} strokeWidth={2.5} />
-              <span>RETRY SYNC</span>
-            </button>
+              <RefreshCw size={14} />
+              <span>Retry Sync</span>
+            </Button>
           )}
 
-          <button
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => navigate('/workspaces')}
-            className="px-4 py-2.5 bg-[#FFE600] hover:bg-[#ffe81a] text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+            className="flex items-center justify-center gap-2"
           >
-            <Briefcase size={14} strokeWidth={2.5} />
-            <span>WORKSPACES</span>
-          </button>
+            <Briefcase size={14} />
+            <span>Workspaces</span>
+          </Button>
 
-          <button
+          <Button
+            variant="outline"
+            size="md"
             onClick={() => navigate('/dashboard')}
-            className="px-4 py-2.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+            className="flex items-center justify-center gap-2"
           >
-            <LayoutDashboard size={14} strokeWidth={2.5} />
-            <span>DASHBOARD</span>
-          </button>
+            <LayoutDashboard size={14} />
+            <span>Dashboard</span>
+          </Button>
         </div>
 
         {/* Bottom Technical Status Bar */}
-        <div className="w-full mt-8 pt-4 border-t-2 border-black flex items-center justify-between text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-          <span>// ENGINE: UNRESOLVED ROUTE</span>
+        <div className="w-full mt-6 pt-3.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+          <span>Unresolved Route</span>
           <span>HTTP 404</span>
         </div>
       </div>
