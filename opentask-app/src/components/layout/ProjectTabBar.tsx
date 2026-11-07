@@ -8,6 +8,7 @@ import {
   Plus,
   ExternalLink
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface TabContextMenuState {
   x: number;
@@ -26,7 +27,6 @@ export const ProjectTabBar: React.FC = () => {
   const newTabRef = useRef<HTMLDivElement>(null);
   const tabsScrollRef = useRef<HTMLDivElement>(null);
 
-  // Close new tab dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (newTabRef.current && !newTabRef.current.contains(e.target as Node)) {
@@ -43,7 +43,6 @@ export const ProjectTabBar: React.FC = () => {
     };
   }, [isNewTabOpen, contextMenu]);
 
-  // Don't render tab bar if no tabs are open and user is on a non-project page
   if (tabs.length === 0 && !activeProjectId) {
     return null;
   }
@@ -66,7 +65,7 @@ export const ProjectTabBar: React.FC = () => {
 
   return (
     <>
-      <div className="w-full bg-[#0E1012] border-b-2 border-black flex items-center justify-between py-2 px-8 select-none shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
+      <div className="w-full bg-muted/30 border-b border-border flex items-center justify-between py-1 px-4 sm:px-6 select-none">
         {/* Left: Scrollable Tabs */}
         <div
           ref={tabsScrollRef}
@@ -80,25 +79,25 @@ export const ProjectTabBar: React.FC = () => {
                 onClick={() => navigate(`/projects/${tab.id}`)}
                 onContextMenu={(e) => handleTabContextMenu(e, tab)}
                 onMouseDown={(e) => {
-                  // Middle click closes tab
                   if (e.button === 1) {
                     e.preventDefault();
                     closeTab(tab.id);
                   }
                 }}
                 title={`${tab.name} (#${tab.id})\nRight-click for options, Middle-click to close`}
-                className={`flex items-center gap-2 border p-2 rounded-none border border-2 shadow-[2px_2px_0px_0px_#000000] text-[11px] font-mono font-bold tracking-wider uppercase transition-all cursor-pointer max-w-[220px] ${isActive
-                  ? 'bg-[#FFE600] text-black border-black'
-                  : 'bg-[#141619] text-neutral-400 border-neutral-800 hover:border-neutral-500 hover:text-white hover:bg-[#1A1D21]'
-                  }`}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer max-w-[220px]',
+                  isActive
+                    ? 'bg-card text-foreground border border-border shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                )}
               >
                 <FolderGit2
                   size={14}
-                  strokeWidth={isActive ? 2.5 : 2}
-                  className={isActive ? 'text-black' : 'text-neutral-500 group-hover:text-neutral-300'}
+                  className={isActive ? 'text-primary' : 'text-muted-foreground'}
                 />
 
-                <span className="truncate max-w-[140px] font-mono font-medium leading-none">
+                <span className="truncate max-w-[140px] leading-none">
                   {tab.name || `Project #${tab.id.slice(-4)}`}
                 </span>
 
@@ -106,13 +105,10 @@ export const ProjectTabBar: React.FC = () => {
                 <button
                   type="button"
                   onClick={(e) => closeTab(tab.id, e)}
-                  title="Close Project Tab"
-                  className={`w-4 h-4 rounded-none flex items-center justify-center transition-all cursor-pointer ml-1 ${isActive
-                    ? 'text-black hover:bg-black hover:text-[#FFE600]'
-                    : 'text-neutral-500 hover:bg-[#FF3333] hover:text-white'
-                    }`}
+                  title="Close Tab"
+                  className="w-4 h-4 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 flex items-center justify-center transition-colors cursor-pointer ml-0.5"
                 >
-                  <X size={11} strokeWidth={2.5} />
+                  <X size={11} />
                 </button>
               </div>
             );
@@ -124,32 +120,31 @@ export const ProjectTabBar: React.FC = () => {
               onClick={() => {
                 navigate('/workspaces');
               }}
-              title="Open Project in New Tab"
-              className="h-7 w-7 rounded-none bg-[#141619] border border-neutral-700 hover:border-white text-neutral-400 hover:text-[#FFE600] flex items-center justify-center shadow-[2px_2px_0px_0px_#000000] transition-all cursor-pointer"
+              title="Open project in new tab"
+              className="h-7 w-7 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             >
-              <Plus size={14} strokeWidth={3} />
+              <Plus size={14} />
             </button>
 
             {/* Quick Project Select Dropdown */}
             {isNewTabOpen && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-[#121417] border-2 border-black shadow-[5px_5px_0px_0px_#000000] z-50 p-2 font-mono animate-in fade-in zoom-in-95 duration-100">
-                <div className="text-[10px] font-black text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-800 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>// OPEN PROJECT TAB</span>
-                  <span className="text-neutral-400 text-[9px]">{projects.length} AVAILABLE</span>
+              <div className="absolute top-full left-0 mt-2 w-72 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl z-50 p-3 animate-in fade-in zoom-in-95 duration-100">
+                <div className="text-xs font-semibold text-foreground mb-2 flex items-center justify-between">
+                  <span>Open project</span>
+                  <span className="text-muted-foreground text-[10px]">{projects.length} available</span>
                 </div>
-                {/* Footer link to Workspaces */}
-                <div className="mt-2 pt-2 border-t border-neutral-800 flex justify-between items-center text-[10px]">
+                <div className="mt-2 pt-2 border-t border-border flex justify-between items-center text-xs">
                   <button
                     onClick={() => {
                       navigate('/workspaces');
                       setIsNewTabOpen(false);
                     }}
-                    className="text-[#FFE600] hover:underline flex items-center gap-1 font-bold"
+                    className="text-primary hover:underline flex items-center gap-1 font-medium"
                   >
-                    <span>BROWSE WORKSPACES</span>
-                    <ExternalLink size={10} />
+                    <span>Browse workspaces</span>
+                    <ExternalLink size={11} />
                   </button>
-                  <span className="text-neutral-500">{tabs.length} tabs open</span>
+                  <span className="text-muted-foreground text-[11px]">{tabs.length} tabs open</span>
                 </div>
               </div>
             )}
@@ -161,46 +156,46 @@ export const ProjectTabBar: React.FC = () => {
       {contextMenu && (
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 w-44 bg-[#121417] border-2 border-black shadow-[4px_4px_0px_0px_#000000] p-1 font-mono text-[11px] animate-in fade-in duration-75"
+          className="fixed z-50 w-44 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl p-1 text-xs animate-in fade-in duration-75"
         >
-          <div className="px-2 py-1 text-[12px] font-black text-neutral-400 border-b border-neutral-800 truncate mb-1">
-            // {contextMenu.tab.name}
+          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-b border-border/70 truncate mb-1">
+            {contextMenu.tab.name}
           </div>
           <button
             onClick={() => {
               closeTab(contextMenu.tab.id);
               setContextMenu(null);
             }}
-            className="w-full text-left px-2 py-1.5 text-neutral-300 hover:bg-[#FF3333] hover:text-white transition-colors cursor-pointer flex items-center justify-between"
+            className="w-full text-left px-2 py-1.5 rounded-md text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer flex items-center justify-between"
           >
-            <span>Close Tab</span>
-            <X size={11} />
+            <span>Close tab</span>
+            <X size={12} />
           </button>
           <button
             onClick={() => {
               closeOtherTabs(contextMenu.tab.id);
               setContextMenu(null);
             }}
-            className="w-full text-left px-2 py-1.5 text-neutral-300 hover:bg-[#FFE600] hover:text-black transition-colors cursor-pointer"
+            className="w-full text-left px-2 py-1.5 rounded-md text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
-            Close Other Tabs
+            Close other tabs
           </button>
           <button
             onClick={() => {
               closeAllTabs();
               setContextMenu(null);
             }}
-            className="w-full text-left px-2 py-1.5 text-neutral-300 hover:bg-[#FF3333] hover:text-white transition-colors cursor-pointer"
+            className="w-full text-left px-2 py-1.5 rounded-md text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
           >
-            Close All Tabs
+            Close all tabs
           </button>
-          <div className="my-1 border-t border-neutral-800" />
+          <div className="my-1 border-t border-border/70" />
           <button
             onClick={() => handleCopyProjectLink(contextMenu.tab)}
-            className="w-full text-left px-2 py-1.5 text-neutral-300 hover:bg-[#FFE600] hover:text-black transition-colors cursor-pointer flex items-center justify-between"
+            className="w-full text-left px-2 py-1.5 rounded-md text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center justify-between"
           >
-            <span>Copy Link</span>
-            <ExternalLink size={10} />
+            <span>Copy link</span>
+            <ExternalLink size={12} />
           </button>
         </div>
       )}

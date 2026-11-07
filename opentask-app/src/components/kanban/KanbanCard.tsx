@@ -6,6 +6,7 @@ import type { TaskType } from '../../models';
 import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
 import { TrashButton } from '../../design-system/TrashButton';
 import { useToast } from '../../design-system/Toast';
+import { cn } from '@/lib/utils';
 
 export interface CardAssignee {
   userId?: string | number;
@@ -106,12 +107,11 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     try {
       const taskId = `[${title}](#${String(id)})`;
       await navigator.clipboard.writeText(taskId);
-      showToast(`Task ID '${taskId}' Copied to Clipboard`, 'success');
+      showToast(`Task ID '${taskId}' copied to clipboard`, 'success');
+    } catch {
+      showToast('Task ID copied to clipboard', 'warning');
     }
-    catch {
-      showToast("Task ID Copied to Clipboard", 'warning');
-    }
-  }
+  };
 
   return (
     <div
@@ -128,16 +128,18 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`p-3.5 rounded-none bg-[#16191D] border-2 group flex flex-col gap-2.5 transition-all duration-75 cursor-grab active:cursor-grabbing select-none ${isOver
-        ? 'border-[#FFE600] shadow-[4px_4px_0px_0px_#FFE600] bg-[#1E2227]'
-        : warnStagnant
-          ? 'border-[#FF3333] shadow-[3px_3px_0px_0px_#FF3333]'
+      className={cn(
+        'p-3.5 rounded-lg bg-card text-card-foreground border group flex flex-col gap-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing select-none shadow-xs',
+        isOver
+          ? 'border-primary bg-primary/5 ring-1 ring-primary/40 shadow-sm'
+          : warnStagnant
+          ? 'border-destructive/40 bg-destructive/5'
           : isSuggested
-            ? 'border-[#FFE600] shadow-[3px_3px_0px_0px_#FFE600]'
-            : isCompleted
-              ? 'border-neutral-800 opacity-80 hover:opacity-100 shadow-[3px_3px_0px_0px_#000000] hover:border-neutral-600'
-              : 'border-black shadow-[3px_3px_0px_0px_#000000] hover:border-[#FFE600] hover:shadow-[4px_4px_0px_0px_#000000]'
-        }`}
+          ? 'border-primary/40 bg-primary/5'
+          : isCompleted
+          ? 'border-border/60 opacity-70 hover:opacity-100 hover:border-border'
+          : 'border-border hover:border-primary/50 hover:shadow-sm'
+      )}
     >
       <div className="flex items-start gap-2.5">
         {onToggleComplete && (
@@ -147,26 +149,34 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               e.stopPropagation();
               onToggleComplete(!isCompleted);
             }}
-            className={`shrink-0 mt-0.5 w-4 h-4 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer shadow-[1px_1px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] ${isCompleted
-              ? 'bg-[#00FF66] border-black text-black'
-              : 'bg-[#0E1012] border-neutral-600 hover:border-[#FFE600] text-transparent hover:text-neutral-500'
-              }`}
-            title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
-            aria-label={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
+            className={cn(
+              'shrink-0 mt-0.5 w-4 h-4 rounded-md border flex items-center justify-center transition-colors cursor-pointer',
+              isCompleted
+                ? 'bg-primary border-primary text-primary-foreground'
+                : 'border-muted-foreground/40 hover:border-primary text-transparent hover:text-muted-foreground'
+            )}
+            title={isCompleted ? "Mark as incomplete" : "Mark as complete"}
+            aria-label={isCompleted ? "Mark as incomplete" : "Mark as complete"}
           >
-            <Check size={11} strokeWidth={3.5} className={isCompleted ? 'opacity-100' : 'opacity-0 hover:opacity-50'} />
+            <Check size={11} strokeWidth={2.5} className={isCompleted ? 'opacity-100' : 'opacity-0 hover:opacity-50'} />
           </button>
         )}
-        <h4 className={`text-[13px] font-bold leading-tight flex-1 transition-colors ${isCompleted ? 'line-through text-neutral-400' : 'text-white'
-          }`}>
+        <h4 className={cn(
+          'text-xs font-semibold leading-snug flex-1 transition-colors',
+          isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
+        )}>
           {title}
         </h4>
-        <div className="flex items-center gap-1.5 shrink-0 -mt-0.5">
-          <button type='button' onClick={(e) => {
-            e.stopPropagation();
-            handleCopyIdToClipboard();
-          }}
-            className="font-mono text-[13px] px-2 text-neutral-500 font-bold hover:bg-[#00FF66] hover:text-black hover:border hover:shadow-[1.5px_1.5px_0px_0px_#000000]">
+        <div className="flex items-center gap-1 shrink-0 -mt-0.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopyIdToClipboard();
+            }}
+            className="font-mono text-[11px] px-1.5 py-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Click to copy task reference"
+          >
             #{String(id).slice(-4)}
           </button>
 
@@ -175,79 +185,79 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
-              }}>
-            </TrashButton>
+              }}
+            />
           )}
         </div>
       </div>
 
       {description && (
         hasMarkdownSyntax(description) ? (
-          <div className="text-[13px] font-sans font-medium text-neutral-300 line-clamp-4 leading-relaxed overflow-hidden">
+          <div className="text-xs text-muted-foreground line-clamp-3 leading-relaxed overflow-hidden">
             <MarkdownRenderer
               content={description}
               isSans
               compact
-              className="!text-[13px] !font-sans !font-medium"
+              className="text-xs"
             />
           </div>
         ) : (
-          <p className="text-[13px] font-sans font-medium text-neutral-300 line-clamp-4 leading-relaxed">
+          <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
             {description}
           </p>
         )
       )}
 
       {/* Tags & Weight */}
-      <div className="flex gap-1.5 flex-wrap items-center mt-1">
+      <div className="flex gap-1.5 flex-wrap items-center mt-0.5">
         {isCompleted && (
-          <Badge variant="success" className="!py-0.5 !px-1.5 !text-[11px]">
-            DONE
+          <Badge variant="success" className="py-0.2 px-1.5 text-[10px]">
+            Done
           </Badge>
         )}
         {parseTaskTypes(type).map((t) => (
-          <Badge key={t} variant={getTaskTypeVariant(t)} className="!py-0.5 !px-1.5 !text-[11px]">
+          <Badge key={t} variant={getTaskTypeVariant(t)} className="py-0.2 px-1.5 text-[10px]">
             {t}
           </Badge>
         ))}
-        <span className="font-mono self-end text-[11px] font-bold px-1.5 py-0.5 bg-black border border-neutral-700 text-[#FFE600]">
-          {weight} PTS
+        <span className="font-mono text-[10px] font-medium px-1.5 py-0.2 rounded-md bg-muted text-muted-foreground">
+          {weight} pts
         </span>
       </div>
 
       {/* Warnings & Badges */}
       {warnStagnant && (
-        <div className="mt-1 text-black font-mono text-[10px] font-black flex items-center gap-1.5 bg-[#FF3333] border border-black px-2 py-0.5 shadow-[1.5px_1.5px_0px_0px_#000000]">
-          <Clock size={11} strokeWidth={3} /> STAGNANT &gt; 48H
+        <div className="mt-0.5 text-destructive text-[11px] font-medium flex items-center gap-1.5 bg-destructive/10 border border-destructive/20 px-2 py-0.5 rounded-md">
+          <Clock size={12} /> Stagnant &gt; 48h
         </div>
       )}
 
       {pr && (
-        <div className="mt-1 text-black font-mono text-[10px] font-black flex items-center gap-1.5 bg-[#FFE600] border border-black px-2 py-0.5 shadow-[1.5px_1.5px_0px_0px_#000000]">
-          <GitPullRequest size={11} strokeWidth={3} /> PR LINKED
+        <div className="mt-0.5 text-primary text-[11px] font-medium flex items-center gap-1.5 bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
+          <GitPullRequest size={12} /> PR linked
         </div>
       )}
 
       {repoUrl && (
-        <div className="mt-1 text-neutral-300 font-mono text-[10px] font-bold flex items-center gap-1.5 bg-[#0B0E14] border border-neutral-700 px-2 py-0.5 truncate" title={repoUrl}>
-          <GitBranch size={10} strokeWidth={2.5} className="text-[#FFE600] shrink-0" />
+        <div className="mt-0.5 text-muted-foreground font-mono text-[11px] flex items-center gap-1.5 bg-muted/50 border border-border/60 px-2 py-0.5 rounded-md truncate" title={repoUrl}>
+          <GitBranch size={11} className="text-primary shrink-0" />
           <span className="truncate">{repoUrl.replace('https://github.com/', '')}</span>
         </div>
       )}
 
       {/* Card Footer */}
-      <div className="mt-2 pt-2 border-t-2 border-neutral-800 flex items-center justify-between">
+      <div className="mt-1.5 pt-2 border-t border-border/60 flex items-center justify-between">
         {effectiveAssignees.length > 0 ? (
           effectiveAssignees.length === 1 ? (
             <div
-              className="px-1.5 py-0.5 rounded-none bg-[#00E5FF] text-black border border-black font-mono text-[11px] font-black flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000000] max-w-[170px]"
+              className="px-2 py-0.5 rounded-full bg-muted/60 border border-border text-foreground text-[11px] font-medium flex items-center gap-1.5 max-w-[170px]"
               title={effectiveAssignees[0].name}
             >
               {effectiveAssignees[0].avatarUrl ? (
                 <img
                   src={effectiveAssignees[0].avatarUrl}
                   alt={effectiveAssignees[0].name}
-                  className="w-3.5 h-3.5 rounded-none border border-black object-cover shrink-0"
+                  className="w-4 h-4 rounded-full object-cover shrink-0"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     const fallback = e.currentTarget.nextElementSibling;
@@ -256,16 +266,18 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 />
               ) : null}
               <span
-                className={`w-3.5 h-3.5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black ${effectiveAssignees[0].avatarUrl ? 'hidden' : ''
-                  }`}
+                className={cn(
+                  'w-4 h-4 rounded-full bg-primary/15 text-primary text-[8px] font-semibold flex items-center justify-center shrink-0',
+                  effectiveAssignees[0].avatarUrl ? 'hidden' : ''
+                )}
               >
                 {getInitials(effectiveAssignees[0].name)}
               </span>
-              <span className="truncate">{effectiveAssignees[0].name.toUpperCase()}</span>
+              <span className="truncate">{effectiveAssignees[0].name}</span>
             </div>
           ) : (
             <div
-              className="flex items-center gap-1 py-0.5"
+              className="flex items-center -space-x-1.5 py-0.5"
               title={effectiveAssignees.map((a) => a.name).join(', ')}
             >
               {effectiveAssignees.slice(0, 4).map((a, idx) => (
@@ -274,7 +286,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                     <img
                       src={a.avatarUrl}
                       alt={a.name}
-                      className="w-5 h-5 rounded-none border-2 border-black object-cover bg-neutral-900 shadow-[1px_1px_0px_0px_#000000]"
+                      className="w-5 h-5 rounded-full border border-background object-cover bg-muted"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         const fallback = e.currentTarget.nextElementSibling;
@@ -283,23 +295,25 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                     />
                   ) : null}
                   <span
-                    className={`w-5 h-5 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center border-2 border-black shadow-[1px_1px_0px_0px_#000000] ${a.avatarUrl ? 'hidden' : ''
-                      }`}
+                    className={cn(
+                      'w-5 h-5 rounded-full bg-primary/15 text-primary border border-background text-[8px] font-semibold flex items-center justify-center',
+                      a.avatarUrl ? 'hidden' : ''
+                    )}
                   >
                     {getInitials(a.name)}
                   </span>
                 </div>
               ))}
               {effectiveAssignees.length > 4 && (
-                <span className="w-5 h-5 rounded-none bg-[#FFE600] text-black font-mono text-[8px] font-black flex items-center justify-center border-2 border-black shadow-[1px_1px_0px_0px_#000000]">
+                <span className="w-5 h-5 rounded-full bg-muted text-muted-foreground border border-background text-[8px] font-semibold flex items-center justify-center">
                   +{effectiveAssignees.length - 4}
                 </span>
               )}
             </div>
           )
         ) : (
-          <div className="font-mono text-[11px] text-neutral-500 font-semibold uppercase">
-            [UNASSIGNED]
+          <div className="text-[11px] text-muted-foreground font-medium">
+            Unassigned
           </div>
         )}
         {onContextMenu ? (
@@ -309,14 +323,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               e.stopPropagation();
               onContextMenu(e);
             }}
-            className="p-1 -mr-1 rounded-none hover:bg-black hover:text-[#FFE600] text-neutral-500 transition-colors cursor-pointer border border-transparent hover:border-neutral-700"
+            className="p-1 -mr-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             title="Task options"
             aria-label="Task options"
           >
             <MoreHorizontal size={14} />
           </button>
         ) : (
-          <MoreHorizontal size={14} className="text-neutral-500 group-hover:text-white transition-colors" />
+          <MoreHorizontal size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
         )}
       </div>
     </div>

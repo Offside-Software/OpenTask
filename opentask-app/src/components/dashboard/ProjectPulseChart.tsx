@@ -30,12 +30,12 @@ const INTERVALS: { id: TimelineInterval; label: string }[] = [
 
 const getActionBadgeClass = (action: string) => {
   const act = action.toLowerCase();
-  if (act.includes('complete')) return 'bg-[#22C55E] text-black border-black';
-  if (act.includes('create')) return 'bg-[#00E5FF] text-black border-black';
-  if (act.includes('move')) return 'bg-[#FFE600] text-black border-black';
-  if (act.includes('delete')) return 'bg-[#EF4444] text-white border-black';
-  if (act.includes('assign')) return 'bg-[#A855F7] text-white border-black';
-  return 'bg-neutral-800 text-white border-neutral-700';
+  if (act.includes('complete')) return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+  if (act.includes('create')) return 'bg-primary/10 text-primary border-primary/20';
+  if (act.includes('move')) return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+  if (act.includes('delete')) return 'bg-destructive/10 text-destructive border-destructive/20';
+  if (act.includes('assign')) return 'bg-primary/10 text-primary border-primary/20';
+  return 'bg-muted text-muted-foreground border-border';
 };
 
 const getInitials = (name?: string): string => {
@@ -153,53 +153,53 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
           <button
             type="button"
             onClick={() => refreshTimeline(false)}
-            className="p-1.5 border-2 border-black bg-black text-neutral-400 hover:text-[#FFE600] shadow-[2px_2px_0px_0px_#000000] cursor-pointer transition-colors"
+            className="p-1.5 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
             title="Refresh Timeline"
             aria-label="Refresh Timeline"
           >
-            <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           </button>
 
           {/* View toggle */}
-          <div className="flex border-2 border-black bg-black p-0.5 shadow-[2px_2px_0px_0px_#000000]">
+          <div className="flex border border-border bg-muted/40 p-0.5 rounded-md">
             <button
               type="button"
               onClick={() => setViewMode('chart')}
-              className={`px-2 py-0.5 text-[10px] font-mono font-black uppercase transition-colors cursor-pointer ${
-                viewMode === 'chart' ? 'bg-[#FFE600] text-black' : 'text-neutral-400 hover:text-white'
+              className={`px-2 py-0.5 text-xs font-medium rounded transition-colors cursor-pointer ${
+                viewMode === 'chart' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Line Chart View"
             >
               <LineChartIcon size={12} className="inline mr-1 -mt-0.5" />
-              CHART
+              Chart
             </button>
             <button
               type="button"
               onClick={() => setViewMode('feed')}
-              className={`px-2 py-0.5 text-[10px] font-mono font-black uppercase transition-colors cursor-pointer ${
-                viewMode === 'feed' ? 'bg-[#FFE600] text-black' : 'text-neutral-400 hover:text-white'
+              className={`px-2 py-0.5 text-xs font-medium rounded transition-colors cursor-pointer ${
+                viewMode === 'feed' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Feed List View"
             >
               <List size={12} className="inline mr-1 -mt-0.5" />
-              FEED
+              Feed
             </button>
           </div>
         </div>
       }
     >
       {/* Interval Selector Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-2 mt-2 pb-3 border-b-2 border-black">
-        <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center justify-between flex-wrap gap-2 mt-2 pb-3 border-b border-border">
+        <div className="flex items-center gap-1 flex-wrap">
           {INTERVALS.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setInterval(item.id)}
-              className={`px-2 py-0.5 font-mono text-[10px] font-black border-2 border-black shadow-[1.5px_1.5px_0px_0px_#000000] cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] ${
+              className={`px-2 py-0.5 text-xs font-medium rounded-md border cursor-pointer transition-colors ${
                 interval === item.id
-                  ? 'bg-[#FFE600] text-black'
-                  : 'bg-[#141619] text-neutral-400 hover:text-white hover:border-neutral-600'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted hover:text-foreground'
               }`}
             >
               {item.label}
@@ -207,9 +207,9 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
           ))}
         </div>
 
-        <div className="flex items-center gap-3 font-mono text-[10px] font-bold text-neutral-400">
-          <span>TOTAL: <strong className="text-[#FFE600] font-black">{totalActivities}</strong></span>
-          <span>PEAK: <strong className="text-white font-black">{peakCount}</strong></span>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>Total: <strong className="text-foreground font-semibold">{totalActivities}</strong></span>
+          <span>Peak: <strong className="text-foreground font-semibold">{peakCount}</strong></span>
         </div>
       </div>
 
@@ -218,7 +218,7 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
         <div className="relative flex-1 flex flex-col justify-center min-h-[220px] mt-2">
           {loading ? (
             <div className="space-y-3 p-4">
-              <Skeleton width="100%" height={120} className="rounded-none" />
+              <Skeleton width="100%" height={120} className="rounded-lg" />
               <div className="flex justify-between">
                 <Skeleton width="15%" height={10} />
                 <Skeleton width="15%" height={10} />
@@ -226,25 +226,25 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
               </div>
             </div>
           ) : error && buckets.length === 0 ? (
-            <div className="text-center py-10 text-neutral-400 font-mono text-[12px]">
-              <p className="text-[#EF4444] font-bold mb-2">// {error}</p>
+            <div className="text-center py-10 text-muted-foreground text-xs">
+              <p className="text-destructive font-medium mb-2">{error}</p>
               <button
                 type="button"
                 onClick={() => refreshTimeline(false)}
-                className="px-3 py-1 bg-[#141619] border-2 border-black text-white hover:bg-[#FFE600] hover:text-black font-mono text-[11px] font-bold shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                className="px-3 py-1 bg-card border border-border text-foreground hover:bg-muted text-xs font-medium rounded-md cursor-pointer transition-colors"
               >
-                RELOAD DATA
+                Reload Data
               </button>
             </div>
           ) : buckets.length === 0 ? (
-            <div className="text-center py-12 text-neutral-500 font-mono text-[12px]">
-              <p className="mb-2">// NO TIMELINE DATA AVAILABLE.</p>
+            <div className="text-center py-12 text-muted-foreground text-xs">
+              <p className="mb-2">No timeline data available.</p>
               <button
                 type="button"
                 onClick={() => refreshTimeline(false)}
-                className="px-3 py-1 bg-[#141619] border-2 border-black text-white hover:bg-[#FFE600] hover:text-black font-mono text-[11px] font-bold shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+                className="px-3 py-1 bg-card border border-border text-foreground hover:bg-muted text-xs font-medium rounded-md cursor-pointer transition-colors"
               >
-                REFRESH
+                Refresh
               </button>
             </div>
           ) : (
@@ -259,13 +259,9 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                 <defs>
                   {/* Linear Gradient for fill under polyline */}
                   <linearGradient id="pulseGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#FFE600" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#FFE600" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.0" />
                   </linearGradient>
-
-                  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="2" dy="2" stdDeviation="0" floodColor="#000000" />
-                  </filter>
                 </defs>
 
                 {/* Horizontal Gridlines & Y-Axis labels */}
@@ -279,17 +275,16 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                         y1={y}
                         x2={SVG_WIDTH - PADDING_RIGHT}
                         y2={y}
-                        stroke="#262626"
+                        stroke="var(--border)"
                         strokeDasharray="3 3"
                         strokeWidth="1"
                       />
                       <text
                         x={PADDING_LEFT - 8}
                         y={y + 3}
-                        fill="#737373"
+                        fill="var(--muted-foreground)"
                         fontSize="9"
-                        fontFamily="monospace"
-                        fontWeight="bold"
+                        fontWeight="normal"
                         textAnchor="end"
                       >
                         {val}
@@ -308,11 +303,10 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                   <path
                     d={linePath}
                     fill="none"
-                    stroke="#FFE600"
-                    strokeWidth="3"
+                    stroke="var(--primary)"
+                    strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    style={{ filter: 'drop-shadow(2px 2px 0px #000000)' }}
                   />
                 )}
 
@@ -327,10 +321,9 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                         <text
                           x={pt.x}
                           y={SVG_HEIGHT - 8}
-                          fill="#737373"
+                          fill="var(--muted-foreground)"
                           fontSize="9"
-                          fontFamily="monospace"
-                          fontWeight="bold"
+                          fontWeight="normal"
                           textAnchor="middle"
                         >
                           {pt.bucket.label}
@@ -347,13 +340,12 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                   return (
                     <g key={pt.index}>
                       {hasCount && (
-                        <rect
-                          x={pt.x - 3}
-                          y={pt.y - 3}
-                          width={6}
-                          height={6}
-                          fill={isHovered ? '#FFFFFF' : '#FFE600'}
-                          stroke="#000000"
+                        <circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={isHovered ? 4.5 : 3}
+                          fill={isHovered ? '#FFFFFF' : 'var(--primary)'}
+                          stroke="var(--background)"
                           strokeWidth="1.5"
                           className="transition-all duration-200"
                         />
@@ -371,22 +363,20 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                       y1={PADDING_TOP}
                       x2={activePoint.x}
                       y2={PADDING_TOP + chartHeight}
-                      stroke="#FFFFFF"
+                      stroke="var(--foreground)"
                       strokeDasharray="2 2"
                       strokeWidth="1"
-                      opacity="0.6"
+                      opacity="0.4"
                     />
 
                     {/* Active point indicator ring */}
-                    <rect
-                      x={activePoint.x - 5}
-                      y={activePoint.y - 5}
-                      width={10}
-                      height={10}
-                      fill="#FFE600"
-                      stroke="#000000"
+                    <circle
+                      cx={activePoint.x}
+                      cy={activePoint.y}
+                      r={5}
+                      fill="var(--primary)"
+                      stroke="var(--background)"
                       strokeWidth="2"
-                      style={{ filter: 'drop-shadow(2px 2px 0px #000000)' }}
                     />
                   </g>
                 )}
@@ -403,25 +393,25 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                       : `calc(${((activePoint.x + 10) / SVG_WIDTH) * 100}%)`,
                   }}
                 >
-                  <div className="bg-[#0B0E14] border-2 border-black shadow-[4px_4px_0px_0px_#000000] p-3 text-left w-64 max-w-[280px]">
-                    <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
-                      <span className="text-[11px] font-mono font-black text-[#FFE600] uppercase">
-                        // {activePoint.bucket.label}
+                  <div className="bg-popover text-popover-foreground border border-border rounded-xl shadow-xl p-3 text-left w-64 max-w-[280px]">
+                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                      <span className="text-xs font-semibold text-primary">
+                        {activePoint.bucket.label}
                       </span>
-                      <Badge variant={activePoint.bucket.count > 0 ? "primary" : "default"} className="!text-[8px] !py-0">
-                        {activePoint.bucket.count} {activePoint.bucket.count === 1 ? 'EVENT' : 'EVENTS'}
+                      <Badge variant={activePoint.bucket.count > 0 ? "accent" : "neutral"} className="!text-[9px] !py-0">
+                        {activePoint.bucket.count} {activePoint.bucket.count === 1 ? 'event' : 'events'}
                       </Badge>
                     </div>
 
-                    <div className="mt-2.5 space-y-2 max-h-44 overflow-y-auto no-scrollbar">
+                    <div className="mt-2.5 space-y-2 max-h-44 overflow-y-auto">
                       {activePoint.bucket.activities && activePoint.bucket.activities.length > 0 ? (
                         activePoint.bucket.activities.slice(0, 5).map((act, i) => (
-                          <div key={act.id || i} className="flex items-start gap-2 text-[10px] font-mono">
+                          <div key={act.id || i} className="flex items-start gap-2 text-xs">
                             {act.avatar_url ? (
                               <img
                                 src={act.avatar_url}
                                 alt={act.user_name}
-                                className="w-3.5 h-3.5 rounded-none border border-black object-cover shrink-0 mt-0.5"
+                                className="w-4 h-4 rounded-full border border-border object-cover shrink-0 mt-0.5"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
                                   const fallback = e.currentTarget.nextElementSibling;
@@ -430,7 +420,7 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                               />
                             ) : null}
                             <span
-                              className={`w-3.5 h-3.5 rounded-none bg-black text-[#00E5FF] font-mono text-[7px] font-black flex items-center justify-center shrink-0 border border-black mt-0.5 ${
+                              className={`w-4 h-4 rounded-full bg-primary/10 text-primary text-[8px] font-bold flex items-center justify-center shrink-0 border border-primary/20 mt-0.5 ${
                                 act.avatar_url ? 'hidden' : ''
                               }`}
                             >
@@ -439,28 +429,28 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
 
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-bold text-white uppercase truncate max-w-[80px]">
+                                <span className="font-medium text-foreground truncate max-w-[80px]">
                                   {act.user_name}
                                 </span>
-                                <span className={`px-1 py-0.2 text-[8px] font-black uppercase border rounded-none ${getActionBadgeClass(act.action)}`}>
+                                <span className={`px-1 py-0.2 text-[9px] font-medium border rounded-md ${getActionBadgeClass(act.action)}`}>
                                   {act.action}
                                 </span>
                               </div>
-                              <p className="text-neutral-400 truncate mt-0.5 font-semibold" title={act.target}>
+                              <p className="text-muted-foreground truncate mt-0.5 text-[11px]" title={act.target}>
                                 {act.target}
                               </p>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <p className="text-neutral-500 text-[10px] font-mono uppercase py-1">
-                          // NO ACTIVITY AT THIS TIMESTAMP.
+                        <p className="text-muted-foreground text-xs py-1">
+                          No activity at this timestamp.
                         </p>
                       )}
 
                       {activePoint.bucket.activities && activePoint.bucket.activities.length > 5 && (
-                        <p className="text-[9px] font-mono text-neutral-500 font-bold uppercase text-right pt-1">
-                          + {activePoint.bucket.activities.length - 5} MORE ACTIVITIES
+                        <p className="text-[10px] text-muted-foreground font-medium text-right pt-1">
+                          + {activePoint.bucket.activities.length - 5} more activities
                         </p>
                       )}
                     </div>
@@ -472,11 +462,11 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
         </div>
       ) : (
         /* Feed View */
-        <div className="flex-1 overflow-y-auto no-scrollbar max-h-[220px] space-y-3 mt-3 pr-1">
+        <div className="flex-1 overflow-y-auto max-h-[220px] space-y-2.5 mt-3 pr-1">
           {loading ? (
             [1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-start gap-3 p-2 bg-[#141619] border border-black">
-                <Skeleton width={18} height={18} className="rounded-none" />
+              <div key={i} className="flex items-start gap-3 p-2.5 bg-card border border-border rounded-lg">
+                <Skeleton width={18} height={18} className="rounded-full" />
                 <div className="flex-1">
                   <Skeleton width="50%" height={10} className="mb-1" />
                   <Skeleton width="80%" height={10} />
@@ -484,20 +474,20 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
               </div>
             ))
           ) : allIntervalActivities.length === 0 ? (
-            <div className="text-neutral-500 font-mono text-[11px] text-center py-10 uppercase">
-              // NO RECENT ACTIVITIES IN THIS TIMEFRAME.
+            <div className="text-muted-foreground text-xs text-center py-10">
+              No recent activities in this timeframe.
             </div>
           ) : (
             allIntervalActivities.map((act, i) => (
               <div
                 key={act.id || i}
-                className="p-2.5 rounded-none bg-[#141619] border-2 border-black shadow-[2px_2px_0px_0px_#000000] flex items-start gap-2.5 font-mono"
+                className="p-2.5 rounded-lg bg-card border border-border shadow-xs flex items-start gap-2.5"
               >
                 {act.avatar_url ? (
                   <img
                     src={act.avatar_url}
                     alt={act.user_name}
-                    className="w-4 h-4 rounded-none border border-black object-cover shrink-0 mt-0.5"
+                    className="w-4 h-4 rounded-full border border-border object-cover shrink-0 mt-0.5"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                       const fallback = e.currentTarget.nextElementSibling;
@@ -506,7 +496,7 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
                   />
                 ) : null}
                 <span
-                  className={`w-4 h-4 rounded-none bg-black text-[#00E5FF] font-mono text-[8px] font-black flex items-center justify-center shrink-0 border border-black mt-0.5 ${
+                  className={`w-4 h-4 rounded-full bg-primary/10 text-primary text-[8px] font-bold flex items-center justify-center shrink-0 border border-primary/20 mt-0.5 ${
                     act.avatar_url ? 'hidden' : ''
                   }`}
                 >
@@ -515,19 +505,19 @@ export const ProjectPulseChart: React.FC<ProjectPulseChartProps> = ({ projectId,
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-white font-bold text-[11px] uppercase truncate">
+                    <span className="text-foreground font-medium text-xs truncate">
                       {act.user_name}
                     </span>
-                    <span className={`px-1.5 py-0.2 text-[8px] font-black uppercase border rounded-none shrink-0 ${getActionBadgeClass(act.action)}`}>
+                    <span className={`px-1.5 py-0.2 text-[12px] font-medium border rounded-md shrink-0 ${getActionBadgeClass(act.action)}`}>
                       {act.action}
                     </span>
                   </div>
-                  <p className="text-neutral-300 text-[10px] truncate mt-0.5 font-semibold" title={act.target}>
+                  <p className="text-muted-foreground text-xs truncate mt-0.5" title={act.target}>
                     {act.target}
                   </p>
                   {act.created_at && (
-                    <span className="text-[9px] text-neutral-500 font-bold uppercase mt-1 block">
-                      <Clock size={9} className="inline mr-1 -mt-0.5" />
+                    <span className="text-[10px] text-muted-foreground mt-1 block">
+                      <Clock size={10} className="inline mr-1 -mt-0.5" />
                       {new Date(act.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}

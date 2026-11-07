@@ -2,6 +2,7 @@ import React from 'react';
 import { CheckCircle2, Plus, Settings2, ChevronDown, Loader2, Expand } from 'lucide-react';
 import { Badge } from '../../design-system/Badge';
 import { TrashButton } from '../../design-system/TrashButton';
+import { cn } from '@/lib/utils';
 
 interface KanbanColumnProps {
   id: number | string;
@@ -90,23 +91,26 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`group ${widthClass || 'min-w-[316px] w-[316px]'} shrink-0 border-2 rounded-none flex flex-col h-full max-h-full transition-all duration-75 shadow-[4px_4px_0px_0px_#000000] ${isOver
-        ? 'bg-[#1E2227] border-[#FFE600] ring-2 ring-[#FFE600]'
-        : 'bg-[#0E1012] border-neutral-700'
-        }`}
+      className={cn(
+        'group shrink-0 rounded-xl border flex flex-col h-full max-h-full transition-all duration-150 shadow-xs',
+        widthClass || 'min-w-[320px] w-[320px]',
+        isOver
+          ? 'bg-primary/5 border-primary ring-1 ring-primary/40'
+          : 'bg-muted/30 border-border/70'
+      )}
     >
       {/* Column Header */}
-      <div className="p-3.5 border-b-2 border-neutral-700 bg-[#141619] select-none shrink-0">
+      <div className="p-3.5 border-b border-border/60 bg-card/60 rounded-t-xl select-none shrink-0 backdrop-blur-xs">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2 min-w-0 pr-2">
-            <div className={`w-2.5 h-2.5 rounded-none border border-black shrink-0 ${colorClass}`} />
-            <h3 className="text-white font-mono font-black text-[13px] uppercase tracking-wider truncate" title={name}>
-              <span className="text-[#FFE600] mr-1">//</span>{name}
+            <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', colorClass)} />
+            <h3 className="text-foreground font-semibold text-sm truncate" title={name}>
+              {name}
             </h3>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <span
-              className="px-1.5 py-0.5 rounded-none bg-black text-[#FFE600] border border-neutral-700 font-mono text-[10px] font-black"
+              className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono text-[10px] font-semibold"
               title={hasRemainingByTotal ? `Loaded ${taskCount} of ${totalTasks} tasks` : `${taskCount} tasks`}
             >
               {hasRemainingByTotal
@@ -117,7 +121,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               <button
                 type="button"
                 onClick={() => onFocusBucket(id)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded-none hover:bg-[#FFE600] hover:text-black text-neutral-400 border border-transparent hover:border-black transition-all cursor-pointer"
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                 title="Focus bucket"
               >
                 <Expand size={13} />
@@ -125,8 +129,9 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             )}
             {onEditBucket && (
               <button
+                type="button"
                 onClick={() => onEditBucket(id)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded-none hover:bg-[#FFE600] hover:text-black text-neutral-400 border border-transparent hover:border-black transition-all cursor-pointer"
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                 title="Column settings"
               >
                 <Settings2 size={13} />
@@ -135,15 +140,15 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             {onDeleteBucket && (
               <TrashButton
                 onClick={() => {
-                  onDeleteBucket(id)
+                  onDeleteBucket(id);
                 }}
-              ></TrashButton>
+              />
             )}
           </div>
         </div>
 
         {description && (
-          <p className="text-[11px] font-mono text-neutral-400 line-clamp-1 mb-2">
+          <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
             {description}
           </p>
         )}
@@ -151,40 +156,44 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
         <div className="flex items-center gap-2">
           <Badge
             variant={statusText === 'RUNNING' ? 'success' : statusText === 'PAUSED' ? 'warning' : 'default'}
-            className="!text-[9px] !py-0.5"
+            className="text-[10px] py-0.5"
           >
-            <CheckCircle2 size={10} strokeWidth={2.5} /> {statusText}
+            <CheckCircle2 size={11} /> {statusText}
           </Badge>
-          <button onClick={() => onAddTask && onAddTask(id)}
-            className='bg-black hover:bg-[#00FF00] text-[#FFE600] border border-neutral-700 shadow-[1.5px_1.5px_0px_0px_#000000] flex items-center px-1.5 py-0.5 hover:text-black font-mono text-[10px] font-bold uppercase tracking-wider gap-1.5'
+          <button
+            type="button"
+            onClick={() => onAddTask && onAddTask(id)}
+            className="bg-background hover:bg-muted text-foreground border border-border shadow-xs flex items-center px-2 py-0.5 rounded-md font-medium text-xs gap-1 transition-colors cursor-pointer"
           >
-            <Plus size={12} strokeWidth={3} /> Add Task
+            <Plus size={12} />
+            <span>Add task</span>
           </button>
         </div>
       </div>
 
       {/* Task List */}
-      <div className="flex flex-col gap-3 p-3 overflow-y-auto flex-1 min-h-0 relative">
-        <div>
+      <div className="flex flex-col gap-2.5 p-3 overflow-y-auto flex-1 min-h-0 relative">
+        <div className="flex flex-col gap-2.5">
           {children}
         </div>
 
         {canLoadMore && (
           <button
+            type="button"
             onClick={() => onLoadMore && onLoadMore(id)}
             disabled={isLoadingMore}
-            className="w-full py-2.5 flex items-center justify-center gap-1.5 bg-[#141619] hover:bg-[#FFE600] text-[#FFE600] hover:text-black border-2 border-black rounded-none transition-all duration-75 font-mono text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50 shrink-0"
+            className="w-full py-2 flex items-center justify-center gap-1.5 bg-background hover:bg-muted text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors text-xs font-medium cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
             title="Load more tasks for this column"
           >
             {isLoadingMore ? (
               <>
                 <Loader2 size={13} className="animate-spin text-current" />
-                <span>LOADING TASKS...</span>
+                <span>Loading tasks…</span>
               </>
             ) : (
               <>
-                <ChevronDown size={14} strokeWidth={3} />
-                <span>LOAD MORE {remainingTasks > 0 ? `(${remainingTasks} MORE)` : '(+20)'}</span>
+                <ChevronDown size={13} />
+                <span>Load more {remainingTasks > 0 ? `(${remainingTasks} more)` : '(+20)'}</span>
               </>
             )}
           </button>

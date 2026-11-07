@@ -32,7 +32,7 @@ function AppShell() {
   if (!user) return <LoginPage />;
 
   return (
-    <div className="h-screen w-full bg-[var(--cmd-app-bg)] text-[var(--cmd-text-body)] font-sans flex overflow-hidden selection:bg-[#FFE600]/30 transition-colors duration-150 relative">
+    <div className="h-screen w-full bg-background text-foreground flex overflow-hidden selection:bg-primary/20 transition-colors duration-150 relative">
       <Sidebar
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
@@ -41,7 +41,7 @@ function AppShell() {
       {/* Global Telemetry & Network Status Badge */}
       <NetworkBadge />
 
-      <main className="flex-1 overflow-y-auto no-scrollbar bg-dots flex flex-col min-w-0">
+      <main className="flex-1 overflow-y-auto no-scrollbar bg-background flex flex-col min-w-0">
         {/* Project Multi-Tab Bar */}
         <ProjectTabBar />
 

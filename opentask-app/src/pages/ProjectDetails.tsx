@@ -20,6 +20,7 @@ import { McpConfigModal } from '../components/modals/McpConfigModal';
 import { TaskFormModal } from '../components/modals/TaskFormModal';
 import { MeetingFormModal } from '../components/modals/MeetingFormModal';
 import { LoadingScreen } from '../components/ui/LoadingScreen';
+import { Button } from '../design-system/Button';
 import { useToast } from '../design-system/Toast';
 import { useAuth } from '../auth/useAuth';
 import { useCurrentUserRole } from '../controllers/useCurrentUserRole';
@@ -768,7 +769,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                 <LoadingScreen
                     fullscreen={false}
                     message="SYNCING PERMISSIONS & DATA…"
-                    subtext="// VERIFYING RBAC & SYNCHRONIZING BOARD ENGINE"
+                    subtext="VERIFYING RBAC & SYNCHRONIZING BOARD ENGINE"
                 />
             </div>
         );
@@ -777,41 +778,35 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     return (
         <div className={`animate-in fade-in duration-200 flex flex-col max-w-[1600px] mx-auto w-full select-none ${activeTab === 'Tasks' ? 'flex-1 min-h-0' : 'h-full'}`}>
             {/* Header */}
-            <div className="flex items-center gap-4 mb-4 shrink-0">
+            <div className="flex items-center gap-3.5 mb-4 shrink-0">
                 <button
                     onClick={() => navigate(-1)}
-                    className="w-10 h-10 rounded-none bg-[#141619] border-2 border-black flex items-center justify-center text-neutral-300 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all shadow-[2px_2px_0px_0px_#000000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    className="w-9 h-9 rounded-md bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shadow-xs"
                 >
-                    <ChevronLeft size={20} strokeWidth={3} />
+                    <ChevronLeft size={18} />
                 </button>
                 <div>
-                    <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[13px] font-black uppercase tracking-wider mb-1 inline-block">
-            // PROJECT PIPELINE CONTROL
-                    </span>
-                    <h1 className="text-[26px] sm:text-[30px] font-black text-white uppercase tracking-tight font-mono leading-none">
-                        {project ? project.name : 'LOADING PROJECT...'}
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight leading-none">
+                        {project ? project.name : 'Loading project...'}
                     </h1>
-                    <p className="text-[11px] font-mono text-neutral-400 mt-1 uppercase tracking-wider">
-                        {project ? project.issue || "SYSTEM PIPELINE NOMINAL." : '...'}
-                    </p>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-4 bg-[#0E1012] p-1.5 rounded-none border-2 border-black w-fit shadow-[3px_3px_0px_0px_#000000] flex-wrap shrink-0">
+            <div className="flex gap-1.5 mb-4 bg-muted/40 p-1 rounded-lg border border-border w-fit flex-wrap shrink-0">
                 {tabs.map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-3.5 py-2 text-[11px] font-mono font-black uppercase tracking-wider rounded-none flex items-center gap-2 cursor-pointer ${activeTab === tab
-                            ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px]'
-                            : 'bg-[#141619] text-neutral-400 border border-neutral-800 hover:border-white hover:text-white'
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-2 cursor-pointer transition-colors ${activeTab === tab
+                            ? 'bg-background text-foreground shadow-xs font-semibold'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                             }`}
                     >
-                        {tab === 'Overview' && <LayoutDashboard size={14} strokeWidth={2.5} />}
-                        {tab === 'Tasks' && <Briefcase size={14} strokeWidth={2.5} />}
-                        {tab === 'MoM & Meetings' && <Video size={14} strokeWidth={2.5} />}
-                        {tab === 'Settings' && <Settings size={14} strokeWidth={2.5} />}
+                        {tab === 'Overview' && <LayoutDashboard size={14} />}
+                        {tab === 'Tasks' && <Briefcase size={14} />}
+                        {tab === 'MoM & Meetings' && <Video size={14} />}
+                        {tab === 'Settings' && <Settings size={14} />}
                         {tab}
                     </button>
                 ))}
@@ -821,7 +816,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             <div className={`min-h-0 ${activeTab === 'Tasks' ? 'flex-1 flex flex-col' : ''}`}>
                 {/* Overview */}
                 {activeTab === 'Overview' && (
-                    roleLoading ? <div className="text-neutral-500 font-mono text-[12px] py-10 text-center">// RESOLVING PERMISSIONS...</div> :
+                    roleLoading ? <div className="text-muted-foreground text-xs py-10 text-center">Resolving permissions...</div> :
                         isManager ? <ProjectOverviewPM projectId={projectId} /> : (
                             <ProjectOverviewDev
                                 projectId={projectId}
@@ -837,118 +832,123 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                 {activeTab === 'Tasks' && (
                     <div className={
                         focusBucket
-                            ? "fixed inset-0 z-[45] bg-[#0C0D0E] p-3 sm:p-5 flex flex-col min-h-0 overflow-hidden select-none animate-in fade-in duration-150"
-                            : "bg-[#0C0D0E] border-2 border-neutral-700 rounded-none p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-[6px_6px_0px_0px_#000000]"
+                            ? "fixed inset-0 z-[45] bg-background p-3 sm:p-5 flex flex-col min-h-0 overflow-hidden select-none animate-in fade-in duration-150"
+                            : "bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-xs"
                     }>
-                        <div className="flex justify-between items-center mb-3 pb-3 border-b-2 border-neutral-800 flex-wrap gap-2 shrink-0">
+                        <div className="flex justify-between items-center mb-3 pb-3 border-b border-border flex-wrap gap-2 shrink-0">
                             <div>
                                 {focusBucket ? (
                                     <>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[#FFE600] bg-black px-1.5 py-0.5 border border-neutral-700 font-mono text-[13px] font-black uppercase tracking-wider inline-block">
-                                                // EXPANDED KANBAN WORKSPACE
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-primary inline-block">
+                                                Expanded Kanban Workspace
                                             </span>
-                                            <span className="text-neutral-400 font-mono text-[11px] font-bold uppercase truncate max-w-sm sm:max-w-md">
-                                                {project ? project.name : 'PROJECT'}
+                                            <span className="text-muted-foreground text-xs truncate max-w-sm sm:max-w-md">
+                                                {project ? project.name : 'Project'}
                                             </span>
                                         </div>
-                                        <h2 className="text-[17px] sm:text-[19px] font-mono font-black text-white uppercase tracking-wider">
-                                            <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
+                                        <h2 className="text-base sm:text-lg font-semibold text-foreground">
+                                            Task Flow Pipeline
                                         </h2>
                                     </>
                                 ) : (
                                     <>
-                                        <h2 className="text-[16px] font-mono font-black text-white uppercase tracking-wider">
-                                            <span className="text-[#FFE600] mr-2">//</span>TASK FLOW PIPELINE
+                                        <h2 className="text-base font-semibold text-foreground">
+                                            Task Flow Pipeline
                                         </h2>
-                                        <p className="text-[11px] font-mono text-neutral-400 mt-0.5 uppercase tracking-wider">
-                                            6-STAGE STACK ARCHITECTURE • DRAFT → COMPLETED
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            6-stage stack architecture • Draft → Completed
                                         </p>
                                     </>
                                 )}
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
-                                <div className="flex items-center border-2 border-black bg-[#141619] p-0.5 shadow-[2px_2px_0px_0px_#000000]">
+                                <div className="flex items-center border border-border bg-muted/40 p-0.5 rounded-lg">
                                     <button
                                         type="button"
                                         onClick={() => setColumnDensity('normal')}
-                                        className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all cursor-pointer ${columnDensity === 'normal'
-                                            ? 'bg-[#FFE600] text-black'
-                                            : 'text-neutral-400 hover:text-white'
+                                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${columnDensity === 'normal'
+                                            ? 'bg-background text-foreground shadow-xs font-semibold'
+                                            : 'text-muted-foreground hover:text-foreground'
                                             }`}
                                         title="Standard column width (316px)"
                                     >
-                                        STANDARD
+                                        Standard
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setColumnDensity('wide')}
-                                        className={`px-2.5 py-1 font-mono text-[13px] font-black uppercase transition-all cursor-pointer ${columnDensity === 'wide'
-                                            ? 'bg-[#FFE600] text-black'
-                                            : 'text-neutral-400 hover:text-white'
+                                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${columnDensity === 'wide'
+                                            ? 'bg-background text-foreground shadow-xs font-semibold'
+                                            : 'text-muted-foreground hover:text-foreground'
                                             }`}
                                         title="Wide column width (420px)"
                                     >
-                                        WIDE
+                                        Wide
                                     </button>
                                 </div>
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => setIsMcpModalOpen(true)}
-                                    className="px-3.5 py-1.5 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                                     title="Configure IDE Model Context Protocol (MCP) server endpoints"
                                 >
-                                    <Cpu size={13} strokeWidth={2.5} />
+                                    <Cpu size={13} />
                                     <span>AI MCP</span>
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={handleSyncAndReviewPrs}
                                     disabled={isSyncingPrs}
-                                    className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
                                     title="Scan connected repositories and immediately run Gemini AI Code Review on open PRs"
                                 >
-                                    <Sparkles size={13} strokeWidth={2.5} className={isSyncingPrs ? 'animate-spin text-black' : ''} />
-                                    <span>{isSyncingPrs ? 'REVIEWING PRS...' : 'SYNC & REVIEW PRS'}</span>
-                                </button>
-                                <button
+                                    <Sparkles size={13} className={isSyncingPrs ? 'animate-spin' : ''} />
+                                    <span>{isSyncingPrs ? 'Reviewing PRs...' : 'Sync & Review PRs'}</span>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={handleRefreshTasksOnly}
                                     disabled={isRefreshingTasks}
-                                    className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
                                     title="Refresh tasks without reloading the web page"
                                 >
-                                    <RefreshCw size={13} strokeWidth={2.5} className={isRefreshingTasks ? 'animate-spin text-black' : ''} />
-                                    <span>{isRefreshingTasks ? 'SYNCING...' : 'REFRESH TASKS'}</span>
-                                </button>
+                                    <RefreshCw size={13} className={isRefreshingTasks ? 'animate-spin' : ''} />
+                                    <span>{isRefreshingTasks ? 'Syncing...' : 'Refresh'}</span>
+                                </Button>
                                 {focusBucket ? (
-                                    <button
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
                                         onClick={() => {
                                             setFocusBucket(false);
                                             setSelectedBucketFocus('ALL');
                                         }}
-                                        className="px-3.5 py-1.5 bg-[#FFE600] hover:bg-yellow-300 text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                                         title="Exit expanded view (Esc)"
                                     >
-                                        <Shrink size={13} strokeWidth={2.5} />
-                                        <span>COLLAPSE</span>
-                                        <kbd className="hidden sm:inline bg-black text-[#FFE600] px-1 py-0.2 text-[9px] font-mono border border-neutral-700">ESC</kbd>
-                                    </button>
+                                        <Shrink size={13} />
+                                        <span>Collapse</span>
+                                        <kbd className="hidden sm:inline bg-primary-foreground/20 text-primary-foreground px-1 py-0.2 text-[9px] rounded font-mono">ESC</kbd>
+                                    </Button>
                                 ) : (
-                                    <button
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         onClick={() => setFocusBucket(true)}
-                                        className="px-3.5 py-1.5 bg-[#141619] hover:bg-[#FFE600] text-neutral-300 hover:text-black border-2 border-black font-mono text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                                         title="Expand bucket and board workspace"
                                     >
-                                        <Expand size={13} strokeWidth={2.5} />
-                                        <span>EXPAND</span>
-                                    </button>
+                                        <Expand size={13} />
+                                        <span>Expand</span>
+                                    </Button>
                                 )}
                             </div>
                         </div>
 
                         {/* Task Search Bar & Assignee Filter */}
-                        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap bg-[#141619] p-2.5 sm:p-3 border-2 border-black shadow-[2px_2px_0px_0px_#000000] shrink-0">
+                        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap bg-card p-2.5 sm:p-3 border border-border rounded-lg shadow-xs shrink-0">
                             <div className="flex items-center gap-3 flex-1 min-w-[260px] flex-wrap">
                                 <div className="relative flex-1 min-w-[220px] max-w-xl">
-                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-500">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted-foreground">
                                         <Search size={14} />
                                     </div>
                                     <input
@@ -957,33 +957,33 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                         value={taskSearchQuery}
                                         onChange={(e) => setTaskSearchQuery(e.target.value)}
                                         onKeyDown={handleSearchKeyDown}
-                                        placeholder="SEARCH TASKS (TITLE, #ID, TAG, ASSIGNEE)... [/]"
-                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none pl-9 pr-8 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                                        placeholder="Search tasks (title, #id, tag, assignee)... [/]"
+                                        className="w-full bg-background border border-input rounded-md pl-9 pr-8 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
                                     />
                                     {taskSearchQuery && (
                                         <button
                                             type="button"
                                             onClick={() => setTaskSearchQuery('')}
-                                            className="absolute inset-y-0 right-2.5 flex items-center text-neutral-400 hover:text-white cursor-pointer"
-                                            title="Clear Search (Esc)"
+                                            className="absolute inset-y-0 right-2.5 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                            title="Clear search (Esc)"
                                         >
-                                            <X size={14} strokeWidth={2.5} />
+                                            <X size={14} />
                                         </button>
                                     )}
                                 </div>
 
                                 {/* Assignee Filter Dropdown */}
-                                <div className="flex items-center gap-1.5 bg-[#0B0E14] border-2 border-black px-2.5 py-1.5 shadow-[2px_2px_0px_0px_#000000]">
-                                    <Filter size={13} className="text-[#FFE600] shrink-0" />
-                                    <span className="font-mono text-[13px] font-black uppercase text-neutral-400 shrink-0">ASSIGNEE:</span>
+                                <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2.5 py-1.5 shadow-xs">
+                                    <Filter size={13} className="text-primary shrink-0" />
+                                    <span className="text-xs font-medium text-muted-foreground shrink-0">Assignee:</span>
                                     <select
                                         value={selectedAssigneeFilter}
                                         onChange={(e) => setSelectedAssigneeFilter(e.target.value)}
-                                        className="bg-transparent font-mono text-[11px] font-bold text-white uppercase focus:outline-none cursor-pointer"
+                                        className="bg-transparent text-xs font-medium text-foreground focus:outline-none cursor-pointer"
                                     >
-                                        <option value="ALL" className="bg-[#141619] text-white">ALL ASSIGNEES ({tasks.length})</option>
-                                        <option value="UNASSIGNED" className="bg-[#141619] text-white">
-                                            UNASSIGNED ({tasks.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id).length})
+                                        <option value="ALL" className="bg-card text-foreground">All Assignees ({tasks.length})</option>
+                                        <option value="UNASSIGNED" className="bg-card text-foreground">
+                                            Unassigned ({tasks.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id).length})
                                         </option>
                                         {members.map(m => {
                                             const uid = String(m.user_id);
@@ -995,7 +995,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                                 (t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id)))
                                             ).length;
                                             return (
-                                                <option key={uid} value={uid} className="bg-[#141619] text-white">
+                                                <option key={uid} value={uid} className="bg-card text-foreground">
                                                     @{m.gh_username || m.display_name || `Member #${uid}`} ({count})
                                                 </option>
                                             );
@@ -1004,21 +1004,21 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                 </div>
 
                                 {/* Bucket Focus Dropdown */}
-                                <div className="flex items-center gap-1.5 bg-[#0B0E14] border-2 border-black px-2.5 py-1.5 shadow-[2px_2px_0px_0px_#000000]">
-                                    <Filter size={13} className="text-[#FFE600] shrink-0" />
-                                    <span className="font-mono text-[13px] font-black uppercase text-neutral-400 shrink-0">BUCKET FOCUS:</span>
+                                <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2.5 py-1.5 shadow-xs">
+                                    <Filter size={13} className="text-primary shrink-0" />
+                                    <span className="text-xs font-medium text-muted-foreground shrink-0">Column:</span>
                                     <select
                                         value={selectedBucketFocus}
                                         onChange={(e) => setSelectedBucketFocus(e.target.value)}
-                                        className="bg-transparent font-mono text-[11px] font-bold text-white uppercase focus:outline-none cursor-pointer"
+                                        className="bg-transparent text-xs font-medium text-foreground focus:outline-none cursor-pointer"
                                     >
-                                        <option value="ALL" className="bg-[#141619] text-white">
-                                            ALL BUCKETS ({buckets.length})
+                                        <option value="ALL" className="bg-card text-foreground">
+                                            All Columns ({buckets.length})
                                         </option>
                                         {buckets.map(b => {
                                             const bTasksCount = matchingTasks.filter(t => String(t.bucket_id) === String(b.id)).length;
                                             return (
-                                                <option key={b.id} value={String(b.id)} className="bg-[#141619] text-white">
+                                                <option key={b.id} value={String(b.id)} className="bg-card text-foreground">
                                                     {b.name || b.state} ({bTasksCount})
                                                 </option>
                                             );
@@ -1028,14 +1028,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
 
                                 {(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL' || selectedBucketFocus !== 'ALL') && (
                                     <div className="flex items-center gap-2">
-                                        <span className="px-2.5 py-1.5 bg-[#1E2227] text-neutral-300 border border-neutral-700 font-mono text-[11px] font-bold uppercase tracking-wider">
-                                            <span className="text-[#FFE600] font-black mr-1">{matchingTasks.length}</span>
-                                            OF {tasks.length} MATCHING
+                                        <span className="px-2 py-1 bg-muted text-muted-foreground border border-border rounded-md text-xs font-medium">
+                                            <span className="text-primary font-semibold mr-1">{matchingTasks.length}</span>
+                                            of {tasks.length} matching
                                         </span>
                                         {isSearchingBackend && (
-                                            <span className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-400">
-                                                <Loader2 size={12} className="animate-spin text-[#FFE600]" />
-                                                SEARCHING BACKLOG...
+                                            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                <Loader2 size={12} className="animate-spin text-primary" />
+                                                Searching backlog...
                                             </span>
                                         )}
                                         <button
@@ -1045,9 +1045,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                                 setSelectedAssigneeFilter('ALL');
                                                 setSelectedBucketFocus('ALL');
                                             }}
-                                            className="p-1.5 bg-[#1E2227] hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-700 font-mono text-[12px] uppercase font-bold cursor-pointer"
+                                            className="p-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border text-xs cursor-pointer transition-colors"
                                         >
-                                            <X size={14} />
+                                            <X size={13} />
                                         </button>
                                     </div>
                                 )}
@@ -1097,20 +1097,20 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                                         return (
                                                             <div
                                                                 key={task.id}
-                                                                className="border-2 border-dashed border-[#EF4444] bg-[#161214] rounded-none p-3.5 animate-pulse select-none"
+                                                                className="border border-dashed border-destructive/40 bg-destructive/5 rounded-lg p-3 animate-pulse select-none"
                                                             >
-                                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                                <div className="flex items-center justify-between gap-2 mb-1.5">
                                                                     <div className="flex items-center gap-2">
-                                                                        <Loader2 size={13} className="animate-spin text-[#EF4444]" />
-                                                                        <span className="font-mono text-[13px] text-[#EF4444] font-black uppercase tracking-wider">
-                                                                            REMOVING TASK...
+                                                                        <Loader2 size={13} className="animate-spin text-destructive" />
+                                                                        <span className="text-xs text-destructive font-medium">
+                                                                            Removing task...
                                                                         </span>
                                                                     </div>
-                                                                    <span className="font-mono text-[13px] text-neutral-500 font-bold">
+                                                                    <span className="text-xs text-muted-foreground font-mono">
                                                                         #{String(task.id).slice(-4)}
                                                                     </span>
                                                                 </div>
-                                                                <div className="font-mono text-[12px] text-neutral-400 font-bold uppercase truncate line-through">
+                                                                <div className="text-xs text-muted-foreground truncate line-through">
                                                                     {task.title}
                                                                 </div>
                                                             </div>
@@ -1161,22 +1161,22 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
 
                                                 {/* In-flight new task creation ghost card */}
                                                 {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
-                                                    <div className="border-2 border-dashed border-[#FFE600] bg-[#141619] rounded-none p-3 animate-pulse">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <Loader2 size={13} className="animate-spin text-[#FFE600]" />
-                                                            <span className="font-mono text-[13px] text-[#FFE600] font-black uppercase tracking-wider">CREATING TASK...</span>
+                                                    <div className="border border-dashed border-primary/40 bg-primary/5 rounded-lg p-3 animate-pulse">
+                                                        <div className="flex items-center gap-2 mb-1.5">
+                                                            <Loader2 size={13} className="animate-spin text-primary" />
+                                                            <span className="text-xs text-primary font-medium">Creating task...</span>
                                                         </div>
-                                                        <div className="font-mono text-[12px] text-white font-bold uppercase truncate">
-                                                            {creatingTaskTitle || '// NEW TASK'}
+                                                        <div className="text-xs text-foreground font-medium truncate">
+                                                            {creatingTaskTitle || 'New task'}
                                                         </div>
                                                     </div>
                                                 )}
 
                                                 <button
                                                     onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
-                                                    className="w-full py-2.5 flex items-center justify-center gap-1.5 text-neutral-400 hover:text-black border-2 border-dashed border-neutral-700 hover:border-black hover:bg-[#FFE600] rounded-none transition-all duration-75 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                                    className="w-full py-2 flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/50 hover:bg-muted/40 rounded-lg transition-colors text-xs font-medium cursor-pointer"
                                                 >
-                                                    <Plus size={14} strokeWidth={3} /> Add Task
+                                                    <Plus size={14} /> Add Task
                                                 </button>
 
                                             </div>
@@ -1187,16 +1187,16 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
 
                                 {/* In-Flight Creating Column Indicator */}
                                 {isCreatingBucketSubmitting && (
-                                    <div className="min-w-[316px] w-[316px] shrink-0 border-2 border-dashed border-[#FFE600] bg-[#141619] p-5 rounded-none flex flex-col justify-center items-center shadow-[4px_4px_0px_0px_#000000] animate-pulse h-full">
-                                        <div className="flex items-center gap-2 text-[#FFE600] font-mono text-[12px] font-black uppercase mb-2">
-                                            <Loader2 size={16} className="animate-spin text-[#FFE600]" />
-                                            <span>CREATING COLUMN...</span>
+                                    <div className="min-w-[316px] w-[316px] shrink-0 border border-dashed border-primary/40 bg-primary/5 p-5 rounded-xl flex flex-col justify-center items-center shadow-xs animate-pulse h-full">
+                                        <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase mb-2">
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>Creating column...</span>
                                         </div>
-                                        <div className="font-mono text-[13px] text-white font-bold uppercase truncate max-w-[260px] text-center">
-                                            <span className="text-[#FFE600] mr-1">//</span>{newBucketName || 'NEW COLUMN'}
+                                        <div className="text-sm text-foreground font-semibold truncate max-w-[260px] text-center">
+                                            {newBucketName || 'New column'}
                                         </div>
-                                        <div className="font-mono text-[13px] text-neutral-400 mt-2">
-                      // PROVISIONING STATE: {newBucketState}
+                                        <div className="text-xs text-muted-foreground mt-1.5">
+                                            State: {newBucketState}
                                         </div>
                                     </div>
                                 )}
@@ -1207,12 +1207,12 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                         {!isCreatingBucket ? (
                                             <button
                                                 onClick={() => setIsCreatingBucket(true)}
-                                                className="w-full h-12 border-2 border-dashed border-black bg-[#121417] rounded-none flex items-center justify-center gap-2 text-neutral-400 hover:text-black hover:bg-[#FFE600] hover:border-black transition-all font-mono text-[12px] font-black uppercase tracking-wider shadow-[3px_3px_0px_0px_#000000] cursor-pointer"
+                                                className="w-full h-11 border border-dashed border-border bg-card/50 hover:bg-muted/50 rounded-xl flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-xs font-medium cursor-pointer"
                                             >
-                                                <Plus size={16} strokeWidth={3} /> ADD COLUMN
+                                                <Plus size={15} /> Add Column
                                             </button>
                                         ) : (
-                                            <div className="border-2 border-black rounded-none bg-[#121417] p-4 space-y-3 font-mono shadow-[4px_4px_0px_0px_#000000]">
+                                            <div className="border border-border rounded-xl bg-card p-4 space-y-3 shadow-xs">
                                                 <input
                                                     type="text"
                                                     autoFocus
@@ -1227,16 +1227,16 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                                             setNewBucketState('TODO');
                                                         }
                                                     }}
-                                                    placeholder="COLUMN NAME"
-                                                    className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white placeholder:text-neutral-600 focus:border-[#FFE600] focus:outline-none shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50"
+                                                    placeholder="Column name"
+                                                    className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:opacity-50"
                                                 />
                                                 <div className="space-y-1">
-                                                    <label className="text-[13px] text-neutral-400 font-bold uppercase tracking-wider">// BEHAVIOR STATE</label>
+                                                    <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Behavior State</label>
                                                     <select
                                                         value={newBucketState}
                                                         disabled={isCreatingBucketSubmitting}
                                                         onChange={(e) => setNewBucketState(e.target.value as BucketState)}
-                                                        className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-3 py-2 text-[12px] font-mono text-white focus:border-[#FFE600] focus:outline-none appearance-none shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50"
+                                                        className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:opacity-50 cursor-pointer"
                                                     >
                                                         <option value="DRAFT">DRAFT (AI Suggestions)</option>
                                                         <option value="PENDING">PENDING (Approval Needed)</option>
@@ -1247,27 +1247,31 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                                     </select>
                                                 </div>
                                                 <div className="flex items-center gap-2 pt-1">
-                                                    <button
+                                                    <Button
+                                                        variant="primary"
+                                                        size="sm"
                                                         onClick={handleCreateBucket}
                                                         disabled={!newBucketName.trim() || isCreatingBucketSubmitting}
-                                                        className="flex-1 bg-[#FFE600] text-black border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                                                        className="flex-1"
                                                     >
                                                         {isCreatingBucketSubmitting ? (
                                                             <>
                                                                 <Loader2 size={13} className="animate-spin" />
-                                                                <span>CREATING...</span>
+                                                                <span>Creating...</span>
                                                             </>
                                                         ) : (
                                                             'Save'
                                                         )}
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
                                                         disabled={isCreatingBucketSubmitting}
                                                         onClick={() => { setIsCreatingBucket(false); setNewBucketName(''); setNewBucketState('TODO'); }}
-                                                        className="flex-1 bg-[#1E2227] text-neutral-300 border-2 border-black text-[11px] font-black uppercase py-2 rounded-none hover:bg-white hover:text-black shadow-[2px_2px_0px_0px_#000000] disabled:opacity-50 transition-all cursor-pointer"
+                                                        className="flex-1"
                                                     >
                                                         Cancel
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </div>
                                         )}

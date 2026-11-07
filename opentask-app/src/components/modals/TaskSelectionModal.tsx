@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, BotMessageSquare, CheckSquare, Square, AlertCircle, Loader2 } from 'lucide-react';
+import { BotMessageSquare, CheckSquare, Square, AlertCircle, Loader2 } from 'lucide-react';
 import { alertService } from '../../services/alertService';
+import { Button } from '../../design-system/Button';
+import { CloseButton } from '../../design-system/CloseButton';
 import type { ProjectMember, ExtractedTask, ExtractedTaskPayload } from '../../models';
 import { parseTaskTypes } from '../../utils/taskTypes';
 
@@ -16,9 +18,6 @@ interface TaskSelectionModalProps {
   members: ProjectMember[];
   onSuccess?: () => void;
 }
-
-// ─── Weight pill colours ─────────────────────────────────────────────────────
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({
   isOpen,
@@ -109,56 +108,51 @@ export const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-100"
+      className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm select-none animate-in fade-in duration-100"
     >
       <div
-        className="bg-[#121417] border-3 border-black rounded-none w-full max-w-xl shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 max-h-[90vh] font-mono"
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-xl shadow-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* ─── Header ─────────────────────────────────────── */}
-        <div className="p-6 border-b-2 border-black bg-[#181B20] flex items-start gap-4 flex-shrink-0">
-          <div className="p-3 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-            <BotMessageSquare size={22} strokeWidth={2.5} />
+        <div className="p-5 border-b border-border bg-card flex items-start gap-4 flex-shrink-0">
+          <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
+            <BotMessageSquare size={20} />
           </div>
-          <div className="flex-1 mt-0.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#FFE600] mb-1">
-              // AI EXTRACTED TASKS
+          <div className="flex-1 mt-0.5 min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-primary mb-0.5">
+              AI Extracted Tasks
             </p>
-            <h2 className="text-white font-black text-[18px] uppercase tracking-wide leading-snug">
-              REVIEW &amp; CONFIRM TASKS
+            <h2 className="text-foreground font-semibold text-base leading-snug">
+              Review &amp; Confirm Tasks
             </h2>
-            <p className="text-neutral-400 text-[11px] uppercase tracking-wider mt-1">
-              {selectedIndices.size} OF {extractedTasks.length} TASKS COMMITTED
+            <p className="text-muted-foreground text-xs mt-0.5">
+              {selectedIndices.size} of {extractedTasks.length} tasks committed
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer"
-          >
-            <X size={18} strokeWidth={3} />
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
 
         {/* ─── Select-all bar ──────────────────────────────── */}
-        <div className="px-6 py-3 border-b-2 border-black bg-[#0E1012] flex items-center justify-between flex-shrink-0">
+        <div className="px-5 py-2.5 border-b border-border bg-muted/40 flex items-center justify-between flex-shrink-0">
           <button
             onClick={toggleAll}
-            className="flex items-center gap-2 text-[12px] font-black uppercase tracking-wider text-neutral-300 hover:text-[#FFE600] transition-colors cursor-pointer"
+            className="flex items-center gap-2 text-xs font-medium text-foreground hover:text-primary transition-colors cursor-pointer"
           >
             {allSelected ? (
-              <CheckSquare size={16} strokeWidth={3} className="text-[#FFE600]" />
+              <CheckSquare size={16} className="text-primary" />
             ) : (
-              <Square size={16} strokeWidth={2} />
+              <Square size={16} className="text-muted-foreground" />
             )}
-            {allSelected ? 'DESELECT ALL' : 'SELECT ALL'}
+            <span>{allSelected ? 'Deselect all' : 'Select all'}</span>
           </button>
-          <span className="text-[11px] text-neutral-400 uppercase">
-            {extractedTasks.length} TASK{extractedTasks.length !== 1 ? 'S' : ''} DETECTED
+          <span className="text-xs text-muted-foreground">
+            {extractedTasks.length} task{extractedTasks.length !== 1 ? 's' : ''} detected
           </span>
         </div>
 
         {/* ─── Task list ───────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {extractedTasks.map((task, idx) => {
             const selected = selectedIndices.has(idx);
             const w = task.weight ?? 3;
@@ -167,68 +161,70 @@ export const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({
               <button
                 key={idx}
                 onClick={() => toggle(idx)}
-                className={`w-full text-left rounded-none border-2 border-black p-4 transition-all flex gap-3 group cursor-pointer ${selected
-                  ? 'bg-[#181B20] shadow-[3px_3px_0px_0px_#FFE600]'
-                  : 'bg-[#0D1017] border-neutral-800 hover:border-black shadow-[2px_2px_0px_0px_#000000]'
-                  }`}
+                className={`w-full text-left rounded-lg border p-3.5 transition-all flex gap-3 group cursor-pointer ${
+                  selected
+                    ? 'bg-card border-primary/50 shadow-xs ring-1 ring-primary/20'
+                    : 'bg-muted/30 border-border hover:border-muted-foreground/30 opacity-75'
+                }`}
               >
                 {/* Checkbox icon */}
                 <div className="mt-0.5 flex-shrink-0">
                   {selected ? (
-                    <CheckSquare size={16} strokeWidth={3} className="text-[#FFE600]" />
+                    <CheckSquare size={16} className="text-primary" />
                   ) : (
-                    <Square size={16} strokeWidth={2} className="text-neutral-500 group-hover:text-white transition-colors" />
+                    <Square size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
                   )}
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0 font-mono">
-                  <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                    <span className="text-white text-[13px] font-bold uppercase leading-snug">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-foreground text-sm font-semibold leading-snug">
                       {task.title}
                     </span>
                     <span
-                      className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-none border border-black bg-[#FFE600] text-black"
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-md border border-primary/20 bg-primary/10 text-primary"
                     >
                       W{w}
                     </span>
                     {task.type && parseTaskTypes(task.type).map(t => (
-                      <span key={t} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-none bg-black text-neutral-300 border border-neutral-700">
+                      <span key={t} className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border">
                         {t}
                       </span>
                     ))}
                   </div>
 
                   {task.description && (
-                    <p className="text-neutral-300 text-[12px] leading-relaxed line-clamp-2">
+                    <p className="text-muted-foreground text-xs leading-relaxed line-clamp-2">
                       {task.description}
                     </p>
                   )}
 
                   {task.reason && (
-                    <p className="mt-1.5 text-[11px] text-[#FFE600] italic line-clamp-1">
+                    <p className="mt-1 text-xs text-primary/80 italic line-clamp-1">
                       ↳ {task.reason}
                     </p>
                   )}
 
                   {/* Assignee Dropdown */}
                   {selected && (
-                    <div className="mt-3" onClick={e => e.stopPropagation()}>
+                    <div className="mt-2.5" onClick={e => e.stopPropagation()}>
                       <select
                         value={assignees[idx] || ''}
                         onChange={e => handleAssigneeChange(idx, Number(e.target.value))}
-                        className={`w-full bg-[#0B0E14] border-2 ${!assignees[idx] ? 'border-[#EF4444]' : 'border-black'
-                          } text-white text-[12px] font-mono rounded-none px-3 py-1.5 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors`}
+                        className={`w-full bg-background border ${
+                          !assignees[idx] ? 'border-destructive' : 'border-input'
+                        } text-foreground text-xs rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring transition-colors`}
                       >
-                        <option value="" disabled>SELECT ASSIGNEE...</option>
+                        <option value="" disabled>Select assignee...</option>
                         {members.map(m => (
                           <option key={m.user_id} value={m.user_id}>
-                            Member #{m.user_id} ({m.role})
+                            {m.display_name || m.gh_username || `Member #${m.user_id}`} ({m.role})
                           </option>
                         ))}
                       </select>
                       {!assignees[idx] && (
-                        <p className="text-[#EF4444] text-[10px] font-bold mt-1 uppercase">// ASSIGNEE REQUIRED</p>
+                        <p className="text-destructive text-[11px] font-medium mt-1">Assignee required</p>
                       )}
                     </div>
                   )}
@@ -240,35 +236,35 @@ export const TaskSelectionModal: React.FC<TaskSelectionModalProps> = ({
 
         {/* ─── Error banner ────────────────────────────────── */}
         {error && (
-          <div className="mx-4 mb-2 mt-2 flex items-start gap-3 px-4 py-3 rounded-none bg-[#EF4444]/15 border-2 border-black flex-shrink-0 shadow-[2px_2px_0px_0px_#000000]">
-            <AlertCircle size={16} strokeWidth={2.5} className="text-[#EF4444] mt-0.5 flex-shrink-0" />
-            <p className="text-[12px] font-bold text-[#EF4444] leading-snug">{error}</p>
+          <div className="mx-5 mb-3 flex items-start gap-2.5 px-3.5 py-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive flex-shrink-0 text-xs">
+            <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+            <p className="leading-snug">{error}</p>
           </div>
         )}
 
         {/* ─── Footer ──────────────────────────────────────── */}
-        <div className="p-4 border-t-2 border-black bg-[#0E1012] flex gap-3 flex-shrink-0">
-          <button
+        <div className="p-4 border-t border-border bg-card flex gap-3 flex-shrink-0 justify-end">
+          <Button
+            variant="outline"
             onClick={onClose}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-none text-[12px] font-black uppercase tracking-wider text-neutral-300 border-2 border-black bg-[#1E2227] shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             onClick={handleConfirm}
             disabled={loading || noneSelected || hasMissingAssignees}
-            className="flex-1 py-2.5 rounded-none text-[12px] font-black uppercase tracking-wider bg-[#FFE600] text-black border-2 border-black shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
           >
             {loading ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
-                SAVING…
+                Saving…
               </>
             ) : (
-              `CONFIRM ${selectedIndices.size} TASK${selectedIndices.size !== 1 ? 'S' : ''}`
+              `Confirm ${selectedIndices.size} task${selectedIndices.size !== 1 ? 's' : ''}`
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,

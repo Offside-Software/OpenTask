@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
 
 /**
  * Detects whether a string contains Markdown formatting syntax.
@@ -31,52 +32,69 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   return (
     <div
       style={style}
-      className={`${useSans ? 'font-sans font-medium' : 'font-mono'} text-neutral-300 dark:text-neutral-300 light:text-neutral-900 ${compact ? 'leading-normal' : 'leading-relaxed'} ${className}`}
+      className={cn(
+        useSans ? 'font-sans font-normal' : 'font-mono',
+        'text-foreground/90',
+        compact ? 'leading-normal' : 'leading-relaxed',
+        className
+      )}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ node, ...props }) => (
             <h1
-              className={`${compact ? 'text-[1.1em] mt-1 mb-0.5' : useSans ? 'text-[1.35em] mt-3 mb-1.5 pb-1' : 'text-[13px] mt-3 mb-1.5 pb-1'} font-black uppercase tracking-wide text-[#FFE600] dark:text-[#FFE600] light:text-neutral-950 border-b-2 border-neutral-800 dark:border-neutral-800 light:border-black`}
+              className={cn(
+                compact ? 'text-[1.1em] mt-1 mb-0.5' : useSans ? 'text-[1.35em] mt-3 mb-1.5 pb-1' : 'text-sm mt-3 mb-1.5 pb-1',
+                'font-bold tracking-tight text-foreground border-b border-border/60'
+              )}
               {...props}
             />
           ),
           h2: ({ node, ...props }) => (
             <h2
-              className={`${compact ? 'text-[1.05em] mt-1 mb-0.5' : useSans ? 'text-[1.2em] mt-2.5 mb-1.5 pb-0.5' : 'text-[12px] mt-2.5 mb-1.5 pb-0.5'} font-black uppercase tracking-wide text-white dark:text-white light:text-neutral-950 border-b border-neutral-800 dark:border-neutral-800 light:border-neutral-300`}
+              className={cn(
+                compact ? 'text-[1.05em] mt-1 mb-0.5' : useSans ? 'text-[1.2em] mt-2.5 mb-1.5 pb-0.5' : 'text-xs mt-2.5 mb-1.5 pb-0.5',
+                'font-bold tracking-tight text-foreground border-b border-border/40'
+              )}
               {...props}
             />
           ),
           h3: ({ node, ...props }) => (
             <h3
-              className={`${compact ? 'text-[1em] mt-0.5 mb-0.5' : useSans ? 'text-[1.1em] mt-2 mb-1' : 'text-[11px] mt-2 mb-1'} font-black uppercase tracking-wider text-[#FFE600] dark:text-[#FFE600] light:text-amber-800`}
+              className={cn(
+                compact ? 'text-[1em] mt-0.5 mb-0.5' : useSans ? 'text-[1.1em] mt-2 mb-1' : 'text-xs mt-2 mb-1',
+                'font-semibold text-foreground'
+              )}
               {...props}
             />
           ),
           h4: ({ node, ...props }) => (
             <h4
-              className={`${compact ? 'text-[0.95em] mt-0.5 mb-0.5' : useSans ? 'text-[1.05em] mt-2 mb-1' : 'text-[11px] mt-2 mb-1'} font-bold uppercase tracking-wider text-neutral-200 dark:text-neutral-200 light:text-neutral-800`}
+              className={cn(
+                compact ? 'text-[0.95em] mt-0.5 mb-0.5' : useSans ? 'text-[1.05em] mt-2 mb-1' : 'text-xs mt-2 mb-1',
+                'font-medium text-muted-foreground'
+              )}
               {...props}
             />
           ),
           p: ({ node, ...props }) => (
-            <p className={`${compact ? 'my-0.5 leading-normal' : 'my-1.5 leading-relaxed'}`} {...props} />
+            <p className={compact ? 'my-0.5 leading-normal' : 'my-1.5 leading-relaxed'} {...props} />
           ),
           ul: ({ node, ...props }) => (
-            <ul className={`list-disc list-outside pl-4 ${compact ? 'space-y-0.5 my-0.5' : 'space-y-1 my-1.5'}`} {...props} />
+            <ul className={cn('list-disc list-outside pl-4', compact ? 'space-y-0.5 my-0.5' : 'space-y-1 my-1.5')} {...props} />
           ),
           ol: ({ node, ...props }) => (
-            <ol className={`list-decimal list-outside pl-4 ${compact ? 'space-y-0.5 my-0.5' : 'space-y-1 my-1.5'}`} {...props} />
+            <ol className={cn('list-decimal list-outside pl-4', compact ? 'space-y-0.5 my-0.5' : 'space-y-1 my-1.5')} {...props} />
           ),
           li: ({ node, ...props }) => (
-            <li className={`${compact ? 'leading-normal' : 'leading-relaxed'} pl-1`} {...props} />
+            <li className={cn(compact ? 'leading-normal' : 'leading-relaxed', 'pl-1')} {...props} />
           ),
           strong: ({ node, ...props }) => (
-            <strong className="font-bold text-white dark:text-white light:text-black" {...props} />
+            <strong className="font-semibold text-foreground" {...props} />
           ),
           em: ({ node, ...props }) => (
-            <em className="italic text-neutral-300 dark:text-neutral-300 light:text-neutral-700" {...props} />
+            <em className="italic text-muted-foreground" {...props} />
           ),
           code: ({ node, className: codeClassName, children, ...props }: any) => {
             const hasNewLine = typeof children === 'string' && children.includes('\n');
@@ -85,7 +103,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             if (!isCodeBlock) {
               return (
                 <code
-                  className="py-1 px-1.5 text-[0.9em] font-mono bg-black/80 text-[#00FF66] dark:text-[#FFE600] light:text-amber-900 border border-neutral-700 dark:border-neutral-700 light:border-neutral-400 rounded-none shadow-[1px_1px_0px_0px_#000000]"
+                  className="py-0.5 px-1.5 text-[0.875em] font-mono bg-muted text-foreground border border-border/80 rounded-md"
                   {...props}
                 >
                   {children}
@@ -94,42 +112,42 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }
 
             return (
-              <pre className="my-2.5 p-2.5 bg-black dark:bg-black light:bg-neutral-100 text-[#00FF66] dark:text-[#00FF66] light:text-emerald-800 border-2 border-black dark:border-neutral-700 light:border-black font-mono text-[0.9em] overflow-x-auto shadow-[2px_2px_0px_0px_#000000] rounded-none">
+              <pre className="my-2 p-3 bg-muted/60 text-foreground border border-border font-mono text-[0.875em] overflow-x-auto rounded-lg">
                 <code {...props}>{children}</code>
               </pre>
             );
           },
           blockquote: ({ node, ...props }) => (
             <blockquote
-              className="border-l-2 border-[#FFE600] pl-3 py-1 my-2 bg-neutral-900/50 dark:bg-neutral-900/50 light:bg-neutral-100 text-neutral-300 dark:text-neutral-300 light:text-neutral-700 italic"
+              className="border-l-2 border-primary pl-3 py-1 my-2 bg-muted/30 text-muted-foreground italic rounded-r-md"
               {...props}
             />
           ),
           a: ({ node, ...props }) => (
             <a
-              className="text-[#FFE600] dark:text-[#FFE600] light:text-blue-600 underline font-bold hover:text-yellow-300 transition-colors"
+              className="text-primary underline font-medium hover:text-primary/80 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
               {...props}
             />
           ),
           hr: ({ node, ...props }) => (
-            <hr className="my-3 border-neutral-800 dark:border-neutral-800 light:border-neutral-300" {...props} />
+            <hr className="my-3 border-border" {...props} />
           ),
           table: ({ node, ...props }) => (
-            <div className="overflow-x-auto my-2 border border-neutral-800 dark:border-neutral-800 light:border-neutral-300 shadow-[2px_2px_0px_0px_#000000]">
-              <table className="w-full text-left border-collapse text-[11px]" {...props} />
+            <div className="overflow-x-auto my-2 border border-border rounded-lg">
+              <table className="w-full text-left border-collapse text-xs" {...props} />
             </div>
           ),
           th: ({ node, ...props }) => (
             <th
-              className="border border-neutral-700 dark:border-neutral-700 light:border-neutral-400 p-1.5 bg-black/70 dark:bg-black/70 light:bg-neutral-200 font-black uppercase text-[#FFE600] dark:text-[#FFE600] light:text-black"
+              className="border-b border-border p-2 bg-muted/50 font-semibold text-foreground text-xs"
               {...props}
             />
           ),
           td: ({ node, ...props }) => (
             <td
-              className="border border-neutral-800 dark:border-neutral-800 light:border-neutral-300 p-1.5 text-neutral-300 dark:text-neutral-300 light:text-neutral-800"
+              className="border-b border-border/50 p-2 text-foreground/90 text-xs"
               {...props}
             />
           ),

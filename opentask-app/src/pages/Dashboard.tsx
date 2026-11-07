@@ -20,34 +20,35 @@ export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { projects, loading } = useProjects();
-  const displayName = user ? getDisplayName(user) : 'OPERATOR';
+  const displayName = user ? getDisplayName(user) : 'Operator';
 
   const totalRepos = projects.reduce((acc, p) => acc + (p.gh_repo_url?.length || 0), 0);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200 max-w-[1600px] mx-auto w-full select-none font-mono">
+    <div className="space-y-6 animate-in fade-in duration-200 max-w-[1600px] mx-auto w-full select-none">
       {/* Header */}
-      <div className="flex justify-between items-end flex-wrap gap-4 border-b-2 border-neutral-800 pb-6">
+      <div className="flex justify-between items-end flex-wrap gap-5 border-b border-border pb-5">
         <div>
-          <div className="inline-flex items-center gap-2 mb-2 px-2 py-0.5 bg-[#FFE600] text-black border border-black text-[10px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_#000000]">
-            <span className="w-2 h-2 bg-black animate-pulse" /> DEV OPS // COMMAND CENTER
+          <div className="inline-flex items-center gap-1.5 mb-1.5 px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span>DevOps Command Center</span>
           </div>
-          <h1 className="text-[28px] sm:text-[34px] font-black text-white uppercase tracking-tight">
-            HELLO {displayName}!
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Hello {displayName}!
           </h1>
-          <p className="text-[12px] text-neutral-400 mt-0.5 uppercase tracking-wider">
-            [SYSTEM STATUS: OPERATIONAL] • WORKLOAD READY
+          <p className="text-xs text-muted-foreground mt-0.5">
+            System status operational • Workload ready
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <Button
             variant="outline"
             size="md"
             onClick={() => navigate('/notifications')}
             className="flex items-center gap-2"
           >
-            <Bell size={14} /> ALERTS
+            <Bell size={14} /> Alerts
           </Button>
           <Button
             variant="primary"
@@ -55,43 +56,43 @@ export const DashboardPage: React.FC = () => {
             onClick={() => navigate('/workspaces')}
             className="flex items-center gap-2"
           >
-            <Plus size={14} strokeWidth={3} /> NEW PROJECT
+            <Plus size={14} /> New Project
           </Button>
         </div>
       </div>
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="bg-[#121417] border-2 border-black rounded-none p-5 shadow-[4px_4px_0px_0px_#000000] flex items-center justify-between">
+        <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold mb-1">// WORKSPACES</div>
-            <div className="text-[28px] font-black text-white">{projects.length}</div>
-            <div className="text-[10px] text-neutral-500 mt-1 uppercase">Active managed projects</div>
+            <div className="text-xs text-muted-foreground font-medium mb-1">Workspaces</div>
+            <div className="text-2xl font-bold text-foreground">{projects.length}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Active managed projects</div>
           </div>
-          <div className="p-3 bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-            <Briefcase size={22} strokeWidth={2.5} />
+          <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
+            <Briefcase size={20} />
           </div>
         </div>
 
-        <div className="bg-[#121417] border-2 border-black rounded-none p-5 shadow-[4px_4px_0px_0px_#000000] flex items-center justify-between">
+        <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold mb-1">// LINKED REPOSITORIES</div>
-            <div className="text-[28px] font-black text-white">{totalRepos}</div>
-            <div className="text-[10px] text-neutral-500 mt-1 uppercase">GitHub repositories attached</div>
+            <div className="text-xs text-muted-foreground font-medium mb-1">Linked Repositories</div>
+            <div className="text-2xl font-bold text-foreground">{totalRepos}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">GitHub repositories attached</div>
           </div>
-          <div className="p-3 bg-[#00FF66] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-            <GitBranch size={22} strokeWidth={2.5} />
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+            <GitBranch size={20} />
           </div>
         </div>
 
-        <div className="bg-[#121417] border-2 border-black rounded-none p-5 shadow-[4px_4px_0px_0px_#000000] flex items-center justify-between">
+        <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold mb-1">// AI AGENT PIPELINE</div>
-            <div className="text-[28px] font-black text-[#FFE600]">READY</div>
-            <div className="text-[10px] text-neutral-500 mt-1 uppercase">Automated code reviews enabled</div>
+            <div className="text-xs text-muted-foreground font-medium mb-1">AI Agent Pipeline</div>
+            <div className="text-2xl font-bold text-primary">Ready</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Automated code reviews enabled</div>
           </div>
-          <div className="p-3 bg-black text-[#FFE600] border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-            <Bot size={22} strokeWidth={2.5} />
+          <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
+            <Bot size={20} />
           </div>
         </div>
       </div>
@@ -99,31 +100,31 @@ export const DashboardPage: React.FC = () => {
       {/* Active Projects Hub */}
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 bg-black text-[#FFE600] border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-              <FolderGit2 size={16} strokeWidth={2.5} />
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+              <FolderGit2 size={16} />
             </div>
-            <h2 className="text-white text-[15px] font-black uppercase tracking-wider">
-              // ACTIVE WORKSPACES
+            <h2 className="text-foreground text-sm font-semibold">
+              Active Workspaces
             </h2>
           </div>
           <button
             onClick={() => navigate('/workspaces')}
-            className="text-[11px] font-black text-[#FFE600] hover:underline flex items-center gap-1 uppercase tracking-wider cursor-pointer"
+            className="text-xs font-medium text-primary hover:underline flex items-center gap-1 cursor-pointer transition-colors"
           >
-            <span>VIEW ALL ({projects.length})</span>
-            <ArrowRight size={13} strokeWidth={2.5} />
+            <span>View all ({projects.length})</span>
+            <ArrowRight size={13} />
           </button>
         </div>
 
         {loading ? (
-          <div className="py-12 text-center text-neutral-500 text-[12px] uppercase">
-            // LOADING WORKSPACES...
+          <div className="py-12 text-center text-muted-foreground text-xs">
+            Loading workspaces...
           </div>
         ) : projects.length === 0 ? (
-          <SurfaceCard title="NO WORKSPACES CONFIGURED" subtitle="CREATE A PROJECT TO INITIALIZE TASK PIPELINES" icon={Briefcase} rightElement={null}>
+          <SurfaceCard title="No workspaces configured" subtitle="Create a project to initialize task pipelines" icon={Briefcase} rightElement={null}>
             <div className="py-8 text-center space-y-4">
-              <p className="text-neutral-400 text-[12px] max-w-md mx-auto">
+              <p className="text-muted-foreground text-xs max-w-md mx-auto">
                 No active projects found. Create a new project workspace to start organizing tasks, tracking progress, and enabling AI code reviews.
               </p>
               <Button
@@ -132,16 +133,16 @@ export const DashboardPage: React.FC = () => {
                 onClick={() => navigate('/workspaces')}
                 className="inline-flex items-center gap-2"
               >
-                <Plus size={14} strokeWidth={3} /> INITIALIZE FIRST PROJECT
+                <Plus size={14} /> Initialize First Project
               </Button>
             </div>
           </SurfaceCard>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {projects.slice(0, 6).map((project) => (
               <ProjectCard
                 key={String(project.id)}
-                title={project.name || 'UNTITLED PROJECT'}
+                title={project.name || 'Untitled Project'}
                 desc={project.description || 'No description provided.'}
                 onClick={() => navigate(`/projects/${project.id}`)}
               />
@@ -152,21 +153,21 @@ export const DashboardPage: React.FC = () => {
 
       {/* AI Agent Quick Integration Banner */}
       <SurfaceCard
-        title="AI AGENT COMMAND CENTER"
-        subtitle="AUTONOMOUS CODE AGENTS & IDE ASSISTANT INTEGRATION"
+        title="AI Agent Command Center"
+        subtitle="Autonomous code agents & IDE assistant integration"
         icon={Bot}
         rightElement={
-          <span className="text-[10px] font-black uppercase bg-[#00FF66] text-black px-2 py-0.5 border border-black shadow-[1px_1px_0px_0px_#000000]">
-            ONLINE
+          <span className="text-[10px] font-semibold uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+            Online
           </span>
         }
       >
-        <div className="space-y-3 text-[12px] text-neutral-400 leading-relaxed">
+        <div className="space-y-3 text-xs text-muted-foreground leading-relaxed">
           <p>
             OpenTask provides programmatic endpoints for AI coding assistants (Cursor, Claude Code, Antigravity, Aider). External agents can read project boards, fetch task requirements, and transition task statuses using project API keys.
           </p>
-          <div className="p-3 bg-[#0B0E14] border-2 border-black rounded-none flex items-center justify-between gap-4 flex-wrap">
-            <span className="text-white text-[11px] font-bold">
+          <div className="p-3 bg-muted/40 border border-border rounded-lg flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-foreground text-xs font-medium">
               Navigate to any Project &gt; Settings &gt; AI Agent Access to generate an authentication token.
             </span>
             <Button
@@ -175,7 +176,7 @@ export const DashboardPage: React.FC = () => {
               onClick={() => navigate('/workspaces')}
               className="shrink-0"
             >
-              OPEN WORKSPACES
+              Open Workspaces
             </Button>
           </div>
         </div>

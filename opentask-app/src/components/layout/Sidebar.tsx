@@ -10,7 +10,8 @@ import {
   MessageSquarePlus,
   Github,
   ExternalLink,
-  PanelLeftClose
+  PanelLeftClose,
+  PanelLeft
 } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../context/themeContext';
@@ -19,11 +20,12 @@ import logo from '../../assets/logo.svg';
 import { useAlerts } from '../../controllers/useAlerts';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', fullLabel: 'DASHBOARD', icon: LayoutDashboard },
-  { id: 'workspaces', fullLabel: 'WORKSPACES', icon: Briefcase },
-  { id: 'notifications', fullLabel: 'NOTIFICATIONS', icon: Bell },
+  { id: 'dashboard', fullLabel: 'Dashboard', icon: LayoutDashboard },
+  { id: 'workspaces', fullLabel: 'Workspaces', icon: Briefcase },
+  { id: 'notifications', fullLabel: 'Notifications', icon: Bell },
 ];
 
 interface SidebarProps {
@@ -38,7 +40,6 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
   const navigate = useNavigate();
   const { alerts } = useAlerts({ userId: user?.db_user?.id });
 
-  // Persist collapsed state to localStorage (default is collapsed on compact screens, or user preference)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('opentask:sidebar:collapsed');
@@ -61,7 +62,7 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
 
   const currentPage = location.pathname.split('/')[1] || 'dashboard';
 
-  const displayName = user ? getDisplayName(user) : 'USER';
+  const displayName = user ? getDisplayName(user) : 'User';
   const initials = displayName
     .split(' ')
     .map(w => w[0])
@@ -72,60 +73,69 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
   return (
     <>
       <div
-        className={`${isCollapsed ? 'w-[68px]' : 'w-60'
-          } flex-shrink-0 relative z-40 select-none transition-all duration-200 ease-in-out`}
+        className={cn(
+          isCollapsed ? 'w-16' : 'w-56',
+          'shrink-0 relative z-40 select-none transition-all duration-200 ease-in-out'
+        )}
       >
         <aside
-          className={`absolute inset-y-0 left-0 border-r-2 border-black flex flex-col py-5 px-3 bg-[#0C0D0E] z-40 transition-all duration-200 ease-in-out overflow-hidden shadow-[4px_0px_0px_0px_rgba(0,0,0,0.4)] ${isCollapsed ? 'w-[68px]' : 'w-60'
-            }`}
+          className={cn(
+            'absolute inset-y-0 left-0 border-r border-sidebar-border flex flex-col py-4 px-2.5 bg-sidebar text-sidebar-foreground z-40 transition-all duration-200 ease-in-out overflow-hidden',
+            isCollapsed ? 'w-16' : 'w-56'
+          )}
         >
-          {/* Brutalist Brand Header & Collapse Toggle */}
-          {!isCollapsed ? (
-            <div className="flex items-center justify-between gap-2 mb-6 w-full">
-              <div
-                className="flex items-center gap-3 cursor-pointer min-w-0"
-                onClick={() => navigate('/dashboard')}
-                title="OpenTask Root"
-              >
-                <div className="w-11 h-11 rounded-none border-2 border-black bg-[#FFE600] flex items-center justify-center shrink-0 shadow-[3px_3px_0px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform">
-                  <img src={logo} alt="OpenTask Logo" className="w-7 h-7 object-contain" />
-                </div>
-                <div className="min-w-0 overflow-hidden">
-                  <span className="text-white font-mono font-black text-[15px] uppercase tracking-wider block leading-tight truncate">
-                    OPENTASK
-                  </span>
-                  <span className="text-neutral-400 font-mono text-[9px] uppercase tracking-widest block truncate">
-                    // COMMAND ROOT
-                  </span>
-                </div>
+          {/* Brand Header */}
+          <div className="flex items-center justify-between gap-2 mb-4 w-full px-1">
+            <div
+              className="flex items-center gap-2.5 cursor-pointer min-w-0"
+              onClick={() => navigate('/dashboard')}
+              title="OpenTask Dashboard"
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
+                <img src={logo} alt="OpenTask" className="w-5 h-5 object-contain" />
               </div>
+              {!isCollapsed && (
+                <div className="min-w-0 overflow-hidden">
+                  <span className="text-foreground font-semibold text-sm tracking-tight block truncate">
+                    OpenTask
+                  </span>
+                  <span className="text-muted-foreground text-[10px] block truncate">
+                    Workspace Root
+                  </span>
+                </div>
+              )}
+            </div>
 
-              {/* Collapse Button */}
+            {/* Collapse Button */}
+            {!isCollapsed && (
               <button
                 type="button"
                 onClick={toggleSidebar}
-                title="Collapse Sidebar"
-                aria-label="Collapse Sidebar"
-                className="w-8 h-8 rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer flex items-center justify-center shrink-0"
+                title="Collapse sidebar"
+                aria-label="Collapse sidebar"
+                className="w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors flex items-center justify-center shrink-0 cursor-pointer"
               >
-                <PanelLeftClose size={16} strokeWidth={2.5} />
+                <PanelLeftClose size={15} />
               </button>
+            )}
+          </div>
 
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 mb-6 w-full">
-              <div
-                className="w-11 h-11 rounded-none border-2 border-black bg-[#FFE600] flex items-center justify-center shrink-0 shadow-[3px_3px_0px_0px_#000000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform cursor-pointer"
+          {isCollapsed && (
+            <div className="flex justify-center mb-3">
+              <button
+                type="button"
                 onClick={toggleSidebar}
-                title="OpenTask Root"
+                title="Expand sidebar"
+                aria-label="Expand sidebar"
+                className="w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors flex items-center justify-center cursor-pointer"
               >
-                <img src={logo} alt="OpenTask Logo" className="w-7 h-7 object-contain" />
-              </div>
+                <PanelLeft size={15} />
+              </button>
             </div>
           )}
 
-          {/* Nav */}
-          <nav className="flex flex-col gap-3 w-full">
+          {/* Navigation Links */}
+          <nav className="flex flex-col gap-1 w-full">
             {NAV_ITEMS.map(({ id, fullLabel, icon: Icon }) => {
               const isActive = currentPage === id || (id === 'workspaces' && currentPage === 'projects');
               const hasUnread = id === 'notifications' && alerts.length > 0;
@@ -134,79 +144,72 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
                   key={id}
                   to={`/${id}`}
                   title={fullLabel}
-                  className={`h-11 rounded-none border-2 transition-all duration-75 relative flex items-center overflow-hidden ${isActive
-                    ? 'bg-[#FFE600] text-black border-black shadow-[3px_3px_0px_0px_#000000]'
-                    : 'bg-[#141619] text-neutral-400 border-neutral-800 hover:border-white hover:text-white hover:shadow-[2px_2px_0px_0px_#000000]'
-                    }`}
+                  className={cn(
+                    'h-9 rounded-lg transition-colors relative flex items-center px-2 text-xs font-medium',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+                  )}
                 >
-                  <div className="w-10 h-full flex items-center justify-center shrink-0 relative">
-                    <Icon size={19} strokeWidth={2.5} />
+                  <div className="w-6 h-full flex items-center justify-center shrink-0 relative">
+                    <Icon size={16} />
                     {hasUnread && (
-                      <div className="absolute top-1 right-0.5 min-w-[16px] h-[16px] bg-[#FF3333] text-white border-2 border-black rounded-none flex items-center justify-center text-[11px] font-mono font-black shadow-[1px_1px_0px_0px_#000000]">
+                      <span className="absolute -top-0.5 -right-1 min-w-[15px] h-[15px] px-1 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-[9px] font-bold">
                         {alerts.length > 99 ? '99+' : alerts.length}
-                      </div>
+                      </span>
                     )}
                   </div>
-                  <div
-                    className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
-                      }`}
-                  >
-                    <span className="text-[11px] font-mono font-black tracking-wider uppercase whitespace-nowrap block">
+                  {!isCollapsed && (
+                    <span className="ml-2.5 truncate">
                       {fullLabel}
                     </span>
-                  </div>
+                  )}
                 </Link>
               );
             })}
           </nav>
 
           {/* Bottom Actions */}
-          <div className="mt-auto w-full flex flex-col gap-2.5">
+          <div className="mt-auto w-full flex flex-col gap-1 pt-3 border-t border-sidebar-border">
             {/* Quick Theme Toggle */}
             <button
+              type="button"
               onClick={toggleTheme}
-              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+              className="h-9 w-full rounded-lg text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer flex items-center px-2 text-xs font-medium"
             >
-              <div className="w-10 h-full flex items-center justify-center shrink-0">
+              <div className="w-6 h-full flex items-center justify-center shrink-0">
                 {theme === 'dark' ? (
-                  <Sun size={18} strokeWidth={2.5} className="text-[#FFE600]" />
+                  <Sun size={15} className="text-amber-400" />
                 ) : (
-                  <Moon size={18} strokeWidth={2.5} className="text-black" />
+                  <Moon size={15} className="text-foreground" />
                 )}
               </div>
-              <div
-                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
-                  }`}
-              >
-                <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 whitespace-nowrap block">
-                  {theme === 'dark' ? 'LIGHT THEME' : 'DARK THEME'}
+              {!isCollapsed && (
+                <span className="ml-2.5 truncate">
+                  {theme === 'dark' ? 'Light theme' : 'Dark theme'}
                 </span>
-              </div>
+              )}
             </button>
 
-            {/* User Feedback & Report */}
+            {/* User Feedback */}
             <button
+              type="button"
               onClick={onOpenFeedback}
-              title="User Feedback & Bug Report (Alpha Release)"
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-[#FFE600] hover:border-[#FFE600] transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
+              title="Feedback & bug report"
+              className="h-9 w-full rounded-lg text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer flex items-center px-2 text-xs font-medium"
             >
-              <div className="w-10 h-full flex items-center justify-center shrink-0">
-                <MessageSquarePlus size={18} strokeWidth={2.5} className="group-hover:text-[#FFE600] text-[#FFE600]" />
+              <div className="w-6 h-full flex items-center justify-center shrink-0">
+                <MessageSquarePlus size={15} />
               </div>
-              <div
-                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
-                  }`}
-              >
-                <div className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 group-hover:text-[#FFE600] block">
-                    FEEDBACK
-                  </span>
-                  <span className="text-[8px] font-mono font-black bg-[#FFE600] text-black px-1 py-0.5 border border-black leading-none">
-                    ALPHA
+              {!isCollapsed && (
+                <div className="ml-2.5 flex items-center gap-1.5 truncate">
+                  <span>Feedback</span>
+                  <span className="text-[9px] font-medium bg-primary/10 text-primary px-1.5 py-0.2 rounded-full">
+                    Alpha
                   </span>
                 </div>
-              </div>
+              )}
             </button>
 
             {/* GitHub Open Source Repo */}
@@ -214,66 +217,59 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
               href="https://github.com/Offside-Software/OpenTask/"
               target="_blank"
               rel="noopener noreferrer"
-              title="OpenTask Source Code on GitHub (Open Source)"
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden group"
+              title="OpenTask repository"
+              className="h-9 w-full rounded-lg text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer flex items-center px-2 text-xs font-medium"
             >
-              <div className="w-10 h-full flex items-center justify-center shrink-0">
-                <Github size={18} strokeWidth={2.2} />
+              <div className="w-6 h-full flex items-center justify-center shrink-0">
+                <Github size={15} />
               </div>
-              <div
-                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
-                  }`}
-              >
-                <div className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 group-hover:text-white block">
-                    SOURCE CODE
-                  </span>
-                  <ExternalLink size={10} className="text-neutral-500 group-hover:text-neutral-300" />
+              {!isCollapsed && (
+                <div className="ml-2.5 flex items-center gap-1.5 truncate">
+                  <span>GitHub</span>
+                  <ExternalLink size={10} className="text-muted-foreground" />
                 </div>
-              </div>
+              )}
             </a>
 
+            {/* Settings */}
             <button
+              type="button"
               onClick={onOpenSettings}
-              title="System Settings"
-              className="h-11 w-full rounded-none bg-[#141619] border-2 border-neutral-800 text-neutral-400 hover:text-white hover:border-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
+              title="System settings"
+              className="h-9 w-full rounded-lg text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer flex items-center px-2 text-xs font-medium"
             >
-              <div className="w-10 h-full flex items-center justify-center shrink-0">
-                <Settings size={18} strokeWidth={2.5} />
+              <div className="w-6 h-full flex items-center justify-center shrink-0">
+                <Settings size={15} />
               </div>
-              <div
-                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
-                  }`}
-              >
-                <span className="text-[11px] font-mono font-black tracking-wider uppercase text-neutral-300 whitespace-nowrap block">
-                  SETTINGS
+              {!isCollapsed && (
+                <span className="ml-2.5 truncate">
+                  Settings
                 </span>
-              </div>
+              )}
             </button>
 
+            {/* Sign Out / User Pill */}
             <button
+              type="button"
               onClick={() => setIsSignOutModalOpen(true)}
               title={`Sign out (${displayName})`}
-              className="h-11 w-full rounded-none bg-[#1E2227] border-2 border-black text-white hover:bg-[#FF3333] hover:text-white transition-all cursor-pointer hover:shadow-[2px_2px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center overflow-hidden"
+              className="h-9 w-full rounded-lg hover:bg-destructive/10 hover:text-destructive text-sidebar-foreground/80 transition-colors cursor-pointer flex items-center px-2 text-xs font-medium mt-1"
             >
-              <div className="w-10 h-full flex items-center justify-center shrink-0">
-                <div className="w-6 h-6 rounded-none bg-black/40 border border-neutral-700 flex items-center justify-center font-mono text-[10px] font-black shrink-0">
+              <div className="w-6 h-full flex items-center justify-center shrink-0">
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-[10px] shrink-0">
                   {initials || <LogOut size={12} />}
                 </div>
               </div>
-              <div
-                className={`overflow-hidden transition-all duration-200 pl-1.5 ${!isCollapsed ? 'opacity-100 max-w-[160px]' : 'opacity-0 max-w-0 pointer-events-none'
-                  }`}
-              >
-                <div className="min-w-0 text-left whitespace-nowrap">
-                  <span className="text-[11px] font-mono font-black uppercase tracking-wider truncate block leading-tight">
+              {!isCollapsed && (
+                <div className="ml-2.5 min-w-0 text-left truncate flex-1">
+                  <span className="truncate block font-medium leading-tight">
                     {displayName}
                   </span>
-                  <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-wider block">
-                    // SIGN OUT
+                  <span className="text-[10px] text-muted-foreground block">
+                    Sign out
                   </span>
                 </div>
-              </div>
+              )}
             </button>
           </div>
         </aside>
@@ -282,10 +278,10 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
       {/* Sign Out Confirmation Modal */}
       {isSignOutModalOpen && (
         <ConfirmModal
-          title="CONFIRM SIGN OUT"
-          message={`Are you sure you want to end your current session for ${displayName}? You will need to re-authenticate with GitHub to access your workspaces.`}
-          confirmLabel="SIGN OUT"
-          cancelLabel="CANCEL"
+          title="Sign out confirmation"
+          message={`Are you sure you want to end your current session for ${displayName}?`}
+          confirmLabel="Sign out"
+          cancelLabel="Cancel"
           variant="danger"
           onConfirm={() => {
             setIsSignOutModalOpen(false);

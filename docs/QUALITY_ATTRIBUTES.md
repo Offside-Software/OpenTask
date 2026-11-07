@@ -5,7 +5,8 @@
 **Mata Kuliah:** Arsitektur Perangkat Lunak / Rekayasa Kebutuhan Perangkat Lunak  
 **Program Studi:** S1 Rekayasa Perangkat Lunak, Fakultas Informatika, Universitas Telkom  
 **Tanggal Update:** Oktober 2026  
-**Repositori:** OpenTask (`opentask-app` & `opentask-api`)
+**Repositori:** OpenTask (`opentask-app` & `opentask-api`)  
+**Dokumen Terkait:** [Quality Attribute Tree (Utility Tree)](file:///d:/Dev/OpenTask/docs/QUALITY_TREE.md) | [Dokumen Formal Standar SEI](file:///d:/Dev/OpenTask/docs/DOKUMEN_QUALITY_ATTRIBUTES_FORMAL.md)
 
 ---
 

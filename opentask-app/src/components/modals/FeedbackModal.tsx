@@ -22,6 +22,7 @@ import { CloseButton } from '../../design-system/CloseButton';
 import { Button } from '../../design-system/Button';
 import { Badge } from '../../design-system/Badge';
 import { ConfirmModal } from './ConfirmModal';
+import { cn } from '@/lib/utils';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -29,11 +30,11 @@ interface FeedbackModalProps {
   defaultTab?: 'submit' | 'review';
 }
 
-const FEEDBACK_TYPES: { type: FeedbackType; label: string; icon: React.ElementType; color: string }[] = [
-  { type: 'FEEDBACK', label: 'FEEDBACK', icon: MessageSquarePlus, color: '#FFE600' },
-  { type: 'BUG', label: 'BUG REPORT', icon: Bug, color: '#FF3333' },
-  { type: 'FEATURE', label: 'FEATURE IDEA', icon: Lightbulb, color: '#00FF66' },
-  { type: 'GENERAL', label: 'ALPHA REVIEW', icon: Sparkles, color: '#FF9900' },
+const FEEDBACK_TYPES: { type: FeedbackType; label: string; icon: React.ElementType }[] = [
+  { type: 'FEEDBACK', label: 'Feedback', icon: MessageSquarePlus },
+  { type: 'BUG', label: 'Bug Report', icon: Bug },
+  { type: 'FEATURE', label: 'Feature Idea', icon: Lightbulb },
+  { type: 'GENERAL', label: 'Alpha Review', icon: Sparkles },
 ];
 
 const CATEGORIES = ['GENERAL', 'UI/UX', 'PERFORMANCE', 'WORKSPACES', 'NOTIFICATIONS', 'MCP/AGENT'];
@@ -54,7 +55,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'submit' | 'review'>(defaultTab);
 
-  // Dev / Localhost Detection (to restrict administrative delete & status changes)
   const isDev = Boolean(
     import.meta.env.DEV ||
     (typeof window !== 'undefined' &&
@@ -63,7 +63,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         window.location.hostname.endsWith('.localhost')))
   );
 
-  // Form State
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('FEEDBACK');
   const [category, setCategory] = useState<string>('GENERAL');
   const [rating, setRating] = useState<number>(5);
@@ -75,7 +74,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Review List State
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -209,28 +207,28 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-100">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-background/80 backdrop-blur-xs select-none animate-in fade-in duration-150">
         <div
-          className="bg-white dark:bg-[#121417] text-neutral-900 dark:text-white border-3 border-black rounded-none w-full max-w-2xl shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 font-mono max-h-[90vh]"
+          className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 max-h-[90vh]"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="p-4 sm:p-5 border-b-2 border-black flex justify-between items-center bg-[#F0F0EB] dark:bg-[#181B20]">
+          <div className="p-4 sm:p-5 border-b border-border flex justify-between items-center bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] flex items-center justify-center shrink-0">
-                <MessageSquarePlus size={20} strokeWidth={2.5} />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <MessageSquarePlus size={20} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-neutral-900 dark:text-white text-[15px] sm:text-[16px] font-mono font-black uppercase tracking-wider">
-                    USER FEEDBACK & REPORT
+                  <h2 className="text-foreground text-base font-semibold">
+                    User Feedback & Report
                   </h2>
-                  <span className="bg-[#FFE600] text-black text-[9px] font-black px-1.5 py-0.5 border border-black uppercase">
-                    ALPHA
+                  <span className="bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5 rounded-full">
+                    Alpha
                   </span>
                 </div>
-                <p className="text-neutral-400 dark:text-neutral-200 text-[10px] sm:text-[11px] uppercase tracking-wider">
-                  // SHAPE THE OPENTASK ALPHA RELEASE
+                <p className="text-muted-foreground text-xs">
+                  Shape the OpenTask experience
                 </p>
               </div>
             </div>
@@ -238,30 +236,34 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           </div>
 
           {/* Tab Switcher */}
-          <div className="grid grid-cols-2 border-b-2 border-black bg-neutral-200 dark:bg-[#0C0D0E]">
+          <div className="grid grid-cols-2 border-b border-border bg-muted/30 p-1 gap-1">
             <button
               type="button"
               onClick={() => setActiveTab('submit')}
-              className={`py-3 px-4 text-[12px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer border-r border-black dark:border-neutral-800 ${activeTab === 'submit'
-                ? 'bg-[#FFE600] text-black shadow-[inset_0_-2px_0_0_#000000]'
-                : 'text-neutral-700 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-300 dark:hover:bg-[#181B20]'
-                }`}
+              className={cn(
+                "py-2 px-3 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer",
+                activeTab === 'submit'
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
             >
-              <Send size={15} strokeWidth={2.5} />
-              SUBMIT FEEDBACK
+              <Send size={14} />
+              <span>Submit Feedback</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('review')}
-              className={`py-3 px-4 text-[12px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${activeTab === 'review'
-                ? 'bg-[#FFE600] text-black shadow-[inset_0_-2px_0_0_#000000]'
-                : 'text-neutral-700 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-300 dark:hover:bg-[#181B20]'
-                }`}
+              className={cn(
+                "py-2 px-3 text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer",
+                activeTab === 'review'
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
             >
-              <Inbox size={15} strokeWidth={2.5} />
-              REVIEW FEEDBACKS
+              <Inbox size={14} />
+              <span>Review Feedbacks</span>
               {feedbacks.length > 0 && (
-                <span className="ml-1 text-[10px] bg-black text-neutral-600 dark:text-white px-1.5 py-0.2 border border-black">
+                <span className="ml-1 text-[10px] bg-primary/15 text-primary px-1.5 py-0.2 rounded-full font-medium">
                   {feedbacks.length}
                 </span>
               )}
@@ -269,47 +271,45 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           </div>
 
           {/* Content Body */}
-          <div className="p-4 sm:p-6 overflow-y-auto no-scrollbar max-h-[70vh] bg-white dark:bg-[#121417]">
+          <div className="p-4 sm:p-6 overflow-y-auto no-scrollbar max-h-[70vh]">
             {activeTab === 'submit' ? (
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {submitSuccess && (
-                  <div className="p-3 bg-[#00FF66]/20 border-2 border-black text-emerald-950 dark:text-[#00FF66] text-[12px] font-bold flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000]">
-                    <CheckCircle2 size={18} strokeWidth={3} className="text-emerald-700 dark:text-[#00FF66]" />
-                    THANK YOU! Feedback received and saved to database.
+                  <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium rounded-lg flex items-center gap-2 shadow-xs">
+                    <CheckCircle2 size={16} />
+                    <span>Thank you! Feedback received and saved.</span>
                   </div>
                 )}
 
                 {errorMessage && (
-                  <div className="p-3 bg-[#FF3333]/20 border-2 border-black text-red-950 dark:text-[#FF3333] text-[12px] font-bold flex items-center gap-2 shadow-[2px_2px_0px_0px_#000000]">
-                    <AlertCircle size={18} strokeWidth={3} className="text-red-700 dark:text-[#FF3333]" />
-                    {errorMessage}
+                  <div className="p-3 bg-destructive/15 border border-destructive/30 text-destructive text-xs font-medium rounded-lg flex items-center gap-2 shadow-xs">
+                    <AlertCircle size={16} />
+                    <span>{errorMessage}</span>
                   </div>
                 )}
 
                 {/* Type Selection */}
                 <div>
-                  <label className="text-neutral-900 dark:text-white text-[11px] font-black uppercase tracking-wider mb-2 block">
-                    <span className="text-amber-600 dark:text-[#FFE600] mr-1.5">//</span>1. REPORT CATEGORY
+                  <label className="text-foreground text-xs font-medium mb-1.5 block">
+                    Category
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {FEEDBACK_TYPES.map(({ type, label, icon: Icon, color }) => {
+                    {FEEDBACK_TYPES.map(({ type, label, icon: Icon }) => {
                       const isSelected = feedbackType === type;
                       return (
                         <button
                           key={type}
                           type="button"
                           onClick={() => setFeedbackType(type)}
-                          className={`p-2.5 rounded-none border-2 transition-all flex flex-col items-center gap-1.5 cursor-pointer text-center ${isSelected
-                            ? 'border-black shadow-[3px_3px_0px_0px_#000000]'
-                            : 'border-neutral-300 dark:border-neutral-800 bg-neutral-100 dark:bg-[#0E1012] text-neutral-700 dark:text-neutral-400 hover:border-black dark:hover:border-neutral-600 hover:text-black dark:hover:text-white'
-                            }`}
-                          style={{
-                            backgroundColor: isSelected ? color : undefined,
-                            color: isSelected ? '#000000' : undefined,
-                          }}
+                          className={cn(
+                            "p-2.5 rounded-lg border text-center flex flex-col items-center gap-1.5 cursor-pointer transition-colors shadow-xs",
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-card border-border hover:bg-muted text-muted-foreground hover:text-foreground"
+                          )}
                         >
-                          <Icon size={18} strokeWidth={2.5} />
-                          <span className="text-[10px] font-black uppercase tracking-wide">
+                          <Icon size={16} />
+                          <span className="text-xs font-medium">
                             {label}
                           </span>
                         </button>
@@ -318,17 +318,17 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   </div>
                 </div>
 
-                {/* Rating Experience */}
+                {/* Rating */}
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-neutral-900 dark:text-white text-[11px] font-black uppercase tracking-wider block">
-                      <span className="text-amber-600 dark:text-[#FFE600] mr-1.5">//</span>2. ALPHA EXPERIENCE RATING
+                    <label className="text-foreground text-xs font-medium block">
+                      Experience Rating
                     </label>
-                    <span className="text-amber-600 dark:text-[#FFE600] text-[11px] font-bold">
+                    <span className="text-xs text-primary font-medium">
                       {RATING_LABELS[hoverRating || rating]}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 bg-neutral-100 dark:bg-[#0E1012] p-3 border-2 border-neutral-300 dark:border-neutral-800">
+                  <div className="flex items-center gap-2 bg-muted/30 p-2.5 rounded-lg border border-border">
                     {[1, 2, 3, 4, 5].map(val => {
                       const activeVal = hoverRating || rating;
                       const isFilled = val <= activeVal;
@@ -339,16 +339,15 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           onMouseEnter={() => setHoverRating(val)}
                           onMouseLeave={() => setHoverRating(0)}
                           onClick={() => setRating(val)}
-                          className="cursor-pointer p-1 transition-transform hover:scale-115 active:scale-95"
+                          className="cursor-pointer p-1 transition-transform hover:scale-110 active:scale-95"
                         >
                           <Star
-                            size={24}
-                            strokeWidth={2}
-                            className={
+                            size={20}
+                            className={cn(
                               isFilled
-                                ? 'text-amber-500 dark:text-[#FFE600] fill-amber-500 dark:fill-[#FFE600]'
-                                : 'text-neutral-400 dark:text-neutral-600 hover:text-amber-400'
-                            }
+                                ? "text-amber-500 fill-amber-500"
+                                : "text-muted-foreground/40 hover:text-amber-400"
+                            )}
                           />
                         </button>
                       );
@@ -356,12 +355,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   </div>
                 </div>
 
-                {/* Context Area / Module */}
+                {/* Module Area */}
                 <div>
-                  <label className="text-neutral-900 dark:text-white text-[11px] font-black uppercase tracking-wider mb-2 block">
-                    <span className="text-amber-600 dark:text-[#FFE600] mr-1.5">//</span>3. SUBSYSTEM AREA
+                  <label className="text-foreground text-xs font-medium mb-1.5 block">
+                    Subsystem Area
                   </label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {CATEGORIES.map(cat => {
                       const isSelected = category === cat;
                       return (
@@ -369,10 +368,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           key={cat}
                           type="button"
                           onClick={() => setCategory(cat)}
-                          className={`px-3 py-1 text-[11px] font-black uppercase tracking-wider border-2 transition-all cursor-pointer ${isSelected
-                            ? 'bg-[#FFE600] text-black border-black shadow-[2px_2px_0px_0px_#000000]'
-                            : 'bg-neutral-100 dark:bg-[#0E1012] text-neutral-700 dark:text-neutral-400 border-neutral-300 dark:border-neutral-800 hover:border-black hover:text-black dark:hover:text-white'
-                            }`}
+                          className={cn(
+                            "px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer shadow-xs",
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-card border-border hover:bg-muted text-muted-foreground hover:text-foreground"
+                          )}
                         >
                           {cat}
                         </button>
@@ -383,38 +384,38 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
                 {/* Title Input */}
                 <div>
-                  <label className="text-neutral-900 dark:text-white text-[11px] font-black uppercase tracking-wider mb-1.5 block">
-                    <span className="text-amber-600 dark:text-[#FFE600] mr-1.5">//</span>4. SUMMARY TITLE (OPTIONAL)
+                  <label className="text-foreground text-xs font-medium mb-1.5 block">
+                    Summary Title (Optional)
                   </label>
                   <input
                     type="text"
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder="e.g. Kanban drag drop glitch, or AI prompt suggestion..."
-                    className="w-full bg-neutral-50 dark:bg-[#0B0E14] border-2 border-neutral-400 dark:border-neutral-800 focus:border-black dark:focus:border-[#FFE600] p-3 text-[12px] font-mono text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-600 outline-none shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                    className="w-full bg-background border border-input rounded-lg p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors"
                   />
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="text-neutral-900 dark:text-white text-[11px] font-black uppercase tracking-wider mb-1.5 block">
-                    <span className="text-amber-600 dark:text-[#FFE600] mr-1.5">//</span>5. DETAILED FEEDBACK / BUG REPRODUCTION
+                  <label className="text-foreground text-xs font-medium mb-1.5 block">
+                    Detailed Feedback / Bug Reproduction
                   </label>
                   <textarea
                     required
                     rows={4}
                     value={description}
                     onChange={e => setDescription(e.target.value)}
-                    placeholder="Describe your experience, what happened, expected behavior, or ideas to improve OpenTask for the Alpha release..."
-                    className="w-full bg-neutral-50 dark:bg-[#0B0E14] border-2 border-neutral-400 dark:border-neutral-800 focus:border-black dark:focus:border-[#FFE600] p-3 text-[12px] font-mono text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-600 outline-none resize-none shadow-[2px_2px_0px_0px_#000000] transition-colors"
+                    placeholder="Describe your experience, what happened, expected behavior, or ideas to improve OpenTask..."
+                    className="w-full bg-background border border-input rounded-lg p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors resize-none leading-relaxed"
                   />
                 </div>
 
                 {/* Telemetry Toggle */}
-                <div className="bg-neutral-100 dark:bg-[#0B0E14] border-2 border-neutral-300 dark:border-neutral-800 p-3 flex items-center justify-between">
+                <div className="bg-muted/30 border border-border rounded-lg p-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Monitor size={16} className="text-amber-600 dark:text-[#FFE600]" />
-                    <span className="text-neutral-800 dark:text-neutral-300 text-[11px]">
+                    <Monitor size={15} className="text-primary" />
+                    <span className="text-muted-foreground text-xs">
                       Include browser & screen telemetry for bug triage
                     </span>
                   </div>
@@ -422,19 +423,19 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     type="checkbox"
                     checked={includeDeviceInfo}
                     onChange={e => setIncludeDeviceInfo(e.target.checked)}
-                    className="w-4 h-4 accent-[#FFE600] cursor-pointer"
+                    className="w-4 h-4 rounded text-primary cursor-pointer accent-purple-600"
                   />
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 justify-end pt-3 border-t-2 border-neutral-200 dark:border-neutral-800">
+                <div className="flex gap-2.5 justify-end pt-3 border-t border-border">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={onClose}
                     disabled={isSubmitting}
                   >
-                    CANCEL
+                    Cancel
                   </Button>
                   <Button
                     type="submit"
@@ -443,11 +444,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   >
                     {isSubmitting ? (
                       <>
-                        <RefreshCw size={14} className="animate-spin" /> SUBMITTING...
+                        <RefreshCw size={13} className="animate-spin" />
+                        <span>Submitting…</span>
                       </>
                     ) : (
                       <>
-                        <Send size={14} strokeWidth={2.5} /> SUBMIT FEEDBACK
+                        <Send size={13} />
+                        <span>Submit feedback</span>
                       </>
                     )}
                   </Button>
@@ -457,60 +460,61 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               /* Review Feedbacks Tab */
               <div className="space-y-4">
                 {/* Filter Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-neutral-100 dark:bg-[#0E1012] border-2 border-neutral-300 dark:border-neutral-800">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-muted/30 border border-border rounded-xl">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] text-neutral-700 dark:text-neutral-400 font-bold uppercase">FILTER:</span>
+                    <span className="text-xs text-muted-foreground font-medium">Filter:</span>
                     <select
                       value={statusFilter}
                       onChange={e => setStatusFilter(e.target.value)}
-                      className="bg-white dark:bg-black text-neutral-900 dark:text-white border-2 border-neutral-400 dark:border-neutral-700 text-[11px] px-2 py-1 outline-none uppercase font-mono cursor-pointer"
+                      className="bg-background text-foreground border border-input rounded-md text-xs px-2 py-1 outline-none font-medium cursor-pointer shadow-xs"
                     >
-                      <option value="ALL">ALL STATUSES</option>
-                      <option value="PENDING">PENDING</option>
-                      <option value="REVIEWED">REVIEWED</option>
-                      <option value="RESOLVED">RESOLVED</option>
+                      <option value="ALL">All Statuses</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="REVIEWED">Reviewed</option>
+                      <option value="RESOLVED">Resolved</option>
                     </select>
 
                     <select
                       value={typeFilter}
                       onChange={e => setTypeFilter(e.target.value)}
-                      className="bg-white dark:bg-black text-neutral-900 dark:text-white border-2 border-neutral-400 dark:border-neutral-700 text-[11px] px-2 py-1 outline-none uppercase font-mono cursor-pointer"
+                      className="bg-background text-foreground border border-input rounded-md text-xs px-2 py-1 outline-none font-medium cursor-pointer shadow-xs"
                     >
-                      <option value="ALL">ALL TYPES</option>
-                      <option value="FEEDBACK">FEEDBACK</option>
-                      <option value="BUG">BUG REPORTS</option>
-                      <option value="FEATURE">FEATURES</option>
-                      <option value="GENERAL">ALPHA REVIEWS</option>
+                      <option value="ALL">All Types</option>
+                      <option value="FEEDBACK">Feedback</option>
+                      <option value="BUG">Bug Reports</option>
+                      <option value="FEATURE">Features</option>
+                      <option value="GENERAL">Alpha Reviews</option>
                     </select>
 
                     {isDev && (
-                      <span className="text-[9px] bg-[#FFE600] text-black font-black px-1.5 py-0.5 border border-black uppercase flex items-center gap-1">
-                        <ShieldAlert size={10} /> DEV CONTROLS ACTIVE
+                      <span className="text-[10px] bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <ShieldAlert size={11} /> Dev controls active
                       </span>
                     )}
                   </div>
 
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={loadFeedbacks}
                     disabled={isLoadingFeedbacks}
-                    className="px-2.5 py-1 text-[11px] bg-neutral-200 dark:bg-[#1E2227] text-neutral-900 dark:text-white border-2 border-neutral-400 dark:border-neutral-700 hover:border-black dark:hover:border-white transition-all flex items-center gap-1.5 cursor-pointer uppercase font-bold"
                   >
                     <RefreshCw size={12} className={isLoadingFeedbacks ? 'animate-spin' : ''} />
-                    REFRESH
-                  </button>
+                    <span>Refresh</span>
+                  </Button>
                 </div>
 
                 {/* Feedback Item Cards */}
                 {isLoadingFeedbacks ? (
-                  <div className="py-12 text-center text-neutral-600 dark:text-neutral-400 text-[12px] flex flex-col items-center gap-3">
-                    <RefreshCw size={24} className="animate-spin text-amber-600 dark:text-[#FFE600]" />
-                    LOADING FEEDBACK RECORDS...
+                  <div className="py-12 text-center text-muted-foreground text-xs flex flex-col items-center gap-3">
+                    <RefreshCw size={24} className="animate-spin text-primary" />
+                    <span>Loading feedback records…</span>
                   </div>
                 ) : feedbacks.length === 0 ? (
-                  <div className="py-12 border-2 border-dashed border-neutral-300 dark:border-neutral-800 text-center text-neutral-600 dark:text-neutral-400 p-6">
-                    <Inbox size={32} className="mx-auto mb-2 text-neutral-400 dark:text-neutral-600" />
-                    <p className="text-[13px] font-bold text-neutral-900 dark:text-white mb-1">NO FEEDBACK SUBMISSIONS FOUND</p>
-                    <p className="text-[11px]">Switch to the Submit tab to log your thoughts or bug reports.</p>
+                  <div className="py-12 border border-dashed border-border rounded-xl text-center text-muted-foreground p-6">
+                    <Inbox size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm font-medium text-foreground mb-1">No feedback submissions found</p>
+                    <p className="text-xs">Switch to the Submit tab to log your thoughts or bug reports.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -519,7 +523,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       return (
                         <div
                           key={item.id}
-                          className="p-4 bg-neutral-50 dark:bg-[#0B0E14] border-2 border-black shadow-[3px_3px_0px_0px_#000000] space-y-3"
+                          className="p-4 bg-muted/20 border border-border rounded-xl shadow-xs space-y-2.5"
                         >
                           {/* Top row */}
                           <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -538,7 +542,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                                 {item.feedback_type}
                               </Badge>
                               {item.category && (
-                                <span className="text-[10px] bg-neutral-200 dark:bg-neutral-900 border border-neutral-400 dark:border-neutral-700 text-neutral-800 dark:text-neutral-300 px-2 py-0.5 font-bold">
+                                <span className="text-[10px] bg-muted border border-border text-muted-foreground px-2 py-0.5 rounded-full font-medium">
                                   {item.category}
                                 </span>
                               )}
@@ -554,11 +558,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                                   <Star
                                     key={s}
                                     size={13}
-                                    className={
+                                    className={cn(
                                       s <= (item.rating || 0)
-                                        ? 'text-amber-500 dark:text-[#FFE600] fill-amber-500 dark:fill-[#FFE600]'
-                                        : 'text-neutral-300 dark:text-neutral-700'
-                                    }
+                                        ? "text-amber-500 fill-amber-500"
+                                        : "text-muted-foreground/30"
+                                    )}
                                   />
                                 ))}
                               </div>
@@ -568,56 +572,58 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           {/* Title & Description */}
                           <div>
                             {item.title && (
-                              <h4 className="text-neutral-900 dark:text-white font-black text-[13px] uppercase mb-1">
+                              <h4 className="text-foreground font-semibold text-xs mb-1">
                                 {item.title}
                               </h4>
                             )}
-                            <p className="text-neutral-800 dark:text-neutral-300 text-[12px] leading-relaxed whitespace-pre-wrap">
+                            <p className="text-foreground text-xs leading-relaxed whitespace-pre-wrap">
                               {item.description}
                             </p>
                           </div>
 
-                          {/* Submitter & Metadata footer */}
-                          <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between text-[10px] text-neutral-600 dark:text-neutral-400 flex-wrap gap-2">
+                          {/* Metadata footer */}
+                          <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground flex-wrap gap-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-neutral-900 dark:text-white font-bold">
+                              <span className="text-foreground font-medium">
                                 @{item.user_name || 'Anonymous'}
                               </span>
                               {item.user_email && <span>({item.user_email})</span>}
                               {item.created_at && (
-                                <span>• {new Date(item.created_at).toLocaleString()}</span>
+                                <span>• {new Date(item.created_at).toLocaleDateString()}</span>
                               )}
                             </div>
 
-                            {/* Action Buttons: Only visible on localhost/dev environment */}
                             {isDev && (
                               <div className="flex items-center gap-1.5 ml-auto">
                                 {item.status !== 'REVIEWED' && (
                                   <button
+                                    type="button"
                                     disabled={isBusy}
                                     onClick={() => handleUpdateStatus(item.id, 'REVIEWED')}
-                                    className="px-2 py-1 bg-neutral-200 dark:bg-[#1E2227] text-neutral-800 dark:text-neutral-300 border border-black hover:bg-black hover:text-white dark:hover:border-white text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
-                                    title="Mark as Reviewed (Dev / Localhost only)"
+                                    className="px-2 py-1 bg-muted hover:bg-muted/80 text-foreground border border-border rounded-md text-[10px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                                    title="Mark as reviewed"
                                   >
-                                    <Check size={11} strokeWidth={3} /> REVIEW
+                                    <Check size={11} /> Review
                                   </button>
                                 )}
 
                                 {item.status !== 'RESOLVED' && (
                                   <button
+                                    type="button"
                                     disabled={isBusy}
                                     onClick={() => handleUpdateStatus(item.id, 'RESOLVED')}
-                                    className="px-2 py-1 bg-[#00FF66] text-black border border-black hover:bg-[#33FF85] text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors shadow-[1px_1px_0px_0px_#000000]"
-                                    title="Mark as Resolved (Dev / Localhost only)"
+                                    className="px-2 py-1 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 rounded-md text-[10px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                                    title="Mark as resolved"
                                   >
-                                    <CheckCircle2 size={11} strokeWidth={3} /> RESOLVE
+                                    <CheckCircle2 size={11} /> Resolve
                                   </button>
                                 )}
                                 <button
+                                  type="button"
                                   disabled={isBusy}
                                   onClick={() => setFeedbackToDelete(item.id)}
-                                  className="p-1 text-neutral-500 hover:text-[#FF3333] hover:bg-[#FF3333] border border-transparent hover:border-[#FF3333] transition-colors cursor-pointer"
-                                  title="Delete Feedback (Dev / Localhost only)"
+                                  className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors cursor-pointer"
+                                  title="Delete feedback"
                                 >
                                   <Trash2 size={13} />
                                 </button>
@@ -635,13 +641,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         </div>
       </div>
 
-      {/* Better Confirmation Modal for Deletion */}
       {feedbackToDelete && (
         <ConfirmModal
-          title="DELETE FEEDBACK ENTRY"
-          message="Are you sure you want to permanently delete this feedback entry? This record will be permanently purged from the database."
-          confirmLabel="DELETE RECORD"
-          cancelLabel="CANCEL"
+          title="Delete feedback entry"
+          message="Are you sure you want to permanently delete this feedback entry? This record will be purged from the database."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
           variant="danger"
           onConfirm={() => {
             if (feedbackToDelete) {

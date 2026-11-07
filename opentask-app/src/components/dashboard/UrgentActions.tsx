@@ -20,20 +20,20 @@ export const UrgentActions: React.FC<UrgentActionsProps> = ({ onNavigateProject,
 
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
 
-  const getProjectName = (id: number) => allProjects.find(p => p.id === id)?.name || `PROJECT #${id}`;
+  const getProjectName = (id: number) => allProjects.find(p => p.id === id)?.name || `Project #${id}`;
 
   return (
     <>
       <SurfaceCard 
-        title="URGENT ACTIONS" 
+        title="Urgent Actions" 
         icon={AlertCircle} 
         className={className} 
-        rightElement={loading ? <Skeleton width={60} height={18} /> : (alerts.length > 0 ? <Badge variant="critical">{alerts.length} ITEMS</Badge> : null)}
+        rightElement={loading ? <Skeleton width={60} height={18} /> : (alerts.length > 0 ? <Badge variant="danger">{alerts.length} Items</Badge> : null)}
       >
         <div className="space-y-2.5 flex-1 overflow-y-auto no-scrollbar pr-1 min-h-0">
           {loading ? (
             [1, 2, 3].map(i => (
-              <div key={i} className="p-3.5 rounded-none bg-[#1E2227] border-2 border-black flex justify-between items-center">
+              <div key={i} className="p-3.5 rounded-lg bg-card/60 border border-border flex justify-between items-center">
                 <div className="flex-1">
                   <Skeleton width="25%" height={10} className="mb-2" />
                   <Skeleton width="80%" height={14} className="mb-2" />
@@ -43,29 +43,29 @@ export const UrgentActions: React.FC<UrgentActionsProps> = ({ onNavigateProject,
               </div>
             ))
           ) : alerts.length === 0 ? (
-            <div className="text-neutral-500 font-mono text-[11px] py-8 text-center border-2 border-dashed border-neutral-700 rounded-none uppercase">
-              // NO CRITICAL ACTIONS PENDING
+            <div className="text-muted-foreground text-xs py-8 text-center border border-dashed border-border rounded-xl">
+              No critical actions pending
             </div>
           ) : (
             alerts.map((alert) => (
               <div
                 key={alert.id!}
                 onClick={() => setSelectedAlert(alert)}
-                className={`p-3.5 rounded-none bg-[#141619] border-2 group cursor-pointer transition-all duration-75 flex justify-between items-center ${
+                className={`p-3.5 rounded-lg border bg-card/50 hover:bg-accent/40 group cursor-pointer transition-all flex justify-between items-center ${
                   alert.severity === 'critical' 
-                    ? 'border-[#FF3333] hover:bg-[#FF3333]/10 shadow-[3px_3px_0px_0px_#FF3333]' 
-                    : 'border-[#FFE600] hover:bg-[#FFE600]/10 shadow-[3px_3px_0px_0px_#FFE600]'
+                    ? 'border-destructive/30 hover:border-destructive/60' 
+                    : 'border-amber-500/30 hover:border-amber-500/60'
                 }`}
               >
                 <div>
-                  <Badge variant={alert.severity === 'critical' ? 'critical' : 'warning'} className="!py-0.2 !px-1.5 !text-[9px]">
+                  <Badge variant={alert.severity === 'critical' ? 'danger' : 'warning'} className="py-0.5 px-1.5 text-[10px]">
                     {alert.severity}
                   </Badge>
-                  <h5 className="text-white font-bold text-[13px] mt-1.5 line-clamp-1">{alert.title}</h5>
-                  <p className="text-neutral-400 font-mono text-[10px] mt-0.5 uppercase">{getProjectName(Number(alert.project_id))}</p>
+                  <h5 className="text-foreground font-medium text-xs mt-1.5 line-clamp-1">{alert.title}</h5>
+                  <p className="text-muted-foreground text-[11px] mt-0.5">{getProjectName(Number(alert.project_id))}</p>
                 </div>
-                <div className="w-6 h-6 rounded-none border border-neutral-700 flex items-center justify-center text-neutral-400 group-hover:text-black group-hover:bg-[#FFE600] group-hover:border-black transition-all flex-shrink-0">
-                  <ChevronRight size={14} strokeWidth={3} />
+                <div className="w-6 h-6 rounded-md border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary-foreground group-hover:bg-primary group-hover:border-primary transition-all shrink-0">
+                  <ChevronRight size={14} />
                 </div>
               </div>
             ))

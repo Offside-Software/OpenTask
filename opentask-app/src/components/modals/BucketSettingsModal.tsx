@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings2, AlignLeft, Activity } from 'lucide-react';
+import { Settings2, AlignLeft, Activity } from 'lucide-react';
+import { Button } from '../../design-system/Button';
+import { CloseButton } from '../../design-system/CloseButton';
 import type { Bucket, BucketState } from '../../models';
+import { cn } from '@/lib/utils';
 
 const BUCKET_STATES: { state: BucketState; label: string; description: string; color: string }[] = [
-  { state: 'DRAFT', label: 'DRAFT', description: 'AI & backlog tasks pending triage', color: 'bg-slate-500' },
-  { state: 'PENDING', label: 'PENDING', description: 'Queued for planning or assignment', color: 'bg-[#F59E0B]' },
-  { state: 'TODO', label: 'TODO', description: 'Ready to be picked up', color: 'bg-[#3B82F6]' },
-  { state: 'ONGOING', label: 'ONGOING', description: 'In active development/execution', color: 'bg-[#16A34A]' },
-  { state: 'ON_REVIEW', label: 'ON_REVIEW', description: 'Under review or PR verification', color: 'bg-[#8B5CF6]' },
-  { state: 'COMPLETED', label: 'COMPLETED', description: 'Finished and verified tasks', color: 'bg-slate-400' },
+  { state: 'DRAFT', label: 'Draft', description: 'AI & backlog tasks pending triage', color: 'bg-neutral-500' },
+  { state: 'PENDING', label: 'Pending', description: 'Queued for planning or assignment', color: 'bg-amber-500' },
+  { state: 'TODO', label: 'To Do', description: 'Ready to be picked up', color: 'bg-blue-500' },
+  { state: 'ONGOING', label: 'Ongoing', description: 'In active development/execution', color: 'bg-emerald-500' },
+  { state: 'ON_REVIEW', label: 'Review', description: 'Under review or PR verification', color: 'bg-purple-500' },
+  { state: 'COMPLETED', label: 'Completed', description: 'Finished and verified tasks', color: 'bg-neutral-400' },
 ];
 
 interface BucketSettingsModalProps {
@@ -59,55 +62,48 @@ export const BucketSettingsModal: React.FC<BucketSettingsModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none animate-in fade-in duration-100"
-    >
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 select-none animate-in fade-in duration-150">
       <div
-        className="bg-[#121417] border-3 border-black rounded-none w-full max-w-md shadow-[8px_8px_0px_0px_#000000] overflow-hidden animate-in zoom-in-95 duration-100 font-mono"
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b-2 border-black bg-[#181B20]">
+        <div className="flex items-center justify-between p-5 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-              <Settings2 size={16} strokeWidth={2.5} />
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <Settings2 size={18} />
             </div>
             <div>
-              <h2 className="text-white font-mono font-black uppercase tracking-wider text-[15px]">
-                COLUMN SETTINGS
+              <h2 className="text-foreground font-semibold text-base">
+                Column Settings
               </h2>
-              <p className="text-neutral-400 text-[10px] uppercase tracking-wider mt-0.5">
-                // STATE: {bucket.state}
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Current state: {bucket.state}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-none bg-black border-2 border-black text-neutral-400 hover:text-black hover:bg-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer"
-          >
-            <X size={16} strokeWidth={3} />
-          </button>
+          <CloseButton onClick={onClose} size="md" />
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2">
-              COLUMN NAME <span className="text-[#EF4444]">*</span>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Column name <span className="text-destructive">*</span>
             </label>
             <input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. In Progress"
-              className="w-full bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors"
+              className="w-full bg-background border border-input rounded-lg px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><Activity size={13} /> BEHAVIOR STATE (PIPELINE STAGE)</span>
-              <span className="text-[10px] text-[#FFE600] font-mono">// {state}</span>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><Activity size={13} /> Pipeline stage</span>
+              <span className="text-xs text-primary font-medium">{state}</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
               {BUCKET_STATES.map((s) => {
@@ -117,19 +113,20 @@ export const BucketSettingsModal: React.FC<BucketSettingsModalProps> = ({
                     key={s.state}
                     type="button"
                     onClick={() => setState(s.state)}
-                    className={`p-2.5 rounded-none border-2 text-left font-mono transition-all cursor-pointer flex flex-col justify-between ${
+                    className={cn(
+                      'p-2.5 rounded-lg border text-left transition-colors cursor-pointer flex flex-col justify-between shadow-xs',
                       isSelected
-                        ? 'bg-[#181B20] border-[#FFE600] shadow-[2px_2px_0px_0px_#FFE600]'
-                        : 'bg-[#0B0E14] border-black hover:border-neutral-700 shadow-[2px_2px_0px_0px_#000000]'
-                    }`}
+                        ? 'bg-primary/10 border-primary text-foreground'
+                        : 'bg-muted/30 border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground'
+                    )}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <div className={`w-2.5 h-2.5 rounded-none border border-black shrink-0 ${s.color}`} />
-                      <span className={`text-[11px] font-black tracking-wider ${isSelected ? 'text-[#FFE600]' : 'text-white'}`}>
+                      <div className={cn('w-2 h-2 rounded-full shrink-0', s.color)} />
+                      <span className="text-xs font-semibold text-foreground">
                         {s.label}
                       </span>
                     </div>
-                    <span className="text-[9px] text-neutral-400 line-clamp-1 leading-tight">
+                    <span className="text-[10px] text-muted-foreground line-clamp-1 leading-tight">
                       {s.description}
                     </span>
                   </button>
@@ -139,36 +136,39 @@ export const BucketSettingsModal: React.FC<BucketSettingsModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-black text-neutral-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <AlignLeft size={13} /> DESCRIPTION
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <AlignLeft size={13} /> Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what tasks belong in this bucket..."
-              className="w-full h-24 bg-[#0B0E14] border-2 border-black rounded-none px-4 py-2.5 text-[13px] font-mono text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] transition-colors resize-none"
+              className="w-full h-24 bg-background border border-input rounded-lg px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-colors resize-none"
             />
           </div>
 
-          <div className="flex gap-3 pt-3 border-t-2 border-neutral-800">
-            <button
+          <div className="flex gap-2.5 pt-3 border-t border-border">
+            <Button
               type="button"
+              variant="outline"
+              size="md"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-none text-[12px] font-mono font-black uppercase tracking-wider text-neutral-300 bg-[#1E2227] border-2 border-black shadow-[2px_2px_0px_0px_#000000] hover:bg-white hover:text-black transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+              className="flex-1"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
               disabled={saving || !name.trim()}
-              className="flex-1 py-2.5 rounded-none text-[12px] font-mono font-black uppercase tracking-wider bg-[#FFE600] text-black border-2 border-black shadow-[3px_3px_0px_0px_#000000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000000] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+              className="flex-1"
             >
-              {saving ? 'SAVING...' : 'SAVE SETTINGS'}
-            </button>
+              {saving ? 'Saving…' : 'Save settings'}
+            </Button>
           </div>
         </form>
       </div>
     </div>
   );
 };
-

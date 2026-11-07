@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Sparkles, CheckSquare, Square, AlertCircle, Loader2, UserCheck, Layers } from 'lucide-react';
 import { taskService } from '../../services/taskService';
+import { Button } from '../../design-system/Button';
 import { CloseButton } from '../../design-system/CloseButton';
 import { useToast } from '../../design-system/Toast';
 import type { Bucket, ProjectMember, ExtractedTask, Task } from '../../models';
@@ -155,25 +156,25 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-sm animate-in fade-in duration-100"
+      className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-6 bg-background/80 backdrop-blur-sm animate-in fade-in duration-100"
     >
       <div
-        className="bg-[#121417] dark:bg-[#121417] light:bg-[#FFFFFF] border-3 border-black rounded-none w-full max-w-4xl shadow-[8px_8px_0px_0px_#000000] flex flex-col overflow-hidden max-h-[94vh] font-mono text-white dark:text-white light:text-black animate-in zoom-in-95 duration-100"
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-4xl shadow-xl flex flex-col overflow-hidden max-h-[94vh] animate-in zoom-in-95 duration-100"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b-2 border-black bg-[#181B20] dark:bg-[#181B20] light:bg-[#F4F4F0] flex items-start gap-4 shrink-0">
-          <div className="p-3 bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-            <Sparkles size={22} />
+        <div className="p-5 sm:p-6 border-b border-border bg-card flex items-start gap-4 shrink-0">
+          <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
+            <Sparkles size={20} />
           </div>
           <div className="flex-1 min-w-0">
-            <span className="text-[11px] font-black uppercase tracking-widest text-[#FFE600] dark:text-[#FFE600] light:text-amber-700 block mb-1">
-              // TASK EXTRACTION FROM CODE REVIEW
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-primary block mb-0.5">
+              Task Extraction From Code Review
             </span>
-            <h2 className="text-[17px] sm:text-[19px] font-black uppercase tracking-wide truncate">
-              {reviewTitle || 'SELECT SUGGESTIONS TO CREATE AS TASKS'}
+            <h2 className="text-base sm:text-lg font-semibold truncate">
+              {reviewTitle || 'Select suggestions to create as tasks'}
             </h2>
-            <p className="text-[12px] text-neutral-400 dark:text-neutral-400 light:text-neutral-600 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {selectedIndices.size} of {tasks.length} tasks selected for creation
             </p>
           </div>
@@ -181,17 +182,17 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
         </div>
 
         {/* Global Configuration Bar (Target Bucket & Assignee) */}
-        <div className="p-4 sm:p-5 border-b-2 border-black bg-[#0E1012] dark:bg-[#0E1012] light:bg-[#EAEAE4] grid grid-cols-1 sm:grid-cols-2 gap-4 shrink-0">
+        <div className="p-4 sm:p-5 border-b border-border bg-muted/30 grid grid-cols-1 sm:grid-cols-2 gap-4 shrink-0">
           {/* Target Column/Bucket */}
           <div>
-            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 dark:text-neutral-400 light:text-neutral-700 mb-1.5 flex items-center gap-1.5">
-              <Layers size={13} className="text-[#FFE600] dark:text-[#FFE600] light:text-amber-600" />
-              DESTINATION COLUMN
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <Layers size={13} className="text-primary" />
+              Destination Column
             </label>
             <select
               value={targetBucketId}
               onChange={e => setTargetBucketId(e.target.value)}
-              className="w-full bg-[#0B0E14] dark:bg-[#0B0E14] light:bg-[#FFFFFF] border-2 border-black rounded-none px-3.5 py-2 text-[12px] font-mono font-bold uppercase text-white dark:text-white light:text-black focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+              className="w-full bg-background border border-input rounded-md px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
             >
               {buckets.map(b => (
                 <option key={String(b.id)} value={String(b.id)}>
@@ -203,16 +204,16 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
 
           {/* Target Assignee (Pre-filled with task assignee!) */}
           <div>
-            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-400 dark:text-neutral-400 light:text-neutral-700 mb-1.5 flex items-center gap-1.5">
-              <UserCheck size={13} className="text-[#00FF66] dark:text-[#00FF66] light:text-emerald-700" />
-              AUTO-ASSIGN TO MEMBER
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <UserCheck size={13} className="text-emerald-500" />
+              Auto-Assign to Member
             </label>
             <select
               value={selectedAssigneeId}
               onChange={e => setSelectedAssigneeId(e.target.value)}
-              className="w-full bg-[#0B0E14] dark:bg-[#0B0E14] light:bg-[#FFFFFF] border-2 border-black rounded-none px-3.5 py-2 text-[12px] font-mono font-bold uppercase text-white dark:text-white light:text-black focus:outline-none focus:border-[#FFE600] shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+              className="w-full bg-background border border-input rounded-md px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
             >
-              <option value="">-- UNASSIGNED --</option>
+              <option value="">-- Unassigned --</option>
               {members.map(m => (
                 <option key={String(m.user_id)} value={String(m.user_id)}>
                   {m.gh_username || m.display_name || `Member #${m.user_id}`} ({m.role})
@@ -224,54 +225,54 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
         </div>
 
         {/* Action Toggle Bar */}
-        <div className="px-5 sm:px-6 py-3 border-b-2 border-black bg-[#14171C] dark:bg-[#14171C] light:bg-[#F0F0EC] flex items-center justify-between shrink-0">
+        <div className="px-5 sm:px-6 py-2.5 border-b border-border bg-muted/40 flex items-center justify-between shrink-0">
           <button
             type="button"
             onClick={toggleSelectAll}
-            className="inline-flex items-center gap-2 text-[12px] font-black uppercase text-neutral-300 dark:text-neutral-300 light:text-neutral-800 hover:text-[#FFE600] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 text-xs font-medium text-foreground hover:text-primary transition-colors cursor-pointer"
           >
             {allSelected ? (
-              <CheckSquare size={17} className="text-[#FFE600]" />
+              <CheckSquare size={16} className="text-primary" />
             ) : (
-              <Square size={17} className="text-neutral-500" />
+              <Square size={16} className="text-muted-foreground" />
             )}
-            <span>{allSelected ? 'DESELECT ALL' : 'SELECT ALL'}</span>
+            <span>{allSelected ? 'Deselect all' : 'Select all'}</span>
           </button>
-          <span className="text-[11px] font-bold text-neutral-400 uppercase font-mono">
-            {tasks.length} SUGGESTION{tasks.length !== 1 ? 'S' : ''} DETECTED
+          <span className="text-xs text-muted-foreground font-mono">
+            {tasks.length} suggestion{tasks.length !== 1 ? 's' : ''} detected
           </span>
         </div>
 
         {/* Task Items List */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
           {tasks.map((task, idx) => {
             const isSelected = selectedIndices.has(idx);
 
             return (
               <div
                 key={idx}
-                className={`border-2 border-black p-4 sm:p-5 transition-all shadow-[3px_3px_0px_0px_#000000] ${
+                className={`border rounded-lg p-4 transition-all shadow-xs ${
                   isSelected
-                    ? 'bg-[#181B20] dark:bg-[#181B20] light:bg-[#FFFFFF]'
-                    : 'bg-[#0E1012] dark:bg-[#0E1012] light:bg-[#F4F4F0] opacity-60'
+                    ? 'bg-card border-border'
+                    : 'bg-muted/30 border-border opacity-60'
                 }`}
               >
-                <div className="flex items-start gap-3.5">
+                <div className="flex items-start gap-3">
                   {/* Checkbox */}
                   <button
                     type="button"
                     onClick={() => toggleSelect(idx)}
-                    className="mt-1 shrink-0 p-1 text-neutral-400 hover:text-[#FFE600] cursor-pointer"
+                    className="mt-1 shrink-0 p-1 text-muted-foreground hover:text-primary cursor-pointer transition-colors"
                   >
                     {isSelected ? (
-                      <CheckSquare size={22} className="text-[#FFE600]" />
+                      <CheckSquare size={18} className="text-primary" />
                     ) : (
-                      <Square size={22} className="text-neutral-500" />
+                      <Square size={18} className="text-muted-foreground" />
                     )}
                   </button>
 
                   {/* Task details */}
-                  <div className="flex-1 min-w-0 space-y-3">
+                  <div className="flex-1 min-w-0 space-y-2.5">
                     {/* Title input */}
                     <input
                       type="text"
@@ -279,18 +280,18 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
                       onChange={e => handleUpdateTaskField(idx, 'title', e.target.value)}
                       disabled={!isSelected}
                       placeholder="Task title..."
-                      className="w-full bg-[#0B0E14] dark:bg-[#0B0E14] light:bg-[#F9F9F6] border-2 border-black dark:border-neutral-700 light:border-neutral-400 px-3.5 py-2 text-[14px] font-bold text-white dark:text-white light:text-black focus:outline-none focus:border-[#FFE600] disabled:opacity-50 shadow-[1px_1px_0px_0px_#000000]"
+                      className="w-full bg-background border border-input rounded-md px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                     />
 
                     {/* Metadata controls: Type & Weight */}
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-neutral-400">
-                        <span>TYPE:</span>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span>Type:</span>
                         <select
                           value={task.type}
                           onChange={e => handleUpdateTaskField(idx, 'type', e.target.value)}
                           disabled={!isSelected}
-                          className="bg-black dark:bg-black light:bg-neutral-200 border-2 border-black px-2.5 py-1 text-[11px] font-mono font-bold text-[#FFE600] dark:text-[#FFE600] light:text-amber-800 disabled:opacity-50 shadow-[1px_1px_0px_0px_#000000]"
+                          className="bg-background border border-input rounded-md px-2 py-1 text-xs text-foreground disabled:opacity-50"
                         >
                           <option value="BUG">BUG</option>
                           <option value="IMPROVEMENT">IMPROVEMENT</option>
@@ -301,13 +302,13 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
                         </select>
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-neutral-400">
-                        <span>POINTS:</span>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span>Points:</span>
                         <select
                           value={task.weight}
                           onChange={e => handleUpdateTaskField(idx, 'weight', Number(e.target.value))}
                           disabled={!isSelected}
-                          className="bg-black dark:bg-black light:bg-neutral-200 border-2 border-black px-2.5 py-1 text-[11px] font-mono font-bold text-[#00FF66] dark:text-[#00FF66] light:text-emerald-800 disabled:opacity-50 shadow-[1px_1px_0px_0px_#000000]"
+                          className="bg-background border border-input rounded-md px-2 py-1 text-xs text-foreground disabled:opacity-50"
                         >
                           <option value={1}>1 pt</option>
                           <option value={2}>2 pts</option>
@@ -324,8 +325,8 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
                         value={task.description}
                         onChange={e => handleUpdateTaskField(idx, 'description', e.target.value)}
                         disabled={!isSelected}
-                        rows={3}
-                        className="w-full bg-[#0B0E14] dark:bg-[#0B0E14] light:bg-[#F9F9F6] border border-neutral-700 dark:border-neutral-700 light:border-neutral-300 p-3 text-[12px] leading-relaxed font-mono text-neutral-200 dark:text-neutral-200 light:text-neutral-800 focus:outline-none focus:border-[#FFE600] disabled:opacity-50 resize-y shadow-inner"
+                        rows={2}
+                        className="w-full bg-background border border-input rounded-md p-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 resize-y"
                       />
                     )}
                   </div>
@@ -337,43 +338,43 @@ export const ReviewTaskExtractionModal: React.FC<ReviewTaskExtractionModalProps>
 
         {/* Error notification */}
         {error && (
-          <div className="mx-5 mb-3 p-3 bg-red-950/40 border-2 border-red-700 text-red-300 font-mono text-[12px] flex items-center gap-2">
-            <AlertCircle size={15} className="shrink-0 text-red-400" />
+          <div className="mx-5 mb-3 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Footer */}
-        <div className="p-4 sm:p-5 border-t-2 border-black bg-[#181B20] dark:bg-[#181B20] light:bg-[#F4F4F0] flex items-center justify-end gap-3.5 shrink-0">
-          <button
+        <div className="p-4 sm:p-5 border-t border-border bg-card flex items-center justify-end gap-3 shrink-0">
+          <Button
+            variant="outline"
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-5 py-2.5 border-2 border-black bg-[#1E2227] dark:bg-[#1E2227] light:bg-neutral-200 text-neutral-300 dark:text-neutral-300 light:text-black font-black font-mono text-[12px] uppercase hover:bg-neutral-800 transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000]"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             type="button"
             onClick={handleCreateSelectedTasks}
             disabled={saving || noneSelected}
-            className="px-5 py-2.5 border-2 border-black bg-[#FFE600] text-black font-black font-mono text-[12px] uppercase hover:bg-yellow-300 disabled:opacity-50 transition-all shadow-[3px_3px_0px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer flex items-center gap-2"
           >
             {saving ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
-                <span>CREATING TASKS...</span>
+                <span>Creating tasks...</span>
               </>
             ) : (
               <>
                 <Sparkles size={14} />
                 <span>
-                  CREATE {selectedIndices.size} TASK{selectedIndices.size !== 1 ? 'S' : ''}
-                  {assignedMember ? ` (FOR @${assignedMember.gh_username || assignedMember.display_name})` : ''}
+                  Create {selectedIndices.size} task{selectedIndices.size !== 1 ? 's' : ''}
+                  {assignedMember ? ` (for @${assignedMember.gh_username || assignedMember.display_name})` : ''}
                 </span>
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,

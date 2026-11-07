@@ -43,24 +43,24 @@ export const TranscriptModal: React.FC<TranscriptModalProps> = ({ jobId, title, 
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-100" onClick={onClose}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-100" onClick={onClose}>
       <div
-        className="bg-[#121417] border-2 border-black rounded-none w-full max-w-3xl max-h-[85vh] flex flex-col shadow-[8px_8px_0px_0px_#000000]"
+        className="bg-card text-card-foreground border border-border rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-xl overflow-hidden animate-in zoom-in-95 duration-100"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="transcript-title"
       >
-        <div className="p-5 border-b-2 border-black flex items-start justify-between gap-4">
+        <div className="p-5 border-b border-border flex items-start justify-between gap-4 bg-card">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="p-2 bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
-              <FileText size={18} strokeWidth={2.5} />
+            <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
+              <FileText size={18} />
             </div>
             <div className="min-w-0">
-              <h2 id="transcript-title" className="text-white font-mono font-black uppercase tracking-wide text-[16px]">
+              <h2 id="transcript-title" className="text-foreground font-semibold text-base">
                 Transcript
               </h2>
-              <p className="text-neutral-400 font-mono text-[11px] uppercase tracking-wider mt-0.5 truncate">
+              <p className="text-muted-foreground text-xs mt-0.5 truncate">
                 {title}
                 {segments ? ` · ${segments.length} segments` : ""}
                 {language ? ` · ${language}` : ""}
@@ -71,7 +71,7 @@ export const TranscriptModal: React.FC<TranscriptModalProps> = ({ jobId, title, 
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          {error && <p className="border-2 border-black bg-[#FF3333] text-white font-mono text-[12px] p-3">{error}</p>}
+          {error && <div className="border border-destructive/20 bg-destructive/10 text-destructive text-xs rounded-lg p-3">{error}</div>}
           {!segments && !error && (
             <div className="space-y-2">
               <Skeleton height={20} />
@@ -80,17 +80,17 @@ export const TranscriptModal: React.FC<TranscriptModalProps> = ({ jobId, title, 
             </div>
           )}
           {segments && segments.length === 0 && (
-            <p className="text-neutral-400 font-mono text-[12px] text-center py-6">No speech was found in this recording.</p>
+            <p className="text-muted-foreground text-xs text-center py-6">No speech was found in this recording.</p>
           )}
           {segments && segments.length > 0 && (
             <ol className="space-y-2">
               {segments.map((s) => {
                 const ts = formatTimestamp(s.start_sec);
                 return (
-                  <li key={s.index} className="font-mono text-[12px] leading-relaxed text-neutral-300 flex gap-2">
-                    {ts && <span className="text-[#FFE600] font-bold shrink-0">[{ts}]</span>}
+                  <li key={s.index} className="text-xs leading-relaxed text-muted-foreground flex gap-2">
+                    {ts && <span className="text-primary font-medium shrink-0">[{ts}]</span>}
                     <span>
-                      {s.speaker && <span className="text-white font-bold mr-1.5">{s.speaker}:</span>}
+                      {s.speaker && <span className="text-foreground font-medium mr-1.5">{s.speaker}:</span>}
                       <span className="whitespace-pre-wrap">{s.text}</span>
                     </span>
                   </li>

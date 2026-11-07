@@ -1,25 +1,28 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface ProgressBarProps {
   value: number;
   label: string;
   colorClass?: string;
+  className?: string;
 }
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({ 
   value, 
   label, 
-  colorClass = "bg-[#FFE600]" 
+  colorClass = "bg-primary",
+  className = ""
 }) => (
-  <div className="w-full mt-auto">
-    <div className="flex justify-between text-[11px] mb-1.5 font-bold font-mono uppercase tracking-wider">
-      <span className="text-neutral-400">{label}</span>
-      <span className="text-white bg-neutral-800 px-1.5 py-0.5 border border-neutral-700">{value}%</span>
+  <div className={cn("w-full mt-auto", className)}>
+    <div className="flex justify-between text-xs mb-1.5 font-medium">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-foreground font-mono text-[11px] font-semibold">{Math.round(value)}%</span>
     </div>
-    <div className="w-full bg-[#1E2227] h-3 rounded-none border-2 border-black overflow-hidden shadow-[2px_2px_0px_0px_#000000]">
+    <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
       <div 
-        className={`h-full transition-all duration-300 ${colorClass}`} 
-        style={{ width: `${Math.min(value, 100)}%` }} 
+        className={cn("h-full transition-all duration-300 rounded-full", colorClass)} 
+        style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }} 
       />
     </div>
   </div>

@@ -172,9 +172,11 @@ export const ProjectTabsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const updateTabName = useCallback((projectId: string | number, name: string) => {
     if (!name) return;
     const idStr = String(projectId);
-    setTabs(prev =>
-      prev.map(tab => (String(tab.id) === idStr ? { ...tab, name } : tab))
-    );
+    setTabs(prev => {
+      const existing = prev.find(tab => String(tab.id) === idStr);
+      if (!existing || existing.name === name) return prev;
+      return prev.map(tab => (String(tab.id) === idStr ? { ...tab, name } : tab));
+    });
   }, []);
 
   const value = useMemo(

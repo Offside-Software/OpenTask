@@ -157,13 +157,13 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
 
   const renderActionItems = () => {
     if (!job) {
-      if (legacyItems.length === 0) return <p className="text-[12px] text-neutral-400">No action items were recorded.</p>;
+      if (legacyItems.length === 0) return <p className="text-xs text-muted-foreground">No action items were recorded.</p>;
       return (
         <div className="space-y-2">
           {legacyItems.map((act, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 rounded-none bg-[#181B20] border-2 border-black">
-              <span className="text-[12px] font-bold text-white">{act.task}</span>
-              {act.deadline && <span className="text-[10px] text-neutral-400 flex items-center gap-1"><Clock size={11} /> {act.deadline}</span>}
+            <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+              <span className="text-xs font-medium text-foreground">{act.task}</span>
+              {act.deadline && <span className="text-[11px] text-muted-foreground flex items-center gap-1"><Clock size={11} /> {act.deadline}</span>}
             </div>
           ))}
         </div>
@@ -171,14 +171,14 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
     }
     if (!reviewable) {
       return (
-        <p className="text-[12px] text-neutral-400 flex items-center gap-2">
+        <p className="text-xs text-muted-foreground flex items-center gap-2">
           {isJobActive(job.status) && <Loader2 size={12} className="animate-spin shrink-0" />}
           {isJobActive(job.status) ? 'Tasks appear here once the meeting is processed. ' : ''}
           {describeJob(job, job.source_type)}
         </p>
       );
     }
-    if (draftsError) return <p className="border-2 border-black bg-[#FF3333] text-white text-[12px] p-2.5">{draftsError}</p>;
+    if (draftsError) return <div className="border border-destructive/20 bg-destructive/10 text-destructive text-xs rounded-lg p-2.5">{draftsError}</div>;
     if (!drafts) {
       return (
         <div className="space-y-2">
@@ -187,18 +187,18 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
         </div>
       );
     }
-    if (drafts.length === 0) return <p className="text-[12px] text-neutral-400">No draft tasks are left for this meeting.</p>;
+    if (drafts.length === 0) return <p className="text-xs text-muted-foreground">No draft tasks are left for this meeting.</p>;
     return (
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         {drafts.map(d => {
           const who = memberName(d.lead_assignee_id) ?? memberName(d.resolved_user_id) ?? (d.assignee_hint ? `“${d.assignee_hint}”` : null);
           const isDraft = d.bucket_state === 'DRAFT';
           const busy = busyTask === d.task_id;
           return (
-            <div key={d.task_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-none bg-[#181B20] border-2 border-black shadow-[2px_2px_0px_0px_#000000]">
+            <div key={d.task_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted/30 border border-border shadow-xs">
               <div className="min-w-0">
-                <span className="block text-[12px] font-bold text-white">{d.title}</span>
-                <span className="text-[10px] text-neutral-400 flex items-center gap-2 flex-wrap mt-0.5">
+                <span className="block text-xs font-semibold text-foreground">{d.title}</span>
+                <span className="text-[11px] text-muted-foreground flex items-center gap-2 flex-wrap mt-0.5">
                   {who && <span>{who}</span>}
                   {d.due_date && <span className="flex items-center gap-1"><Clock size={11} /> {d.due_date}</span>}
                 </span>
@@ -225,33 +225,33 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
   };
 
   return (
-    <div className="mt-4 rounded-none border-2 border-black bg-[#0C0D0E] overflow-hidden shadow-[4px_4px_0px_0px_#000000] select-none">
+    <div className="mt-4 rounded-xl border border-border bg-card overflow-hidden shadow-xs select-none">
        <div
-         className="group p-5 flex justify-between items-center gap-4 bg-[#141619] cursor-pointer hover:bg-[#1A1D22] transition-colors"
+         className="group p-4 sm:p-5 flex justify-between items-center gap-4 bg-card cursor-pointer hover:bg-muted/40 transition-colors"
          onClick={() => setIsExpanded(!isExpanded)}
        >
           <div className="min-w-0">
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <h4 className="text-[17px] font-mono font-black uppercase tracking-wide text-white">{title}</h4>
-              <Badge variant="primary" className="font-mono text-[9px] uppercase">{SOURCE_LABEL[meeting.source_type] ?? meeting.source_type}</Badge>
+            <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
+              <h4 className="text-base font-semibold text-foreground">{title}</h4>
+              <Badge variant="accent" className="text-[9px]">{SOURCE_LABEL[meeting.source_type] ?? meeting.source_type}</Badge>
               {job && (
-                <Badge variant={JOB_STATUS_VARIANT[job.status]} className="font-mono text-[9px]">
-                  {isJobActive(job.status) && <span className="w-1.5 h-1.5 bg-current animate-pulse" />}
+                <Badge variant={JOB_STATUS_VARIANT[job.status]} className="text-[9px]">
+                  {isJobActive(job.status) && <span className="w-1.5 h-1.5 bg-current animate-pulse rounded-full mr-1" />}
                   {job.status === 'DRAFTS_READY' && job.pending_drafts > 0 ? `${job.pending_drafts} to review` : JOB_STATUS_LABEL[job.status]}
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-4 text-[11px] font-mono text-neutral-400 font-medium flex-wrap">
-               {meetingDate && <span className="flex items-center gap-1.5"><Calendar size={13} /> {meetingDate}</span>}
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+               {meetingDate && <span className="flex items-center gap-1"><Calendar size={12} /> {meetingDate}</span>}
                {(meeting.time || duration) && (
-                 <span className="flex items-center gap-1.5"><Clock size={13} /> {[meeting.time, duration].filter(Boolean).join(' • ')}</span>
+                 <span className="flex items-center gap-1"><Clock size={12} /> {[meeting.time, duration].filter(Boolean).join(' • ')}</span>
                )}
             </div>
           </div>
           <div className="flex gap-2 items-center shrink-0" onClick={e => e.stopPropagation()}>
              {job && WITH_TRANSCRIPT.has(job.status) && onTranscript && (
-               <Button variant="white" size="sm" onClick={() => onTranscript(job.id)} title="Read the transcript the tasks came from">
-                 <FileText size={13} strokeWidth={2.5} /> Transcript
+               <Button variant="outline" size="sm" onClick={() => onTranscript(job.id)} title="Read the transcript the tasks came from">
+                 <FileText size={13} /> Transcript
                </Button>
              )}
              {onDelete && <TrashButton onClick={onDelete} aria-label={`Delete ${title}`} />}
@@ -261,30 +261,30 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
                aria-expanded={isExpanded}
                aria-label={isExpanded ? 'Collapse meeting' : 'Expand meeting'}
                title={isExpanded ? 'Collapse' : 'Show minutes and action items'}
-               className="w-8 h-8 rounded-none bg-[#1F2937] border-2 border-black text-neutral-300 flex items-center justify-center hover:bg-[#FFE600] hover:text-black shadow-[2px_2px_0px_0px_#000000] transition-colors cursor-pointer"
+               className="w-7 h-7 rounded-md border border-border bg-card text-muted-foreground flex items-center justify-center hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
              >
-               <ChevronRight size={16} strokeWidth={3} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+               <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
              </button>
           </div>
        </div>
 
        {isExpanded && (
-         <div className="p-6 bg-[#121417] border-t-2 border-black">
-            <div className="flex justify-between items-center mb-6 pb-2 border-b-2 border-neutral-800">
-               <h5 className="text-[#22C55E] font-mono text-[11px] font-black uppercase tracking-widest">// MINUTES OF MEETING</h5>
+         <div className="p-5 sm:p-6 bg-card border-t border-border">
+            <div className="flex justify-between items-center mb-5 pb-2 border-b border-border">
+               <h5 className="text-primary text-xs font-semibold uppercase tracking-wider">Minutes of Meeting</h5>
                <Button variant="ghost" size="sm" onClick={downloadMinutes} title="Download the minutes as a Markdown file">
                  <Download size={13} /> Download
                </Button>
             </div>
 
-            <div className="space-y-6 font-mono">
+            <div className="space-y-5">
                {summaryLines.length > 0 && (
                  <section>
-                    <h6 className="text-[#FFE600] text-[10px] font-black uppercase tracking-widest mb-3">// KEY POINTS DISCUSSED</h6>
-                    <ul className="space-y-2.5 pl-1">
+                    <h6 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Key Points Discussed</h6>
+                    <ul className="space-y-1.5 pl-1">
                        {summaryLines.map((pt, i) => (
-                         <li key={i} className="text-[12px] text-neutral-300 flex items-start gap-2.5">
-                           <span className="text-[#FFE600] font-black">→</span>
+                         <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                           <span className="text-primary font-bold">→</span>
                            <span className="leading-relaxed">{pt}</span>
                          </li>
                        ))}
@@ -294,11 +294,11 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
 
                {decisions.length > 0 && (
                  <section>
-                    <h6 className="text-[#22C55E] text-[10px] font-black uppercase tracking-widest mb-3">// DECISIONS MADE</h6>
-                    <div className="space-y-2">
+                    <h6 className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-2">Decisions Made</h6>
+                    <div className="space-y-1.5">
                        {decisions.map((d: string, i: number) => (
-                         <div key={i} className="flex items-center gap-2.5 text-[12px] text-neutral-300">
-                           <CheckCircle2 className="text-[#22C55E] shrink-0" size={14} strokeWidth={3} /> {d}
+                         <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                           <CheckCircle2 className="text-emerald-500 shrink-0" size={13} /> {d}
                          </div>
                        ))}
                     </div>
@@ -307,16 +307,16 @@ export const MeetingAccordion: React.FC<MeetingProps> = ({
 
                <section>
                   <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                    <h6 className="text-[#F59E0B] text-[10px] font-black uppercase tracking-widest">// ACTION ITEMS</h6>
+                    <h6 className="text-xs font-semibold text-amber-500 uppercase tracking-wider">Action Items</h6>
                     {reviewable && pendingDrafts.length > 0 && (
                       <div className="flex items-center gap-2">
                         {targetBuckets.length > 1 && (
-                          <label className="flex items-center gap-1.5 text-[10px] text-neutral-400 uppercase tracking-wider">
-                            Accept into
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span>Accept into</span>
                             <select
                               value={effectiveTarget}
                               onChange={e => setTargetBucketId(e.target.value)}
-                              className="bg-[#0B0E14] border-2 border-neutral-700 rounded-none px-2 py-1 text-white font-mono text-[11px] focus:outline-none focus:border-[#FFE600]"
+                              className="bg-background border border-input rounded-md px-2 py-1 text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                             >
                               {targetBuckets.map(b => <option key={String(b.id)} value={String(b.id)}>{b.name}</option>)}
                             </select>

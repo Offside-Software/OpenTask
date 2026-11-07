@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface SurfaceCardProps {
   children: React.ReactNode;
@@ -17,23 +18,23 @@ export const SurfaceCard: React.FC<SurfaceCardProps> = ({
   rightElement, 
   icon: Icon 
 }) => (
-  <div className={`p-5 rounded-none border-2 border-neutral-700 bg-[#141619] shadow-[4px_4px_0px_0px_#000000] flex flex-col ${className}`}>
+  <div className={cn("p-5 rounded-xl border border-border bg-card text-card-foreground shadow-xs flex flex-col transition-all", className)}>
     {(title || rightElement || Icon) && (
-      <div className="flex justify-between items-start pb-4 mb-4 border-b-2 border-neutral-800 flex-shrink-0">
+      <div className="flex justify-between items-start pb-3.5 mb-4 border-b border-border/70 flex-shrink-0">
         <div className="flex items-center gap-3">
           {Icon && (
-            <div className="p-2 rounded-none bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_0px_#000000] flex-shrink-0">
-              <Icon size={16} strokeWidth={2.5} />
+            <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20 flex-shrink-0 flex items-center justify-center">
+              <Icon size={16} strokeWidth={2} />
             </div>
           )}
           <div>
             {title && (
-              <h3 className="text-white font-bold text-[13px] uppercase tracking-wider font-mono">
-                <span className="text-[#FFE600] mr-1.5">//</span>{title}
+              <h3 className="text-foreground font-semibold text-sm tracking-tight">
+                {title}
               </h3>
             )}
             {subtitle && (
-              <p className="text-neutral-400 font-mono text-[11px] mt-0.5 uppercase tracking-wider">
+              <p className="text-muted-foreground text-xs mt-0.5">
                 {subtitle}
               </p>
             )}
