@@ -4,6 +4,7 @@ pub mod ai_keys;
 pub mod alerts;
 pub mod auth;
 pub mod buckets;
+pub mod diagrams;
 pub mod feedback;
 pub mod github;
 pub mod mcp;
@@ -28,6 +29,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(projects::router())
         .merge(realtime::router())
         .merge(buckets::router())
+        .merge(diagrams::router())
         .merge(tasks::router())
         .merge(alerts::router())
         .merge(activities::router())

@@ -116,6 +116,7 @@ pub async fn create_task(
                   COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                   title, description, type as task_type, weight, branch_name, repo_url,
                   COALESCE(attachments, '[]'::jsonb) as attachments,
+                  COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
                   last_activity_at, order_idx, created_at, updated_at;
         "#
     )
@@ -196,6 +197,7 @@ pub async fn list_tasks(
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
+               COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE ($1::BIGINT IS NULL OR project_id = $1)
@@ -222,6 +224,7 @@ pub async fn get_task(
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
+               COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE id = $1
@@ -315,6 +318,11 @@ pub async fn update_task(
         builder.push(", attachments = ");
         builder.push_bind(attachments);
     }
+    if let Some(ref diagram_ids) = payload.diagram_ids {
+        let raw: Vec<i64> = diagram_ids.iter().map(|id| id.0).collect();
+        builder.push(", diagram_ids = ");
+        builder.push_bind(raw);
+    }
     if let Some(order_idx) = payload.order_idx {
         builder.push(", order_idx = ");
         builder.push_bind(order_idx);
@@ -328,6 +336,7 @@ pub async fn update_task(
                    COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids, \
                    title, description, type as task_type, weight, branch_name, repo_url, \
                    COALESCE(attachments, '[]'::jsonb) as attachments, \
+                   COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids, \
                    last_activity_at, order_idx, created_at, updated_at;",
     );
 
@@ -640,6 +649,7 @@ pub async fn search_tasks(
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
+               COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1
@@ -854,6 +864,7 @@ pub async fn get_bucket_tasks(
                COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
+               COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1 AND bucket_id = $2

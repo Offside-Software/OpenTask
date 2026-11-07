@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, Minus, Code, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw, Users, Paperclip, UploadCloud, FileText, Download, Trash2, Image as ImageIcon, Eye } from 'lucide-react';
-import type { Task, Bucket, ProjectMember, PrReview, ExtractedTask, TaskAttachment } from '../../models';
+import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, Minus, Code, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw, Users, Paperclip, UploadCloud, FileText, Download, Trash2, Image as ImageIcon, Eye, Network } from 'lucide-react';
+import type { Task, Bucket, ProjectMember, PrReview, ExtractedTask, TaskAttachment, ProjectDiagram } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
 import { useToast } from '../../design-system/Toast';
@@ -9,9 +9,11 @@ import { Button } from '../../design-system/Button';
 import { MarkdownRenderer, hasMarkdownSyntax } from '../../design-system/MarkdownRenderer';
 import { prReviewService } from '../../services/prReviewService';
 import { taskService } from '../../services/taskService';
+import { diagramService } from '../../services/diagramService';
 import { uploadTaskAttachment, deleteTaskAttachment, formatFileSize, isImageFile, MAX_FILE_SIZE_BYTES } from '../../services/supabaseStorage';
 import { ConfirmModal } from './ConfirmModal';
 import { ReviewTaskExtractionModal } from './ReviewTaskExtractionModal';
+import { DiagramModal } from './DiagramModal';
 import { cn } from '@/lib/utils';
 
 interface TaskDetailModalProps {
@@ -78,6 +80,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [previewImage, setPreviewImage] = useState<TaskAttachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+
+  const [diagramIds, setDiagramIds] = useState<string[]>(() => {
+    if (task.diagram_ids && Array.isArray(task.diagram_ids)) {
+      return task.diagram_ids.map(String);
+    }
+    return [];
+  });
+  const [projectDiagrams, setProjectDiagrams] = useState<ProjectDiagram[]>([]);
+  const [loadingDiagrams, setLoadingDiagrams] = useState(false);
+  const [isAttachDiagramOpen, setIsAttachDiagramOpen] = useState(false);
+  const [viewingDiagramId, setViewingDiagramId] = useState<string | null>(null);
+  const [isLinkingDiagram, setIsLinkingDiagram] = useState(false);
+  const attachDiagramRef = useRef<HTMLDivElement>(null);
 
   const handleToggleAssignee = (userId: string) => {
     setAssigneeIds(prev => {
@@ -309,6 +324,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     ? parseTaskTypes(task.type)
     : ['CODE'];
 
+  const initialDiagramIds = (task.diagram_ids || []).map(String);
+
   const isDirty = Boolean(
     title.trim() !== (task.title || '').trim() ||
     description.trim() !== (task.description || '').trim() ||
@@ -319,8 +336,99 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     bucketId !== (task.bucket_id ? String(task.bucket_id) : undefined) ||
     JSON.stringify(attachments) !== JSON.stringify(task.attachments || []) ||
     JSON.stringify([...assigneeIds].sort()) !== JSON.stringify([...initialAssigneeIds].sort()) ||
-    JSON.stringify([...selectedTypes].sort()) !== JSON.stringify([...initialTypes].sort())
+    JSON.stringify([...selectedTypes].sort()) !== JSON.stringify([...initialTypes].sort()) ||
+    JSON.stringify([...diagramIds].sort()) !== JSON.stringify([...initialDiagramIds].sort())
   );
+
+  useEffect(() => {
+    if (!task.project_id) return;
+    let active = true;
+    setLoadingDiagrams(true);
+    diagramService.getProjectDiagrams(task.project_id)
+      .then((list) => {
+        if (active) setProjectDiagrams(list);
+      })
+      .catch((err) => console.warn("Failed to load project diagrams for task:", err))
+      .finally(() => {
+        if (active) setLoadingDiagrams(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [task.project_id]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (attachDiagramRef.current && !attachDiagramRef.current.contains(e.target as Node)) {
+        setIsAttachDiagramOpen(false);
+      }
+    };
+    if (isAttachDiagramOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isAttachDiagramOpen]);
+
+  const handleLinkDiagram = async (diagramId: string) => {
+    if (diagramIds.includes(diagramId)) return;
+    setIsLinkingDiagram(true);
+    try {
+      if (task.id) {
+        await diagramService.linkDiagramToTask(diagramId, task.id);
+      }
+      const next = [...diagramIds, diagramId];
+      setDiagramIds(next);
+      task.diagram_ids = next;
+      setIsAttachDiagramOpen(false);
+      showToast("Diagram linked to task", "success");
+    } catch (err: any) {
+      console.error("Failed to link diagram:", err);
+      showToast(err.message || "Failed to link diagram", "error");
+    } finally {
+      setIsLinkingDiagram(false);
+    }
+  };
+
+  const handleUnlinkDiagram = async (diagramId: string) => {
+    try {
+      if (task.id) {
+        await diagramService.unlinkDiagramFromTask(diagramId, task.id);
+      }
+      const next = diagramIds.filter((id) => id !== diagramId);
+      setDiagramIds(next);
+      task.diagram_ids = next;
+      showToast("Diagram unlinked from task", "info");
+    } catch (err: any) {
+      console.error("Failed to unlink diagram:", err);
+      showToast(err.message || "Failed to unlink diagram", "error");
+    }
+  };
+
+  const handleCreateAndLinkDiagram = async () => {
+    if (!task.project_id) return;
+    setIsLinkingDiagram(true);
+    try {
+      const newDiagram = await diagramService.createDiagram(task.project_id, {
+        title: `${task.title} Architecture`,
+        description: `Diagram created for task #${task.id}`,
+      });
+      setProjectDiagrams((prev) => [newDiagram, ...prev]);
+      if (task.id) {
+        await diagramService.linkDiagramToTask(newDiagram.id, task.id);
+      }
+      const next = [...diagramIds, newDiagram.id];
+      setDiagramIds(next);
+      task.diagram_ids = next;
+      setIsAttachDiagramOpen(false);
+      setViewingDiagramId(newDiagram.id);
+      showToast("Created new diagram for task", "success");
+    } catch (err: any) {
+      console.error("Failed to create diagram:", err);
+      showToast(err.message || "Failed to create diagram", "error");
+    } finally {
+      setIsLinkingDiagram(false);
+    }
+  };
 
   useEffect(() => {
     if (!task.id) return;
@@ -331,6 +439,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         if (fresh.attachments && Array.isArray(fresh.attachments)) {
           setAttachments(fresh.attachments);
           task.attachments = fresh.attachments;
+        }
+        if (fresh.diagram_ids && Array.isArray(fresh.diagram_ids)) {
+          const freshIds = fresh.diagram_ids.map(String);
+          setDiagramIds(freshIds);
+          task.diagram_ids = freshIds;
         }
         if (fresh.description !== undefined && !isDirty) {
           setDescription(fresh.description || '');
@@ -378,6 +491,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       branch_name: branchName.trim() || undefined,
       repo_url: repoUrl.trim() || undefined,
       attachments: attachments,
+      diagram_ids: diagramIds,
     };
     try {
       await onUpdate(task.id, updatePayload);
@@ -391,6 +505,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       task.branch_name = updatePayload.branch_name;
       task.repo_url = updatePayload.repo_url;
       task.attachments = updatePayload.attachments;
+      task.diagram_ids = updatePayload.diagram_ids;
       onClose();
     } catch (err) {
       console.error("Failed to update task", err);
@@ -407,6 +522,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       showToast('Task reference copied', 'warning');
     }
   };
+
+  const attachedDiagrams = projectDiagrams.filter((d) => diagramIds.includes(d.id));
+  const unattachedDiagrams = projectDiagrams.filter((d) => !diagramIds.includes(d.id));
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 select-none overflow-hidden animate-in fade-in duration-150">
@@ -734,6 +852,149 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Architecture & Diagrams */}
+            <div>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <div className="flex items-center gap-2 text-foreground font-semibold text-xs tracking-tight">
+                  <Network size={14} className="text-primary" />
+                  <span>Architecture & Diagrams</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {diagramIds.length > 0 && (
+                    <Badge variant="primary">
+                      {diagramIds.length} {diagramIds.length === 1 ? 'diagram' : 'diagrams'}
+                    </Badge>
+                  )}
+
+                  {/* Attach Diagram Popover Button */}
+                  <div className="relative" ref={attachDiagramRef}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAttachDiagramOpen((prev) => !prev)}
+                      className="gap-1.5 h-7 text-xs"
+                    >
+                      <Plus size={12} />
+                      <span>Attach Diagram</span>
+                    </Button>
+
+                    {isAttachDiagramOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 w-72 bg-card border border-border rounded-xl shadow-[3px_3px_0px_0px_#000000] p-2 z-50 animate-in fade-in duration-100">
+                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mb-1">
+                          Link Project Diagram
+                        </div>
+
+                        <div className="max-h-56 overflow-y-auto space-y-1">
+                          {loadingDiagrams ? (
+                            <div className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                              <Loader2 size={13} className="animate-spin text-primary" />
+                              <span>Loading diagrams...</span>
+                            </div>
+                          ) : unattachedDiagrams.length === 0 ? (
+                            <div className="px-2 py-3 text-center text-xs text-muted-foreground">
+                              No other diagrams in this project yet.
+                            </div>
+                          ) : (
+                            unattachedDiagrams.map((d) => (
+                              <button
+                                key={d.id}
+                                type="button"
+                                onClick={() => handleLinkDiagram(d.id)}
+                                disabled={isLinkingDiagram}
+                                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-muted/60 transition-colors flex items-center justify-between gap-2 cursor-pointer group"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-medium text-foreground truncate group-hover:text-primary">
+                                    {d.title}
+                                  </div>
+                                  {d.description && (
+                                    <div className="text-[10px] text-muted-foreground truncate">
+                                      {d.description}
+                                    </div>
+                                  )}
+                                </div>
+                                <Plus size={12} className="text-muted-foreground group-hover:text-primary shrink-0" />
+                              </button>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="border-t border-border mt-1.5 pt-1.5">
+                          <button
+                            type="button"
+                            onClick={handleCreateAndLinkDiagram}
+                            disabled={isLinkingDiagram}
+                            className="w-full text-left px-2.5 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium text-xs flex items-center gap-2 cursor-pointer transition-colors"
+                          >
+                            <Plus size={13} />
+                            <span>+ Create New Architecture Diagram</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-4 space-y-2.5 shadow-xs">
+                {attachedDiagrams.length === 0 ? (
+                  <div className="text-center py-4 space-y-1.5 text-muted-foreground">
+                    <Network size={22} className="mx-auto text-muted-foreground/60" />
+                    <p className="text-xs font-medium">No diagrams attached to this task</p>
+                    <p className="text-[11px] max-w-xs mx-auto">
+                      Attach architecture diagrams, sequence flows, or data models to give context to this task.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
+                    {attachedDiagrams.map((d) => (
+                      <div
+                        key={d.id}
+                        className="group flex items-center justify-between gap-2.5 bg-muted/30 border border-border rounded-lg p-2.5 shadow-xs hover:border-primary/40 transition-all min-w-0"
+                      >
+                        <div
+                          className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                          onClick={() => setViewingDiagramId(d.id)}
+                        >
+                          <div className="w-10 h-10 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary">
+                            <Network size={18} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors" title={d.title}>
+                              {d.title}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {d.description || "Interactive Mermaid graph"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setViewingDiagramId(d.id)}
+                            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                            title="View / Edit Diagram"
+                          >
+                            <Eye size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUnlinkDiagram(d.id)}
+                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                            title="Unlink diagram from task"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1292,6 +1553,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Diagram Viewer & Editor Modal */}
+      {viewingDiagramId && (
+        <DiagramModal
+          diagramId={viewingDiagramId}
+          isOpen={!!viewingDiagramId}
+          onClose={() => setViewingDiagramId(null)}
+          onDiagramUpdated={(updated) => {
+            setProjectDiagrams((prev) =>
+              prev.map((d) => (d.id === updated.id ? updated : d))
+            );
+          }}
+        />
       )}
     </div>
   );

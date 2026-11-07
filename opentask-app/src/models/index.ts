@@ -339,6 +339,17 @@ export interface Task {
   prUrl?: string;
   repo_url?: string;
   attachments?: TaskAttachment[];
+  diagram_ids?: string[];
+}
+
+export interface ProjectDiagram {
+  id: string; // 64-bit Snowflake SafeId
+  project_id: string;
+  title: string;
+  code: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TaskAttachment {

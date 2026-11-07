@@ -83,9 +83,28 @@ pub async fn init_database(pool: &PgPool) -> Result<(), sqlx::Error> {
         r#"
         ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS assignee_ids BIGINT[] DEFAULT '{}';
         ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
+        ALTER TABLE opentask.tasks ADD COLUMN IF NOT EXISTS diagram_ids BIGINT[] DEFAULT '{}';
         UPDATE opentask.tasks
         SET assignee_ids = ARRAY[lead_assignee_id]
         WHERE lead_assignee_id IS NOT NULL AND (assignee_ids IS NULL OR assignee_ids = '{}');
+        "#,
+    )
+    .execute(pool)
+    .await;
+
+    // Ensure project diagrams table
+    let _ = sqlx::raw_sql(
+        r#"
+        CREATE TABLE IF NOT EXISTS opentask.project_diagrams (
+            id BIGINT PRIMARY KEY,
+            project_id BIGINT NOT NULL REFERENCES opentask.projects(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            code TEXT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_diagrams_project_id ON opentask.project_diagrams(project_id);
         "#,
     )
     .execute(pool)

@@ -6,10 +6,11 @@ import { useBuckets } from '../controllers/useBuckets';
 import { useDashboard } from '../controllers/useDashboard';
 import { useAsyncReorderQueue } from '../controllers/useAsyncReorderQueue';
 import { useDragAutoScroll } from '../controllers/useDragAutoScroll';
-import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Loader2, RefreshCw, Sparkles, Search, X, Cpu, Filter, Expand, Shrink } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Video, Settings, ChevronLeft, Plus, Loader2, RefreshCw, Sparkles, Search, X, Cpu, Filter, Expand, Shrink, Network } from 'lucide-react';
 import { ProjectOverviewPM, ProjectOverviewDev } from '../components/dashboard/ProjectOverviews';
 import { ProjectSettingsTab } from '../components/dashboard/ProjectSettingsTab';
 import { MeetingIntelligenceTab } from '../components/dashboard/MeetingIntelligenceTab';
+import { ProjectDiagramsTab } from '../components/diagrams/ProjectDiagramsTab';
 import { KanbanCard } from '../components/kanban/KanbanCard';
 import { KanbanColumn } from '../components/kanban/KanbanColumn';
 import { TaskContextMenu, type ContextMenuState } from '../components/kanban/TaskContextMenu';
@@ -53,6 +54,9 @@ const tabToKey = (t: string) => {
     switch (t.toLowerCase()) {
         case 'overview': return 'overview';
         case 'tasks': return 'tasks';
+        case 'diagrams':
+        case 'diagram':
+            return 'diagrams';
         case 'mom & meetings':
         case 'meetings':
         case 'mom':
@@ -66,6 +70,9 @@ const keyToTab = (k: string) => {
     switch (k.toLowerCase()) {
         case 'overview': return 'Overview';
         case 'tasks': return 'Tasks';
+        case 'diagrams':
+        case 'diagram':
+            return 'Diagrams';
         case 'mom & meetings':
         case 'meetings':
         case 'mom':
@@ -741,7 +748,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         queueBucketReorder(reorderedBuckets.map(b => b.id!));
     };
 
-    const tabs = ['Overview', 'Tasks', 'MoM & Meetings', 'Settings'];
+    const tabs = ['Overview', 'Tasks', 'Diagrams', 'MoM & Meetings', 'Settings'];
 
     if (projectNotFound) {
         return (
@@ -776,7 +783,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     }
 
     return (
-        <div className={`animate-in fade-in duration-200 flex flex-col max-w-[1600px] mx-auto w-full select-none ${activeTab === 'Tasks' ? 'flex-1 min-h-0' : 'h-full'}`}>
+        <div className={`animate-in fade-in duration-200 flex flex-col max-w-[1600px] mx-auto w-full select-none ${(activeTab === 'Tasks' || activeTab === 'Diagrams') ? 'flex-1 min-h-0' : 'h-full'}`}>
             {/* Header */}
             <div className="flex items-center gap-3.5 mb-4 shrink-0">
                 <button
@@ -805,6 +812,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                     >
                         {tab === 'Overview' && <LayoutDashboard size={14} />}
                         {tab === 'Tasks' && <Briefcase size={14} />}
+                        {tab === 'Diagrams' && <Network size={14} />}
                         {tab === 'MoM & Meetings' && <Video size={14} />}
                         {tab === 'Settings' && <Settings size={14} />}
                         {tab}
@@ -813,7 +821,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             </div>
 
             {/* Tab Content */}
-            <div className={`min-h-0 ${activeTab === 'Tasks' ? 'flex-1 flex flex-col' : ''}`}>
+            <div className={`min-h-0 ${(activeTab === 'Tasks' || activeTab === 'Diagrams') ? 'flex-1 flex flex-col' : ''}`}>
                 {/* Overview */}
                 {activeTab === 'Overview' && (
                     roleLoading ? <div className="text-muted-foreground text-xs py-10 text-center">Resolving permissions...</div> :
@@ -1282,6 +1290,15 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
 
 
                     </div>
+                )}
+
+                {/* Diagrams */}
+                {activeTab === 'Diagrams' && (
+                    <ProjectDiagramsTab
+                        projectId={projectId}
+                        tasks={tasks}
+                        isManager={isManager}
+                    />
                 )}
 
                 {/* MoM & Meetings */}

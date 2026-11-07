@@ -1,6 +1,7 @@
 pub mod ai_key;
 pub mod alert;
 pub mod bucket;
+pub mod diagram;
 pub mod feedback;
 pub mod history;
 pub mod meeting;
