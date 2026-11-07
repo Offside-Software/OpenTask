@@ -13,6 +13,241 @@ interface MermaidViewerProps {
   showControls?: boolean;
 }
 
+const DARK_THEME_CSS = `
+  * {
+    filter: none !important;
+  }
+
+  /* State Diagrams */
+  g.stateGroup rect {
+    fill: #121824 !important;
+    stroke: #FFE600 !important;
+    stroke-width: 1.5px !important;
+  }
+  g.stateGroup .state-title,
+  g.stateGroup text,
+  g.stateGroup tspan {
+    fill: #FFFFFF !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+  }
+  .transition {
+    stroke: #94A3B8 !important;
+    stroke-width: 1.5px !important;
+  }
+
+  /* Class Diagrams */
+  g.classGroup rect {
+    fill: #121824 !important;
+    stroke: #38BDF8 !important;
+    stroke-width: 1.5px !important;
+  }
+  g.classGroup text,
+  g.classGroup tspan,
+  g.classGroup .title {
+    fill: #FFFFFF !important;
+    color: #FFFFFF !important;
+  }
+  g.classGroup line {
+    stroke: #242F45 !important;
+  }
+  .relation {
+    stroke: #94A3B8 !important;
+    stroke-width: 1.5px !important;
+  }
+  .cardinality text,
+  .classLabel text,
+  .classLabel span,
+  .classLabel tspan {
+    fill: #F8FAFC !important;
+    color: #F8FAFC !important;
+  }
+
+  /* Mindmap Diagrams */
+  .mindmap-node text,
+  .mindmap-node tspan,
+  [class*="section-"] text,
+  [class*="section-"] tspan,
+  [class*="section-"] span {
+    fill: #FFFFFF !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+  }
+  .mindmap-node line {
+    stroke-width: 2.5px !important;
+  }
+
+  /* Flowchart Nodes */
+  .node rect,
+  .node circle,
+  .node ellipse,
+  .node polygon,
+  .node path {
+    fill: #121824 !important;
+    stroke: #FFE600 !important;
+    stroke-width: 1.5px !important;
+  }
+  .node .label text,
+  .node .label tspan,
+  .node .label span {
+    fill: #FFFFFF !important;
+    color: #FFFFFF !important;
+    font-weight: 500 !important;
+  }
+
+  /* Transition & Edge Labels across all diagrams */
+  .edgeLabel rect,
+  .stateLabel rect,
+  .labelBox {
+    fill: #1A2234 !important;
+    stroke: #242F45 !important;
+    opacity: 0.95 !important;
+  }
+  .edgeLabel text,
+  .stateLabel text,
+  .edgeLabel span,
+  .stateLabel span,
+  .labelText {
+    fill: #F8FAFC !important;
+    color: #F8FAFC !important;
+    font-weight: 500 !important;
+  }
+
+  /* Sequence Diagram */
+  rect.actor {
+    fill: #121824 !important;
+    stroke: #FFE600 !important;
+    stroke-width: 1.5px !important;
+  }
+  text.actor {
+    fill: #FFFFFF !important;
+    font-weight: bold !important;
+  }
+  text.messageText {
+    fill: #F8FAFC !important;
+  }
+  line.messageLine0, line.messageLine1 {
+    stroke: #94A3B8 !important;
+  }
+
+  /* Entity Relationship (ER) */
+  .entityBox {
+    fill: #121824 !important;
+    stroke: #FFE600 !important;
+    stroke-width: 1.5px !important;
+  }
+  .entityLabel text,
+  .attributeBoxOdd text,
+  .attributeBoxEven text {
+    fill: #FFFFFF !important;
+    color: #FFFFFF !important;
+  }
+  .attributeBoxOdd {
+    fill: #161F30 !important;
+  }
+  .attributeBoxEven {
+    fill: #121824 !important;
+  }
+`;
+
+const LIGHT_THEME_CSS = `
+  * {
+    filter: none !important;
+  }
+
+  /* State Diagrams */
+  g.stateGroup rect {
+    fill: #FFFFFF !important;
+    stroke: #000000 !important;
+    stroke-width: 1.5px !important;
+  }
+  g.stateGroup .state-title,
+  g.stateGroup text,
+  g.stateGroup tspan {
+    fill: #000000 !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+  }
+  .transition {
+    stroke: #475569 !important;
+    stroke-width: 1.5px !important;
+  }
+
+  /* Class Diagrams */
+  g.classGroup rect {
+    fill: #FFFFFF !important;
+    stroke: #000000 !important;
+    stroke-width: 1.5px !important;
+  }
+  g.classGroup text,
+  g.classGroup tspan,
+  g.classGroup .title {
+    fill: #000000 !important;
+    color: #000000 !important;
+  }
+  g.classGroup line {
+    stroke: #CBD5E1 !important;
+  }
+  .relation {
+    stroke: #475569 !important;
+    stroke-width: 1.5px !important;
+  }
+  .cardinality text,
+  .classLabel text,
+  .classLabel span,
+  .classLabel tspan {
+    fill: #0F172A !important;
+    color: #0F172A !important;
+  }
+
+  /* Mindmap Diagrams */
+  .mindmap-node text,
+  .mindmap-node tspan,
+  [class*="section-"] text,
+  [class*="section-"] tspan,
+  [class*="section-"] span {
+    fill: #000000 !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+  }
+
+  /* Flowchart Nodes */
+  .node rect,
+  .node circle,
+  .node ellipse,
+  .node polygon,
+  .node path {
+    fill: #FFFFFF !important;
+    stroke: #000000 !important;
+    stroke-width: 1.5px !important;
+  }
+  .node .label text,
+  .node .label tspan,
+  .node .label span {
+    fill: #000000 !important;
+    color: #000000 !important;
+    font-weight: 500 !important;
+  }
+
+  /* Edge Labels */
+  .edgeLabel rect,
+  .stateLabel rect,
+  .labelBox {
+    fill: #F1F5F9 !important;
+    stroke: #CBD5E1 !important;
+    opacity: 0.95 !important;
+  }
+  .edgeLabel text,
+  .stateLabel text,
+  .edgeLabel span,
+  .stateLabel span,
+  .labelText {
+    fill: #0F172A !important;
+    color: #0F172A !important;
+    font-weight: 500 !important;
+  }
+`;
+
 export const MermaidViewer: React.FC<MermaidViewerProps> = ({
   code,
   className,
@@ -51,7 +286,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
       });
   }, []);
 
-  // Initialize Mermaid configuration
+  // Initialize Mermaid configuration with theme-specific variables and CSS
   useEffect(() => {
     try {
       mermaid.initialize({
@@ -68,34 +303,79 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
         },
         fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         theme: isDark ? "dark" : "default",
+        themeCSS: isDark ? DARK_THEME_CSS : LIGHT_THEME_CSS,
         themeVariables: isDark
           ? {
               darkMode: true,
               background: "#0A0D14",
-              primaryColor: "#FFE600",
-              primaryTextColor: "#000000",
+              primaryColor: "#121824",
+              primaryTextColor: "#FFFFFF",
               primaryBorderColor: "#FFE600",
               lineColor: "#94A3B8",
-              secondaryColor: "#1E293B",
-              tertiaryColor: "#0F172A",
-              textColor: "#F8FAFC",
-              mainBkg: "#1E293B",
+              secondaryColor: "#161F30",
+              tertiaryColor: "#1A2234",
+              textColor: "#FFFFFF",
+              mainBkg: "#121824",
               nodeBorder: "#FFE600",
-              nodeTextColor: "#F8FAFC",
+              nodeTextColor: "#FFFFFF",
+              classText: "#FFFFFF",
+              stateLabelColor: "#FFFFFF",
+              stateBkg: "#121824",
+              labelTextColor: "#FFFFFF",
+              scaleLabelColor: "#FFFFFF",
+              cScaleLabel0: "#FFFFFF",
+              cScaleLabel1: "#FFFFFF",
+              cScaleLabel2: "#FFFFFF",
+              cScaleLabel3: "#FFFFFF",
+              cScaleLabel4: "#FFFFFF",
+              cScaleLabel5: "#FFFFFF",
+              cScaleLabel6: "#FFFFFF",
+              cScaleLabel7: "#FFFFFF",
+              cScaleLabel8: "#FFFFFF",
+              cScaleLabel9: "#FFFFFF",
+              cScaleLabel10: "#FFFFFF",
+              cScaleLabel11: "#FFFFFF",
+              gitBranchLabel0: "#FFFFFF",
+              gitBranchLabel1: "#FFFFFF",
+              gitBranchLabel2: "#FFFFFF",
+              gitBranchLabel3: "#FFFFFF",
+              gitBranchLabel4: "#FFFFFF",
+              gitBranchLabel5: "#FFFFFF",
+              git0: "#2563EB",
+              git1: "#7C3AED",
+              git2: "#059669",
+              git3: "#D97706",
+              git4: "#DC2626",
+              git5: "#0891B2",
+              cScale0: "#1E3A8A",
+              cScale1: "#581C87",
+              cScale2: "#064E3B",
+              cScale3: "#78350F",
+              cScale4: "#7F1D1D",
+              cScale5: "#164E63",
+              dropShadow: "none",
+              useMaxWidth: true,
             }
           : {
               darkMode: false,
               background: "#FFFFFF",
-              primaryColor: "#FFE600",
+              primaryColor: "#FFFFFF",
               primaryTextColor: "#000000",
               primaryBorderColor: "#000000",
               lineColor: "#475569",
               secondaryColor: "#F1F5F9",
               tertiaryColor: "#F8FAFC",
-              textColor: "#0F172A",
-              mainBkg: "#F8FAFC",
+              textColor: "#000000",
+              mainBkg: "#FFFFFF",
               nodeBorder: "#000000",
               nodeTextColor: "#000000",
+              classText: "#000000",
+              stateLabelColor: "#000000",
+              stateBkg: "#FFFFFF",
+              labelTextColor: "#000000",
+              scaleLabelColor: "#000000",
+              dropShadow: "none",
+              useMaxWidth: true,
             },
       });
     } catch (e) {
@@ -266,15 +546,16 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full h-full min-h-[320px] overflow-hidden select-none bg-muted/15 border border-border rounded-xl flex items-center justify-center transition-all",
-        isFullscreen ? "fixed inset-0 z-50 rounded-none bg-background border-none" : "",
+        "relative w-full h-full min-h-[320px] overflow-hidden select-none border border-border rounded-xl flex items-center justify-center transition-all",
+        isDark ? "bg-[#0A0D14]" : "bg-[#F8F9FA]",
+        isFullscreen ? "fixed inset-0 z-50 rounded-none border-none" : "",
         className,
       )}
       style={{
         backgroundImage: isDark
-          ? "radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)"
-          : "radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px)",
-        backgroundSize: "20px 20px",
+          ? "radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px)"
+          : "radial-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px)",
+        backgroundSize: "22px 22px",
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
