@@ -18,7 +18,6 @@ import { NetworkBadge } from "./components/ui/NetworkBadge";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { MeetingUploadTray } from "./components/meetings/MeetingUploadTray";
 import { ProjectTabsProvider, useProjectTabs } from "./context/projectTabsContext";
-import { ProjectTabBar } from "./components/layout/ProjectTabBar";
 import { ToastProvider } from "./design-system/Toast";
 import { UpdateProvider } from "./components/updater/UpdateChecker";
 import "./App.css";
@@ -42,9 +41,6 @@ function AppShell() {
       <NetworkBadge />
 
       <main className="flex-1 overflow-y-auto no-scrollbar bg-background flex flex-col min-w-0">
-        {/* Project Multi-Tab Bar */}
-        <ProjectTabBar />
-
         <div className="px-4 pt-4 sm:pt-6 pb-6 flex-1 flex flex-col min-h-0">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
