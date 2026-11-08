@@ -23,6 +23,7 @@ import logo from '../../assets/logo.svg';
 import { useAlerts } from '../../controllers/useAlerts';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import { NetworkBadge } from '../ui/NetworkBadge';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -275,6 +276,9 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
 
           {/* Bottom Actions */}
           <div className="mt-auto w-full flex flex-col gap-1 pt-3 border-t border-sidebar-border">
+            {/* System Telemetry & Network Status */}
+            <NetworkBadge isCollapsed={isCollapsed} />
+
             {/* Quick Theme Toggle */}
             <button
               type="button"

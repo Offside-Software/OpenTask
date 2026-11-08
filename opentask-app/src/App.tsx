@@ -14,7 +14,6 @@ import { SettingsModal } from "./components/modals/SettingsModal";
 import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPrompt";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "./context/themeContext";
-import { NetworkBadge } from "./components/ui/NetworkBadge";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { MeetingUploadTray } from "./components/meetings/MeetingUploadTray";
 import { ProjectTabsProvider, useProjectTabs } from "./context/projectTabsContext";
@@ -43,9 +42,6 @@ function AppShell() {
               onOpenSettings={() => setIsSettingsOpen(true)}
               onOpenFeedback={() => setIsFeedbackOpen(true)}
             />
-
-            {/* Global Telemetry & Network Status Badge */}
-            <NetworkBadge />
 
             <main className="flex-1 overflow-y-auto no-scrollbar bg-background flex flex-col min-w-0">
               <div className="px-4 pt-4 sm:pt-6 pb-6 flex-1 flex flex-col min-h-0">
