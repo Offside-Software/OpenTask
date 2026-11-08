@@ -838,11 +838,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
 
                 {/* Tasks — Kanban */}
                 {activeTab === 'Tasks' && (
-                    <div className={
-                        focusBucket
-                            ? "fixed inset-0 z-[45] bg-background p-3 sm:p-5 flex flex-col min-h-0 overflow-hidden select-none animate-in fade-in duration-150"
-                            : "bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-xs"
-                    }>
+                    <div
+                        className={
+                            focusBucket
+                                ? "fixed inset-x-0 bottom-0 z-[45] bg-background p-3 sm:p-5 flex flex-col min-h-0 overflow-hidden select-none animate-in fade-in duration-150"
+                                : "bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-xs"
+                        }
+                        style={focusBucket ? { top: 'var(--titlebar-height, 0px)' } : undefined}
+                    >
                         <div className="flex justify-between items-center mb-3 pb-3 border-b border-border flex-wrap gap-2 shrink-0">
                             <div>
                                 {focusBucket ? (

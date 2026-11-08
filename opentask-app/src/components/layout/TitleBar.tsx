@@ -24,9 +24,30 @@ interface TitleBarProps {
   forceShow?: boolean;
 }
 
+// Pre-initialize titlebar height CSS variable immediately if in Tauri
+if (typeof document !== "undefined" && isTauriEnvironment()) {
+  document.documentElement.style.setProperty("--titlebar-height", "2.25rem");
+  document.documentElement.classList.add("has-custom-titlebar");
+}
+
 export const TitleBar: React.FC<TitleBarProps> = ({ title, forceShow = false }) => {
   const [isTauri, setIsTauri] = useState<boolean>(() => isTauriEnvironment() || forceShow);
   const [isMaximized, setIsMaximized] = useState(false);
+
+  // Synchronize custom titlebar height and CSS helper class on root document
+  useEffect(() => {
+    if (isTauri || forceShow) {
+      document.documentElement.style.setProperty("--titlebar-height", "2.25rem");
+      document.documentElement.classList.add("has-custom-titlebar");
+    } else {
+      document.documentElement.style.setProperty("--titlebar-height", "0px");
+      document.documentElement.classList.remove("has-custom-titlebar");
+    }
+    return () => {
+      document.documentElement.style.setProperty("--titlebar-height", "0px");
+      document.documentElement.classList.remove("has-custom-titlebar");
+    };
+  }, [isTauri, forceShow]);
 
   // Accurate platform detection (Windows vs macOS)
   const isMac =
