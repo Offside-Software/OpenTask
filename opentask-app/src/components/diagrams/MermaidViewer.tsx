@@ -548,10 +548,11 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({
       className={cn(
         "relative w-full h-full min-h-[320px] overflow-hidden select-none border border-border rounded-xl flex items-center justify-center transition-all",
         isDark ? "bg-[#0A0D14]" : "bg-[#F8F9FA]",
-        isFullscreen ? "fixed inset-0 z-50 rounded-none border-none" : "",
+        isFullscreen ? "fixed inset-x-0 bottom-0 z-50 rounded-none border-none" : "",
         className,
       )}
       style={{
+        top: isFullscreen ? 'var(--titlebar-height, 0px)' : undefined,
         backgroundImage: isDark
           ? "radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px)"
           : "radial-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px)",
