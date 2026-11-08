@@ -1,4 +1,4 @@
-﻿use axum::{
+use axum::{
     extract::{Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
@@ -513,11 +513,25 @@ fn get_redirect_uri(config: &Config, headers: &HeaderMap) -> String {
         .and_then(|v| v.to_str().ok())
         .unwrap_or(if host.contains("vercel.app") { "https" } else { "http" });
 
-    if !host.is_empty() && !host.contains("localhost") && !host.contains("127.0.0.1") {
+    // 1. If request came through a frontend Vercel deployment, use that Vercel callback
+    if !host.is_empty() && host.contains("vercel.app") {
         return format!("{proto}://{host}/api/auth/callback");
     }
 
-    config.gh_oauth_redirect_uri.clone()
+    // 2. If request came from local development
+    if host.contains("localhost") || host.contains("127.0.0.1") {
+        return "http://localhost:5173/api/auth/callback".to_string();
+    }
+
+    // 3. Otherwise (e.g. desktop app calling backend directly, or proxy environments)
+    // Always route GitHub callback to the public client gateway on Vercel:
+    let frontend = get_frontend_url(config, headers);
+    if !frontend.contains("localhost") && !frontend.contains("127.0.0.1") {
+        let clean_frontend = frontend.trim_end_matches('/');
+        return format!("{clean_frontend}/api/auth/callback");
+    }
+
+    "https://open-task-five.vercel.app/api/auth/callback".to_string()
 }
 
 fn get_frontend_url(config: &Config, headers: &HeaderMap) -> String {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './LoginPage.css';
 import logo from '../assets/logo.svg';
-import { resolveApiUrl, isTauriEnvironment } from '../services/apiClient';
+import { resolveApiUrl, resolveOAuthLoginUrl, isTauriEnvironment } from '../services/apiClient';
 import { useAuth } from './useAuth';
 import { RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
 import { Button } from '../design-system/Button';
@@ -25,7 +25,7 @@ export function LoginPage() {
     setLoginError(null);
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const authUrl = resolveApiUrl('/auth/login');
+      const authUrl = resolveOAuthLoginUrl();
       const token = await invoke<string>('start_desktop_oauth', { authUrl });
       if (token) {
         localStorage.setItem('gh_token', token);
