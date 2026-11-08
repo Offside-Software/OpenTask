@@ -11,15 +11,19 @@ import {
   Github,
   ExternalLink,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  FolderGit2,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useTheme } from '../../context/themeContext';
+import { useProjectTabs } from '../../context/projectTabsContext';
 import { getDisplayName } from '../../auth/displayName';
 import logo from '../../assets/logo.svg';
 import { useAlerts } from '../../controllers/useAlerts';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import { NetworkBadge } from '../ui/NetworkBadge';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -39,6 +43,7 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { alerts } = useAlerts({ userId: user?.db_user?.id });
+  const { tabs, closeTab } = useProjectTabs();
 
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
@@ -135,9 +140,9 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
           )}
 
           {/* Navigation Links */}
-          <nav className="flex flex-col gap-1 w-full">
+          <nav className="flex flex-col gap-1 w-full shrink-0">
             {NAV_ITEMS.map(({ id, fullLabel, icon: Icon }) => {
-              const isActive = currentPage === id || (id === 'workspaces' && currentPage === 'projects');
+              const isActive = currentPage === id;
               const hasUnread = id === 'notifications' && alerts.length > 0;
               return (
                 <Link
@@ -169,8 +174,111 @@ export function Sidebar({ onOpenSettings, onOpenFeedback }: SidebarProps) {
             })}
           </nav>
 
+          {/* Open Projects Section */}
+          {tabs.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-sidebar-border/60 flex flex-col min-h-0 flex-1">
+              {!isCollapsed ? (
+                <>
+                  <div className="flex items-center justify-between px-2 pb-1.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase shrink-0">
+                    <span className="flex items-center gap-1.5">
+                      <FolderGit2 size={12} className="text-primary" />
+                      <span>Open Projects</span>
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 bg-sidebar-accent text-sidebar-foreground/80 rounded-sm border border-sidebar-border font-semibold">
+                      {tabs.length}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-0.5 overflow-y-auto no-scrollbar flex-1 pr-0.5">
+                    {tabs.map((tab) => {
+                      const isProjectActive = location.pathname.startsWith(`/projects/${tab.id}`);
+                      return (
+                        <div
+                          key={tab.id}
+                          onClick={() => navigate(`/projects/${tab.id}`)}
+                          title={`${tab.name || `Project #${tab.id.slice(-4)}`}\nID: ${tab.id}`}
+                          className={cn(
+                            'group h-8 rounded-lg transition-colors relative flex items-center justify-between px-2 text-xs font-medium cursor-pointer shrink-0',
+                            isProjectActive
+                              ? 'bg-primary text-primary-foreground shadow-xs'
+                              : 'text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+                          )}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <FolderGit2
+                              size={13}
+                              className={cn(
+                                'shrink-0',
+                                isProjectActive ? 'text-primary-foreground' : 'text-primary'
+                              )}
+                            />
+                            <span className="truncate text-xs">
+                              {tab.name || `Project #${tab.id.slice(-4)}`}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              closeTab(tab.id, e);
+                            }}
+                            title="Close project"
+                            className={cn(
+                              'w-5 h-5 rounded flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100 shrink-0 ml-1 cursor-pointer',
+                              isProjectActive
+                                ? 'hover:bg-primary-foreground/20 text-primary-foreground'
+                                : 'hover:bg-sidebar-border text-muted-foreground hover:text-foreground'
+                            )}
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-1 overflow-y-auto no-scrollbar flex-1">
+                  {tabs.map((tab) => {
+                    const isProjectActive = location.pathname.startsWith(`/projects/${tab.id}`);
+                    return (
+                      <div
+                        key={tab.id}
+                        onClick={() => navigate(`/projects/${tab.id}`)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          closeTab(tab.id, e);
+                        }}
+                        title={`${tab.name || `Project #${tab.id.slice(-4)}`}\n(Click to open, right-click to close)`}
+                        className={cn(
+                          'w-8 h-8 rounded-lg transition-colors relative flex items-center justify-center cursor-pointer group shrink-0',
+                          isProjectActive
+                            ? 'bg-primary text-primary-foreground shadow-xs'
+                            : 'text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+                        )}
+                      >
+                        <FolderGit2
+                          size={15}
+                          className={isProjectActive ? 'text-primary-foreground' : 'text-primary'}
+                        />
+                        {isProjectActive && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-foreground rounded-full border border-sidebar" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Bottom Actions */}
           <div className="mt-auto w-full flex flex-col gap-1 pt-3 border-t border-sidebar-border">
+            {/* System Telemetry & Network Status */}
+            <NetworkBadge isCollapsed={isCollapsed} />
+
             {/* Quick Theme Toggle */}
             <button
               type="button"

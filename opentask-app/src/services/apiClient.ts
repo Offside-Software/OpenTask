@@ -6,6 +6,7 @@ export const DEFAULT_DEV_API_URL = "http://localhost:8000";
 export function isTauriEnvironment(): boolean {
   if (typeof window === "undefined") return false;
   return Boolean(
+    (window as any).isTauri ||
     (window as any).__TAURI_INTERNALS__ ||
     (window as any).__TAURI__ ||
     window.location.protocol === "tauri:" ||
@@ -40,6 +41,21 @@ export function getBaseUrl(): string {
 }
 
 export const BASE_URL = getBaseUrl();
+
+export const VERCEL_PUBLIC_CLIENT_URL = "https://open-task-five.vercel.app";
+
+export function resolveOAuthLoginUrl(): string {
+  const baseUrl = getBaseUrl();
+  // If running against a local development backend (e.g. localhost:8000)
+  if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+    return resolveApiUrl("/auth/login");
+  }
+
+  // When connecting to production backend (DewaCloud), route browser OAuth through Vercel
+  // so that GitHub receives https://open-task-five.vercel.app/api/auth/callback (the registered URI)
+  // and Vercel rewrites the callback to DewaCloud /api/opentask/auth/callback.
+  return `${VERCEL_PUBLIC_CLIENT_URL}/api/auth/login`;
+}
 
 export function resolveApiUrl(endpoint: string): string {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;

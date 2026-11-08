@@ -14,13 +14,12 @@ import { SettingsModal } from "./components/modals/SettingsModal";
 import { TelegramLinkPrompt } from "./components/notifications/TelegramLinkPrompt";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "./context/themeContext";
-import { NetworkBadge } from "./components/ui/NetworkBadge";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { MeetingUploadTray } from "./components/meetings/MeetingUploadTray";
 import { ProjectTabsProvider, useProjectTabs } from "./context/projectTabsContext";
-import { ProjectTabBar } from "./components/layout/ProjectTabBar";
 import { ToastProvider } from "./design-system/Toast";
 import { UpdateProvider } from "./components/updater/UpdateChecker";
+import { TitleBar } from "./components/layout/TitleBar";
 import "./App.css";
 
 function AppShell() {
@@ -28,40 +27,43 @@ function AppShell() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
-  if (isLoading) return <LoadingScreen message="Resolving session…" />;
-  if (!user) return <LoginPage />;
-
   return (
-    <div className="h-screen w-full bg-background text-foreground flex overflow-hidden selection:bg-primary/20 transition-colors duration-150 relative">
-      <Sidebar
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenFeedback={() => setIsFeedbackOpen(true)}
-      />
+    <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden selection:bg-primary/20 transition-colors duration-150 relative">
+      <TitleBar />
 
-      {/* Global Telemetry & Network Status Badge */}
-      <NetworkBadge />
+      <div className="flex-1 flex overflow-hidden relative min-h-0">
+        {isLoading ? (
+          <LoadingScreen message="Resolving session…" />
+        ) : !user ? (
+          <LoginPage />
+        ) : (
+          <>
+            <Sidebar
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onOpenFeedback={() => setIsFeedbackOpen(true)}
+            />
 
-      <main className="flex-1 overflow-y-auto no-scrollbar bg-background flex flex-col min-w-0">
-        {/* Project Multi-Tab Bar */}
-        <ProjectTabBar />
+            <main className="flex-1 overflow-y-auto no-scrollbar bg-background flex flex-col min-w-0">
+              <div className="px-4 pt-4 sm:pt-6 pb-6 flex-1 flex flex-col min-h-0">
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/workspaces" element={<WorkspacesPage />} />
+                  <Route path="/projects/:projectId" element={<ProjectDetailsPageWrapper />} />
+                  <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </div>
+            </main>
 
-        <div className="px-4 pt-4 sm:pt-6 pb-6 flex-1 flex flex-col min-h-0">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/workspaces" element={<WorkspacesPage />} />
-            <Route path="/projects/:projectId" element={<ProjectDetailsPageWrapper />} />
-            <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />
-            <Route path="/notifications" element={<NotificationsPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </div>
-      </main>
-
-      <TelegramLinkPrompt onOpenSettings={() => setIsSettingsOpen(true)} />
-      <MeetingUploadTray />
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+            <TelegramLinkPrompt onOpenSettings={() => setIsSettingsOpen(true)} />
+            <MeetingUploadTray />
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+            <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+          </>
+        )}
+      </div>
     </div>
   );
 }
