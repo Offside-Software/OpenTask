@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, Minus, Code, GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles, RotateCcw, Users, Paperclip, UploadCloud, FileText, Download, Trash2, Image as ImageIcon, Eye, Network } from 'lucide-react';
+import {
+  CheckSquare, AlignLeft, Tag, GitPullRequest, Activity, Check, Plus, Minus, Code,
+  GitBranch, ExternalLink, ShieldCheck, ChevronDown, ChevronUp, Loader2, Sparkles,
+  RotateCcw, Users, Paperclip, UploadCloud, FileText, Download, Trash2, Image as ImageIcon,
+  Eye, Network, Calendar, AtSign, Hash, Copy
+} from 'lucide-react';
 import type { Task, Bucket, ProjectMember, PrReview, ExtractedTask, TaskAttachment, ProjectDiagram } from '../../models';
 import { getAllTaskTypes, saveCustomTaskType, parseTaskTypes, serializeTaskTypes, getTaskTypeVariant } from '../../utils/taskTypes';
 import { CloseButton } from '../../design-system/CloseButton';
@@ -21,14 +26,22 @@ interface TaskDetailModalProps {
   buckets: Bucket[];
   members: ProjectMember[];
   projectRepoUrls?: string[];
+  allTasks?: Task[];
   onClose: () => void;
   onUpdate: (taskId: string | number, data: Partial<Task>) => Promise<void>;
+  onDuplicate?: (task: Task) => void;
 }
+
+const isPdfFile = (type?: string, name?: string): boolean => {
+  if (type === 'application/pdf') return true;
+  if (name && name.toLowerCase().endsWith('.pdf')) return true;
+  return false;
+};
 
 const TASK_WEIGHTS = [1, 2, 3, 5, 8];
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
-  task, buckets, members, projectRepoUrls = [], onClose, onUpdate
+  task, buckets, members, projectRepoUrls = [], allTasks = [], onClose, onUpdate, onDuplicate
 }) => {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
@@ -64,6 +77,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   });
   const [weight, setWeight] = useState<number>(task.weight);
   const [bucketId, setBucketId] = useState<string | undefined>(task.bucket_id ? String(task.bucket_id) : undefined);
+  const [startDate, setStartDate] = useState<string>(() => {
+    return task.start_date ? task.start_date.split('T')[0] : '';
+  });
+  const [targetDate, setTargetDate] = useState<string>(() => {
+    return task.target_date ? task.target_date.split('T')[0] : '';
+  });
+  const [completedAt, setCompletedAt] = useState<string | null>(() => {
+    return task.completed_at || null;
+  });
+
   const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
     if (task.assignee_ids && task.assignee_ids.length > 0) {
       return task.assignee_ids.map(String);
@@ -77,8 +100,101 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [attachments, setAttachments] = useState<TaskAttachment[]>(task.attachments || []);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [previewImage, setPreviewImage] = useState<TaskAttachment | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<TaskAttachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [mentionMenu, setMentionMenu] = useState<'member' | 'task' | 'diagram' | 'file' | null>(null);
+  const mentionMenuRef = useRef<HTMLDivElement>(null);
+
+  interface AutocompleteState {
+    active: boolean;
+    type: 'user' | 'task';
+    query: string;
+    startIndex: number;
+  }
+  const [autocomplete, setAutocomplete] = useState<AutocompleteState>({
+    active: false,
+    type: 'user',
+    query: '',
+    startIndex: -1,
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mentionMenuRef.current && !mentionMenuRef.current.contains(e.target as Node)) {
+        setMentionMenu(null);
+      }
+    };
+    if (mentionMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [mentionMenu]);
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setDescription(val);
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const lastAt = textBeforeCursor.lastIndexOf('@');
+    const lastHash = textBeforeCursor.lastIndexOf('#');
+    const lastTrigger = Math.max(lastAt, lastHash);
+
+    if (lastTrigger !== -1) {
+      const char = textBeforeCursor[lastTrigger];
+      const query = textBeforeCursor.slice(lastTrigger + 1);
+      const charBefore = lastTrigger > 0 ? textBeforeCursor[lastTrigger - 1] : ' ';
+      if ((charBefore === ' ' || charBefore === '\n') && !query.includes(' ') && !query.includes('\n')) {
+        setAutocomplete({
+          active: true,
+          type: char === '@' ? 'user' : 'task',
+          query: query.toLowerCase(),
+          startIndex: lastTrigger,
+        });
+        return;
+      }
+    }
+    setAutocomplete({ active: false, type: 'user', query: '', startIndex: -1 });
+  };
+
+  const insertMention = (replacement: string, fromAutocomplete = false) => {
+    if (fromAutocomplete && autocomplete.startIndex !== -1) {
+      const before = description.slice(0, autocomplete.startIndex);
+      const after = description.slice(autocomplete.startIndex + autocomplete.query.length + 1);
+      const nextVal = `${before}${replacement} ${after}`;
+      setDescription(nextVal);
+      setAutocomplete({ active: false, type: 'user', query: '', startIndex: -1 });
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const pos = before.length + replacement.length + 1;
+          textareaRef.current.setSelectionRange(pos, pos);
+        }
+      }, 0);
+    } else {
+      if (textareaRef.current) {
+        const start = textareaRef.current.selectionStart || description.length;
+        const end = textareaRef.current.selectionEnd || description.length;
+        const before = description.substring(0, start);
+        const after = description.substring(end);
+        const nextVal = `${before}${before.endsWith(' ') || before.length === 0 ? '' : ' '}${replacement} ${after}`;
+        setDescription(nextVal);
+        setMentionMenu(null);
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            const pos = start + replacement.length + 2;
+            textareaRef.current.setSelectionRange(pos, pos);
+          }
+        }, 0);
+      } else {
+        setDescription(prev => `${prev} ${replacement}`);
+        setMentionMenu(null);
+      }
+    }
+  };
+
   const { showToast } = useToast();
 
   const [diagramIds, setDiagramIds] = useState<string[]>(() => {
@@ -210,6 +326,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       if (compBucket) {
         setBucketId(String(compBucket.id));
       }
+      setCompletedAt(new Date().toISOString());
     } else {
       const fallback = (previousBucketId && buckets.some(b => String(b.id) === String(previousBucketId) && b.state !== 'COMPLETED'))
         ? previousBucketId
@@ -217,6 +334,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       if (fallback) {
         setBucketId(String(fallback));
       }
+      setCompletedAt(null);
     }
   };
 
@@ -334,6 +452,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     branchName.trim() !== (task.branch_name || '').trim() ||
     Number(weight) !== Number(task.weight ?? 1) ||
     bucketId !== (task.bucket_id ? String(task.bucket_id) : undefined) ||
+    startDate !== (task.start_date ? task.start_date.split('T')[0] : '') ||
+    targetDate !== (task.target_date ? task.target_date.split('T')[0] : '') ||
+    completedAt !== (task.completed_at || null) ||
     JSON.stringify(attachments) !== JSON.stringify(task.attachments || []) ||
     JSON.stringify([...assigneeIds].sort()) !== JSON.stringify([...initialAssigneeIds].sort()) ||
     JSON.stringify([...selectedTypes].sort()) !== JSON.stringify([...initialTypes].sort()) ||
@@ -356,6 +477,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       active = false;
     };
   }, [task.project_id]);
+
+  useEffect(() => {
+    const handleOpenDiagram = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.diagramId) {
+        setViewingDiagramId(String(detail.diagramId));
+      }
+    };
+    window.addEventListener('opentask:open-diagram', handleOpenDiagram);
+    return () => window.removeEventListener('opentask:open-diagram', handleOpenDiagram);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -492,7 +624,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       repo_url: repoUrl.trim() || undefined,
       attachments: attachments,
       diagram_ids: diagramIds,
+      start_date: startDate ? new Date(startDate).toISOString() : null,
+      target_date: targetDate ? new Date(targetDate).toISOString() : null,
+      completed_at: completedAt,
     };
+
+    onClose();
+
     try {
       await onUpdate(task.id, updatePayload);
       task.title = updatePayload.title!;
@@ -506,7 +644,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       task.repo_url = updatePayload.repo_url;
       task.attachments = updatePayload.attachments;
       task.diagram_ids = updatePayload.diagram_ids;
-      onClose();
+      task.start_date = updatePayload.start_date;
+      task.target_date = updatePayload.target_date;
+      task.completed_at = updatePayload.completed_at;
     } catch (err) {
       console.error("Failed to update task", err);
     } finally {
@@ -576,29 +716,62 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </button>
             </div>
 
-            {/* Mark as Complete Button */}
-            <button
-              type="button"
-              onClick={() => handleToggleComplete(!isCompleted)}
-              className={cn(
-                "flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-lg border text-xs font-medium transition-colors shadow-xs",
-                isCompleted
-                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
-                  : "bg-background border-border text-foreground hover:bg-muted"
+            {/* Action Bar Right */}
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              {onDuplicate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDuplicate({
+                      ...task,
+                      title: title.trim(),
+                      description: description.trim() || undefined,
+                      type: serializeTaskTypes(selectedTypes) || task.type,
+                      weight: Number(weight),
+                      bucket_id: bucketId,
+                      assignee_ids: assigneeIds,
+                      lead_assignee_id: assigneeIds.length > 0 ? assigneeIds[0] : null,
+                      branch_name: branchName.trim() || undefined,
+                      repo_url: repoUrl.trim() || undefined,
+                      attachments,
+                      diagram_ids: diagramIds,
+                      start_date: startDate ? new Date(startDate).toISOString() : null,
+                      target_date: targetDate ? new Date(targetDate).toISOString() : null,
+                    });
+                    onClose();
+                  }}
+                  className="flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1 rounded-lg border border-border bg-background hover:bg-muted text-foreground text-xs font-medium transition-colors shadow-xs"
+                  title="Duplicate this task"
+                >
+                  <Copy size={12} className="text-primary" />
+                  <span>Duplicate</span>
+                </button>
               )}
-            >
-              <div className={cn(
-                "w-4 h-4 rounded-md border flex items-center justify-center transition-colors",
-                isCompleted
-                  ? "bg-emerald-600 text-white border-emerald-600"
-                  : "border-muted-foreground/50"
-              )}>
-                {isCompleted && <Check size={11} strokeWidth={2.5} />}
-              </div>
-              <span>
-                {isCompleted ? 'Completed' : 'Mark as complete'}
-              </span>
-            </button>
+
+              {/* Mark as Complete Button */}
+              <button
+                type="button"
+                onClick={() => handleToggleComplete(!isCompleted)}
+                className={cn(
+                  "flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-lg border text-xs font-medium transition-colors shadow-xs",
+                  isCompleted
+                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+                    : "bg-background border-border text-foreground hover:bg-muted"
+                )}
+              >
+                <div className={cn(
+                  "w-4 h-4 rounded-md border flex items-center justify-center transition-colors",
+                  isCompleted
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "border-muted-foreground/50"
+                )}>
+                  {isCompleted && <Check size={11} strokeWidth={2.5} />}
+                </div>
+                <span>
+                  {isCompleted ? 'Completed' : 'Mark as complete'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -681,13 +854,202 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </div>
 
               {descriptionViewMode === 'raw' ? (
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter task description or requirements (Markdown supported)..."
-                  style={{ fontSize: `${descriptionFontSize}px` }}
-                  className="w-full h-96 bg-background border border-input rounded-xl px-4 py-3 font-sans text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-all resize-y leading-relaxed"
-                />
+                <div className="relative">
+                  {/* Mention Toolbar */}
+                  <div className="flex items-center gap-1.5 mb-2 flex-wrap border-b border-border pb-1.5 text-xs">
+                    <span className="text-[11px] text-muted-foreground font-medium mr-1">Insert:</span>
+                    <div className="relative" ref={mentionMenu === 'member' ? mentionMenuRef : undefined}>
+                      <button
+                        type="button"
+                        onClick={() => setMentionMenu(prev => prev === 'member' ? null : 'member')}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-border bg-background hover:bg-muted text-foreground text-xs transition-colors cursor-pointer"
+                        title="Mention member"
+                      >
+                        <AtSign size={12} className="text-primary" />
+                        <span>Member</span>
+                      </button>
+                      {mentionMenu === 'member' && (
+                        <div className="absolute left-0 top-full mt-1 w-56 bg-card border border-border rounded-lg shadow-lg p-1.5 z-30 max-h-48 overflow-y-auto">
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase px-2 py-1">Project Members</div>
+                          {members.length === 0 ? (
+                            <div className="text-xs text-muted-foreground px-2 py-1">No members found</div>
+                          ) : (
+                            members.map(m => {
+                              const handle = m.gh_username || m.display_name || `user_${m.user_id}`;
+                              return (
+                                <button
+                                  key={String(m.user_id)}
+                                  type="button"
+                                  onClick={() => insertMention(`@${handle}`)}
+                                  className="w-full text-left px-2 py-1 rounded hover:bg-muted text-xs flex items-center gap-2 truncate cursor-pointer"
+                                >
+                                  <AtSign size={11} className="text-primary shrink-0" />
+                                  <span className="truncate">{handle}</span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative" ref={mentionMenu === 'task' ? mentionMenuRef : undefined}>
+                      <button
+                        type="button"
+                        onClick={() => setMentionMenu(prev => prev === 'task' ? null : 'task')}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-border bg-background hover:bg-muted text-foreground text-xs transition-colors cursor-pointer"
+                        title="Link task"
+                      >
+                        <Hash size={12} className="text-primary" />
+                        <span>Task</span>
+                      </button>
+                      {mentionMenu === 'task' && (
+                        <div className="absolute left-0 top-full mt-1 w-64 bg-card border border-border rounded-lg shadow-lg p-1.5 z-30 max-h-48 overflow-y-auto">
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase px-2 py-1">Project Tasks</div>
+                          {allTasks.filter(t => String(t.id) !== String(task.id)).length === 0 ? (
+                            <div className="text-xs text-muted-foreground px-2 py-1">No other tasks found</div>
+                          ) : (
+                            allTasks.filter(t => String(t.id) !== String(task.id)).map(t => (
+                              <button
+                                key={String(t.id)}
+                                type="button"
+                                onClick={() => insertMention(`[#${t.id}: ${t.title}](#${t.id})`)}
+                                className="w-full text-left px-2 py-1 rounded hover:bg-muted text-xs flex items-center gap-1.5 truncate cursor-pointer"
+                              >
+                                <Hash size={11} className="text-primary shrink-0" />
+                                <span className="font-mono text-[11px] shrink-0">#{t.id}</span>
+                                <span className="truncate text-muted-foreground">{t.title}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative" ref={mentionMenu === 'diagram' ? mentionMenuRef : undefined}>
+                      <button
+                        type="button"
+                        onClick={() => setMentionMenu(prev => prev === 'diagram' ? null : 'diagram')}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-border bg-background hover:bg-muted text-foreground text-xs transition-colors cursor-pointer"
+                        title="Link diagram"
+                      >
+                        <Network size={12} className="text-primary" />
+                        <span>Diagram</span>
+                      </button>
+                      {mentionMenu === 'diagram' && (
+                        <div className="absolute left-0 top-full mt-1 w-60 bg-card border border-border rounded-lg shadow-lg p-1.5 z-30 max-h-48 overflow-y-auto">
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase px-2 py-1">Diagrams</div>
+                          {projectDiagrams.length === 0 ? (
+                            <div className="text-xs text-muted-foreground px-2 py-1">No diagrams found</div>
+                          ) : (
+                            projectDiagrams.map(d => (
+                              <button
+                                key={String(d.id)}
+                                type="button"
+                                onClick={() => insertMention(`[Diagram: ${d.title}](#diagram-${d.id})`)}
+                                className="w-full text-left px-2 py-1 rounded hover:bg-muted text-xs flex items-center gap-1.5 truncate cursor-pointer"
+                              >
+                                <Network size={11} className="text-primary shrink-0" />
+                                <span className="truncate">{d.title}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative" ref={mentionMenu === 'file' ? mentionMenuRef : undefined}>
+                      <button
+                        type="button"
+                        onClick={() => setMentionMenu(prev => prev === 'file' ? null : 'file')}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-border bg-background hover:bg-muted text-foreground text-xs transition-colors cursor-pointer"
+                        title="Link attachment"
+                      >
+                        <Paperclip size={12} className="text-primary" />
+                        <span>File</span>
+                      </button>
+                      {mentionMenu === 'file' && (
+                        <div className="absolute left-0 top-full mt-1 w-64 bg-card border border-border rounded-lg shadow-lg p-1.5 z-30 max-h-48 overflow-y-auto">
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase px-2 py-1">Attached Files</div>
+                          {attachments.length === 0 ? (
+                            <div className="text-xs text-muted-foreground px-2 py-1">No attachments on this task</div>
+                          ) : (
+                            attachments.map(att => (
+                              <button
+                                key={att.id}
+                                type="button"
+                                onClick={() => insertMention(`[${att.name}](${att.url})`)}
+                                className="w-full text-left px-2 py-1 rounded hover:bg-muted text-xs flex items-center gap-1.5 truncate cursor-pointer"
+                              >
+                                <Paperclip size={11} className="text-primary shrink-0" />
+                                <span className="truncate">{att.name}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <textarea
+                    ref={textareaRef}
+                    value={description}
+                    onChange={handleDescriptionChange}
+                    placeholder="Enter task description or requirements (Markdown, @mentions, #task-links supported)..."
+                    style={{ fontSize: `${descriptionFontSize}px` }}
+                    className="w-full h-96 bg-background border border-input rounded-xl px-4 py-3 font-sans text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-xs transition-all resize-y leading-relaxed"
+                  />
+
+                  {/* Autocomplete Popup */}
+                  {autocomplete.active && (
+                    <div className="absolute left-4 bottom-4 w-64 bg-card border border-border rounded-xl shadow-[3px_3px_0px_0px_#000000] p-1.5 z-40 max-h-52 overflow-y-auto">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase px-2 py-1">
+                        {autocomplete.type === 'user' ? 'Mention Member' : 'Reference Task'}
+                      </div>
+                      {autocomplete.type === 'user' ? (
+                        members
+                          .filter(m => {
+                            const name = (m.gh_username || m.display_name || '').toLowerCase();
+                            return name.includes(autocomplete.query);
+                          })
+                          .slice(0, 8)
+                          .map(m => {
+                            const handle = m.gh_username || m.display_name || `user_${m.user_id}`;
+                            return (
+                              <button
+                                key={String(m.user_id)}
+                                type="button"
+                                onClick={() => insertMention(`@${handle}`, true)}
+                                className="w-full text-left px-2 py-1.5 rounded hover:bg-muted text-xs flex items-center gap-2 truncate cursor-pointer"
+                              >
+                                <AtSign size={12} className="text-primary shrink-0" />
+                                <span className="truncate">{handle}</span>
+                              </button>
+                            );
+                          })
+                      ) : (
+                        allTasks
+                          .filter(t =>
+                            String(t.id) !== String(task.id) &&
+                            (t.title.toLowerCase().includes(autocomplete.query) || String(t.id).includes(autocomplete.query))
+                          )
+                          .slice(0, 8)
+                          .map(t => (
+                            <button
+                              key={String(t.id)}
+                              type="button"
+                              onClick={() => insertMention(`[#${t.id}: ${t.title}](#${t.id})`, true)}
+                              className="w-full text-left px-2 py-1.5 rounded hover:bg-muted text-xs flex items-center gap-1.5 truncate cursor-pointer"
+                            >
+                              <Hash size={12} className="text-primary shrink-0" />
+                              <span className="font-mono text-[11px] shrink-0">#{t.id}</span>
+                              <span className="truncate text-muted-foreground">{t.title}</span>
+                            </button>
+                          ))
+                      )}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div
                   style={{ fontSize: `${descriptionFontSize}px` }}
@@ -795,7 +1157,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                               <div
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setPreviewImage(att);
+                                  setPreviewAttachment(att);
                                 }}
                                 className="w-10 h-10 rounded-md bg-muted border border-border shrink-0 overflow-hidden relative cursor-pointer group/thumb hover:border-primary transition-colors"
                                 title="Preview image"
@@ -810,7 +1172,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 </div>
                               </div>
                             ) : (
-                              <div className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center shrink-0 text-primary">
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewAttachment(att);
+                                }}
+                                className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center shrink-0 text-primary cursor-pointer hover:border-primary transition-colors"
+                                title={isPdfFile(att.type, att.name) ? "Preview PDF" : "View file"}
+                              >
                                 <FileText size={18} />
                               </div>
                             )}
@@ -1256,7 +1625,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </label>
               <select
                 value={bucketId || ''}
-                onChange={(e) => setBucketId(e.target.value || undefined)}
+                onChange={(e) => {
+                  const newBucketId = e.target.value || undefined;
+                  setBucketId(newBucketId);
+                  const targetBucket = buckets.find(b => String(b.id) === String(newBucketId));
+                  if (targetBucket?.state === 'COMPLETED') {
+                    if (!completedAt) setCompletedAt(new Date().toISOString());
+                  } else {
+                    if (completedAt) setCompletedAt(null);
+                  }
+                }}
                 className="w-full bg-background border border-input rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors shadow-xs"
               >
                 <option value="" disabled>Select bucket…</option>
@@ -1264,6 +1642,57 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   <option key={String(b.id)} value={String(b.id)}>{b.name} ({b.state})</option>
                 ))}
               </select>
+            </div>
+
+            {/* Schedule & Dates */}
+            <div className="bg-muted/20 border border-border rounded-xl p-3 space-y-3">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Calendar size={13} className="text-primary" />
+                <span>Schedule & Dates</span>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">Target / Due Date</label>
+                <input
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  className="w-full bg-background border border-input rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">Completed Date</label>
+                {completedAt ? (
+                  <div className="flex items-center justify-between gap-1 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs text-emerald-600 dark:text-emerald-400">
+                    <span className="font-mono">{new Date(completedAt).toLocaleDateString()}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCompletedAt(null)}
+                      className="text-[10px] hover:underline cursor-pointer text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletedAt(new Date().toISOString())}
+                    className="w-full text-xs h-7"
+                  >
+                    + Stamp completed now
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Task Types */}
@@ -1466,7 +1895,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             size="md"
             disabled={saving || !title.trim() || !isDirty}
           >
-            {saving ? 'Saving…' : 'Save changes'}
+            Save
           </Button>
         </div>
       </div>
@@ -1510,46 +1939,79 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         />
       )}
 
-      {/* Image Preview Modal */}
-      {previewImage && (
+      {/* Attachment Preview Modal (Images and PDFs) */}
+      {previewAttachment && (
         <div
           className="fixed inset-0 bg-background/90 backdrop-blur-sm z-60 flex items-center justify-center p-2 sm:p-4 select-none"
-          onClick={() => setPreviewImage(null)}
+          onClick={() => setPreviewAttachment(null)}
         >
           <div
-            className="relative max-w-4xl w-full bg-card border border-border rounded-xl shadow-2xl p-4 flex flex-col gap-3 max-h-[90vh] overflow-hidden"
+            className="relative max-w-4xl w-full bg-card border border-border rounded-xl shadow-2xl p-4 flex flex-col gap-3 max-h-[92vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2 min-w-0">
-                <ImageIcon size={16} className="text-primary shrink-0" />
+                {isImageFile(previewAttachment.type) || isImageFile(previewAttachment.name) ? (
+                  <ImageIcon size={16} className="text-primary shrink-0" />
+                ) : (
+                  <FileText size={16} className="text-primary shrink-0" />
+                )}
                 <span className="text-xs font-semibold text-foreground truncate">
-                  {previewImage.name}
+                  {previewAttachment.name}
                 </span>
                 <span className="text-[11px] text-muted-foreground shrink-0">
-                  ({formatFileSize(previewImage.size)})
+                  ({formatFileSize(previewAttachment.size)})
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <a
-                  href={previewImage.url}
+                  href={previewAttachment.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  download={previewImage.name}
+                  className="px-2.5 py-1 text-xs font-medium border border-border bg-background hover:bg-muted text-foreground rounded-md transition-colors flex items-center gap-1.5 shadow-xs"
+                >
+                  <ExternalLink size={12} />
+                  <span>Open tab</span>
+                </a>
+                <a
+                  href={previewAttachment.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={previewAttachment.name}
                   className="px-2.5 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors flex items-center gap-1.5 shadow-xs"
                 >
                   <Download size={12} />
                   <span>Download</span>
                 </a>
-                <CloseButton onClick={() => setPreviewImage(null)} size="sm" />
+                <CloseButton onClick={() => setPreviewAttachment(null)} size="sm" />
               </div>
             </div>
             <div className="overflow-auto max-h-[75vh] flex items-center justify-center bg-muted/30 rounded-lg border border-border/70 p-2">
-              <img
-                src={previewImage.url}
-                alt={previewImage.name}
-                className="max-w-full max-h-[70vh] object-contain rounded-md"
-              />
+              {isImageFile(previewAttachment.type) || isImageFile(previewAttachment.name) ? (
+                <img
+                  src={previewAttachment.url}
+                  alt={previewAttachment.name}
+                  className="max-w-full max-h-[70vh] object-contain rounded-md"
+                />
+              ) : isPdfFile(previewAttachment.type, previewAttachment.name) ? (
+                <iframe
+                  src={previewAttachment.url}
+                  title={previewAttachment.name}
+                  className="w-full h-[70vh] rounded-md border border-border bg-white"
+                />
+              ) : (
+                <div className="py-16 text-center text-muted-foreground flex flex-col items-center gap-2">
+                  <FileText size={32} className="text-primary" />
+                  <p className="text-sm font-medium">Preview not supported for this file format</p>
+                  <a
+                    href={previewAttachment.url}
+                    download={previewAttachment.name}
+                    className="text-xs text-primary underline"
+                  >
+                    Click here to download
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>

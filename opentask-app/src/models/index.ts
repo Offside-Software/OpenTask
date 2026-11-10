@@ -340,6 +340,9 @@ export interface Task {
   repo_url?: string;
   attachments?: TaskAttachment[];
   diagram_ids?: string[];
+  start_date?: string | null;
+  target_date?: string | null;
+  completed_at?: string | null;
 }
 
 export interface ProjectDiagram {

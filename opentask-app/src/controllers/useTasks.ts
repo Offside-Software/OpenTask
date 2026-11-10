@@ -42,12 +42,14 @@ export const useTasks = (projectId?: string | number) => {
     async (data: {
       project_id: number | string;
       title: string;
-      type: TaskType;
-      weight: number;
+      type?: TaskType;
+      weight?: number;
       bucket_id?: number | string;
+      order_idx?: number;
+      [key: string]: any;
     }) => {
       try {
-        const created = await taskService.createTask(data);
+        const created = await taskService.createTask({ type: 'TASK', weight: 1, ...data } as Task);
         showToast("Task created", "success");
         // Refetch tasks in background without blocking immediate return
         fetchTasks().catch(console.error);

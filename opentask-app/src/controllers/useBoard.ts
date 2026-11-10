@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Bucket, Task } from "../models";
 import { apiFetch } from "../services/apiClient";
 import { taskService } from "../services/taskService";
@@ -17,6 +17,25 @@ export const useBoard = (projectId: string | number) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatingTaskIds, setUpdatingTaskIds] = useState<Set<string>>(new Set());
+  const updatingTaskIdsRef = useRef<Set<string>>(updatingTaskIds);
+  updatingTaskIdsRef.current = updatingTaskIds;
+
+  const markTaskUpdating = useCallback((taskId: string | number) => {
+    setUpdatingTaskIds((prev) => {
+      const next = new Set(prev);
+      next.add(String(taskId));
+      return next;
+    });
+  }, []);
+
+  const unmarkTaskUpdating = useCallback((taskId: string | number) => {
+    setUpdatingTaskIds((prev) => {
+      const next = new Set(prev);
+      next.delete(String(taskId));
+      return next;
+    });
+  }, []);
 
   // Clear any legacy cached board data to prevent stale tasks/descriptions
   useEffect(() => {
@@ -40,7 +59,28 @@ export const useBoard = (projectId: string | number) => {
           (a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0),
         );
         setBuckets(sortedBuckets);
-        setTasks(sortedTasks);
+        setTasks((prev) => {
+          const currentUpdating = updatingTaskIdsRef.current;
+          if (!currentUpdating || currentUpdating.size === 0) {
+            return sortedTasks;
+          }
+          // Non-destructive merge: retain local optimistic state for any task currently updating/moving
+          const serverIds = new Set(sortedTasks.map((t) => String(t.id)));
+          const merged = sortedTasks.map((serverTask) => {
+            const sId = String(serverTask.id);
+            if (currentUpdating.has(sId)) {
+              const existing = prev.find((t) => String(t.id) === sId);
+              if (existing) {
+                return { ...serverTask, ...existing };
+              }
+            }
+            return serverTask;
+          });
+          const uncommitted = prev.filter(
+            (t) => currentUpdating.has(String(t.id)) && !serverIds.has(String(t.id)),
+          );
+          return [...uncommitted, ...merged];
+        });
         setError(null);
       } catch (err) {
         console.error("useBoard fetch error:", err);
@@ -164,14 +204,14 @@ export const useBoard = (projectId: string | number) => {
   );
 
   /**
-   * Optimistically add a task to local state
+   * Optimistically add a task to local state (prepends by default so it appears on top)
    */
-  const addTaskLocally = useCallback((newTask: Task) => {
+  const addTaskLocally = useCallback((newTask: Task, prepend = true) => {
     setTasks((prev) => {
       if (prev.some((t) => String(t.id) === String(newTask.id))) {
         return prev;
       }
-      return [...prev, newTask];
+      return prepend ? [newTask, ...prev] : [...prev, newTask];
     });
     if (newTask.bucket_id) {
       setBuckets((bucketsPrev) =>
@@ -259,5 +299,8 @@ export const useBoard = (projectId: string | number) => {
     removeBucketLocally,
     addTaskLocally,
     removeTaskLocally,
+    updatingTaskIds,
+    markTaskUpdating,
+    unmarkTaskUpdating,
   };
 };

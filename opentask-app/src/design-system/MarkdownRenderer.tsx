@@ -78,18 +78,57 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               {...props}
             />
           ),
-          p: ({ node, ...props }) => (
-            <p className={compact ? 'my-0.5 leading-normal' : 'my-1.5 leading-relaxed'} {...props} />
-          ),
+          p: ({ node, children, ...props }) => {
+            const renderWithMentions = (child: React.ReactNode): React.ReactNode => {
+              if (typeof child !== 'string') return child;
+              const parts = child.split(/(@[a-zA-Z0-9_\-\.]+)/g);
+              if (parts.length === 1) return child;
+              return parts.map((part, i) => {
+                if (part.startsWith('@') && part.length > 1) {
+                  return (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-1.5 py-0.2 mx-0.5 rounded bg-muted text-foreground border border-border font-medium text-[0.9em]"
+                    >
+                      {part}
+                    </span>
+                  );
+                }
+                return part;
+              });
+            };
+
+            const formattedChildren = React.Children.map(children, renderWithMentions);
+            return <p className={compact ? 'my-0.5 leading-normal' : 'my-1.5 leading-relaxed'} {...props}>{formattedChildren}</p>;
+          },
           ul: ({ node, ...props }) => (
             <ul className={cn('list-disc list-outside pl-4', compact ? 'space-y-0.5 my-0.5' : 'space-y-1 my-1.5')} {...props} />
           ),
           ol: ({ node, ...props }) => (
             <ol className={cn('list-decimal list-outside pl-4', compact ? 'space-y-0.5 my-0.5' : 'space-y-1 my-1.5')} {...props} />
           ),
-          li: ({ node, ...props }) => (
-            <li className={cn(compact ? 'leading-normal' : 'leading-relaxed', 'pl-1')} {...props} />
-          ),
+          li: ({ node, children, ...props }) => {
+            const renderWithMentions = (child: React.ReactNode): React.ReactNode => {
+              if (typeof child !== 'string') return child;
+              const parts = child.split(/(@[a-zA-Z0-9_\-\.]+)/g);
+              if (parts.length === 1) return child;
+              return parts.map((part, i) => {
+                if (part.startsWith('@') && part.length > 1) {
+                  return (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-1.5 py-0.2 mx-0.5 rounded bg-muted text-foreground border border-border font-medium text-[0.9em]"
+                    >
+                      {part}
+                    </span>
+                  );
+                }
+                return part;
+              });
+            };
+            const formattedChildren = React.Children.map(children, renderWithMentions);
+            return <li className={cn(compact ? 'leading-normal' : 'leading-relaxed', 'pl-1')} {...props}>{formattedChildren}</li>;
+          },
           strong: ({ node, ...props }) => (
             <strong className="font-semibold text-foreground" {...props} />
           ),
@@ -123,14 +162,41 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               {...props}
             />
           ),
-          a: ({ node, ...props }) => (
-            <a
-              className="text-primary underline font-medium hover:text-primary/80 transition-colors"
-              target="_blank"
-              rel="noopener noreferrer"
-              {...props}
-            />
-          ),
+          a: ({ node, href, children, ...props }) => {
+            const isInternal = href?.startsWith('#');
+            if (isInternal) {
+              return (
+                <a
+                  href={href}
+                  className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/25 hover:bg-primary/20 no-underline font-medium transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const rawTarget = href ? href.replace(/^#/, '') : '';
+                    if (rawTarget.startsWith('diagram-')) {
+                      const diagramId = rawTarget.replace(/^diagram-/, '');
+                      window.dispatchEvent(new CustomEvent('opentask:open-diagram', { detail: { diagramId } }));
+                    } else if (rawTarget) {
+                      window.dispatchEvent(new CustomEvent('opentask:navigate-task', { detail: { taskId: rawTarget } }));
+                    }
+                  }}
+                  {...props}
+                >
+                  {children}
+                </a>
+              );
+            }
+            return (
+              <a
+                href={href}
+                className="text-primary underline font-medium hover:text-primary/80 transition-colors"
+                target="_blank"
+                rel="noopener noreferrer"
+                {...props}
+              >
+                {children}
+              </a>
+            );
+          },
           hr: ({ node, ...props }) => (
             <hr className="my-3 border-border" {...props} />
           ),

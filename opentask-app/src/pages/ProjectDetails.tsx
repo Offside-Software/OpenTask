@@ -200,6 +200,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         updateBucketLocally,
         addTaskLocally,
         removeTaskLocally,
+        updatingTaskIds,
+        markTaskUpdating,
+        unmarkTaskUpdating,
     } = useBoard(projectId);
 
     const handleMemberRemoved = useCallback((userId: string | number) => {
@@ -240,9 +243,19 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     // Seamless asynchronous reorder queue (debounced + silent retries, zero-latency UI)
     const { queueTaskReorder, queueBucketReorder, cancelTaskFromQueue, hasPendingReorders } = useAsyncReorderQueue({
         projectId,
-        onTasksSynced: () => {
+        onTasksSynced: (syncedTaskIds) => {
+            if (syncedTaskIds && syncedTaskIds.length > 0) {
+                syncedTaskIds.forEach(id => unmarkTaskUpdating(id));
+            }
             refreshDashboard(true);
+            void refreshBoard(true);
             notifyActivityUpdated();
+        },
+        onTasksFailed: (failedTaskIds) => {
+            if (failedTaskIds && failedTaskIds.length > 0) {
+                failedTaskIds.forEach(id => unmarkTaskUpdating(id));
+            }
+            void refreshBoard(true);
         },
         onBucketsSynced: () => refreshDashboard(true),
         debounceMs: 50,
@@ -255,6 +268,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             setMeetingEventKey(k => k + 1);
             if (hasPendingReorders()) {
                 // Skip board reload while optimistic moves or network syncs are pending/in flight
+                return;
+            }
+            if (event.entity === 'task' && event.entity_id && updatingTaskIds.has(String(event.entity_id))) {
+                // Skip board reload if this task is actively being updated locally
                 return;
             }
             void refreshBoard(true);
@@ -275,7 +292,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         } else if (event.entity === 'meeting_job') {
             setMeetingEventKey(k => k + 1);
         }
-    }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally]);
+    }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally, updatingTaskIds]);
 
     useProjectRealtime(projectId, { onEvent: handleProjectEvent });
 
@@ -330,18 +347,26 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     }, [focusBucket, selectedTaskForEdit, showTaskModal, selectedBucketForEdit, bucketToDelete, taskToDelete, isMcpModalOpen]);
 
     // Open / Close task modal with URL query param synchronization
+    const closedTaskIdRef = useRef<string | null>(null);
+    const autoOpenedTaskIdRef = useRef<string | null>(null);
+
     const handleOpenTask = (task: Task) => {
-        setSelectedTaskForEdit(task);
+        closedTaskIdRef.current = null;
         if (task?.id) {
+            autoOpenedTaskIdRef.current = String(task.id);
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev);
                 next.set('taskId', String(task.id));
                 return next;
             }, { replace: true });
         }
+        setSelectedTaskForEdit(task);
     };
 
     const handleCloseTask = () => {
+        const currentId = selectedTaskForEdit?.id ? String(selectedTaskForEdit.id) : (taskIdParam || null);
+        closedTaskIdRef.current = currentId;
+        autoOpenedTaskIdRef.current = currentId;
         setSelectedTaskForEdit(null);
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
@@ -350,17 +375,29 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         }, { replace: true });
     };
 
-    // Auto-open task if ?taskId=... query param is present
+    // Auto-open task if ?taskId=... query param is present on mount or navigation
     React.useEffect(() => {
-        if (!taskIdParam) return;
+        if (!taskIdParam) {
+            closedTaskIdRef.current = null;
+            autoOpenedTaskIdRef.current = null;
+            return;
+        }
+
+        // If the task was explicitly closed or already auto-opened, prevent re-opening on background task/board updates
+        if (closedTaskIdRef.current === taskIdParam || autoOpenedTaskIdRef.current === taskIdParam) {
+            return;
+        }
+
         const found = tasks.find(t => String(t.id) === String(taskIdParam));
         if (found) {
+            autoOpenedTaskIdRef.current = taskIdParam;
             setSelectedTaskForEdit(found);
             setActiveTab('Tasks');
         } else if (!boardLoading) {
             taskService.getTaskById(taskIdParam)
                 .then(t => {
                     if (t && String(t.project_id) === String(projectId)) {
+                        autoOpenedTaskIdRef.current = taskIdParam;
                         setSelectedTaskForEdit(t);
                         setActiveTab('Tasks');
                     }
@@ -506,14 +543,37 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         }
     };
 
+    // Listen for cross-task reference navigation from Markdown links (e.g. #123)
+    useEffect(() => {
+        const handleNavigateTask = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.taskId) {
+                const targetId = String(detail.taskId);
+                if (targetId.startsWith('diagram-')) return;
+                const found = tasks.find(t => String(t.id) === targetId);
+                if (found) {
+                    handleOpenTask(found);
+                } else {
+                    taskService.getTaskById(targetId)
+                        .then(t => {
+                            if (t) handleOpenTask(t);
+                        })
+                        .catch(err => console.warn("Failed to open referenced task:", err));
+                }
+            }
+        };
+        window.addEventListener('opentask:navigate-task', handleNavigateTask);
+        return () => window.removeEventListener('opentask:navigate-task', handleNavigateTask);
+    }, [tasks]);
+
     const handleCreateTask = async (data: { project_id: number | string; title: string; type: TaskType; weight: number; bucket_id?: number | string }) => {
         setIsCreatingTask(true);
         setCreatingTaskBucketId(data.bucket_id);
         setCreatingTaskTitle(data.title);
         try {
-            const created = await createTask(data);
+            const created = await createTask({ ...data, order_idx: 0 });
             if (created) {
-                addTaskLocally(created);
+                addTaskLocally(created, true);
             }
             // Immediately disable the indicator as soon as task is created
             setIsCreatingTask(false);
@@ -529,6 +589,41 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             setIsCreatingTask(false);
             setCreatingTaskBucketId(undefined);
             setCreatingTaskTitle('');
+        }
+    };
+
+    const handleDuplicateTask = async (task: Task) => {
+        if (!task.id) return;
+        const dupTitle = `${task.title} (Copy)`;
+        const payload = {
+            project_id: projectId,
+            title: dupTitle,
+            description: task.description || undefined,
+            type: task.type || 'TASK',
+            weight: task.weight ?? 1,
+            bucket_id: task.bucket_id,
+            assignee_ids: task.assignee_ids,
+            lead_assignee_id: task.lead_assignee_id,
+            branch_name: task.branch_name,
+            repo_url: task.repo_url,
+            attachments: task.attachments,
+            diagram_ids: task.diagram_ids,
+            start_date: task.start_date,
+            target_date: task.target_date,
+            order_idx: 0,
+        };
+        try {
+            const created = await createTask(payload as any);
+            if (created) {
+                addTaskLocally(created, true);
+                showToast(`Task duplicated: "${dupTitle}"`, 'success');
+                refreshDashboard(true);
+                refreshBoard(true);
+                notifyActivityUpdated();
+            }
+        } catch (err: any) {
+            console.error("Failed to duplicate task:", err);
+            showToast(err?.message || "Failed to duplicate task", "error");
         }
     };
 
@@ -566,26 +661,28 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     };
 
     const handleUpdateTask = async (taskId: number | string, data: Partial<Task>) => {
+        markTaskUpdating(taskId);
         // 1. Write optimistic patch to state + cache immediately (no delay)
         updateTaskLocally(taskId, data);
         setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(taskId) ? { ...prev, ...data } : prev));
         // 2. Fire API in background
-        updateTask(taskId, data)
-            .then((confirmed) => {
-                // 3. Write server-confirmed result back to cache to prevent stale reload
-                if (confirmed?.id) {
-                    updateTaskLocally(confirmed.id, confirmed);
-                    setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(confirmed.id) ? { ...prev, ...confirmed } : prev));
-                }
-                refreshDashboard(true);
-                refreshBoard(true);
-                notifyActivityUpdated();
-            })
-            .catch((err) => {
-                console.error("Failed to update task:", err);
-                // 4. On failure, rollback by pulling fresh data
-                refreshBoard(true);
-            });
+        try {
+            const confirmed = await updateTask(taskId, data);
+            // 3. Write server-confirmed result back to cache to prevent stale reload
+            if (confirmed?.id) {
+                updateTaskLocally(confirmed.id, confirmed);
+                setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(confirmed.id) ? { ...prev, ...confirmed } : prev));
+            }
+            refreshDashboard(true);
+            await refreshBoard(true);
+            notifyActivityUpdated();
+        } catch (err) {
+            console.error("Failed to update task:", err);
+            // 4. On failure, rollback by pulling fresh data
+            await refreshBoard(true);
+        } finally {
+            unmarkTaskUpdating(taskId);
+        }
     };
 
     const handleToggleTaskComplete = async (taskId: number | string, completed: boolean) => {
@@ -611,7 +708,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         }
 
         if (targetBucket && targetBucket.id) {
-            handleUpdateTask(taskId, { bucket_id: targetBucket.id });
+            const completedAt = completed ? new Date().toISOString() : null;
+            updateTaskLocally(taskId, { bucket_id: targetBucket.id, completed_at: completedAt });
+            handleUpdateTask(taskId, { bucket_id: targetBucket.id, completed_at: completedAt });
             showToast(completed ? "Task marked as complete" : "Task marked as incomplete", "success");
         } else {
             showToast("No suitable column found", "error");
@@ -631,10 +730,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     };
 
     const handleDropTask = async (taskId: number | string, newBucketId: number | string, targetTaskId?: number | string) => {
+        markTaskUpdating(taskId);
         // Determine the task order within the target bucket based on where it was dropped
         const bucketTasks = tasks.filter(t => String(t.bucket_id) === String(newBucketId)).sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
         const draggedTask = tasks.find(t => String(t.id) === String(taskId));
-        if (!draggedTask) return;
+        if (!draggedTask) {
+            unmarkTaskUpdating(taskId);
+            return;
+        }
 
         const sourceBucketId = draggedTask.bucket_id;
         const isCrossBucket = sourceBucketId && String(sourceBucketId) !== String(newBucketId);
@@ -651,8 +754,19 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             }
         }
 
+        // Automatic completion date sync
+        const targetBucket = buckets.find(b => String(b.id) === String(newBucketId));
+        const isCompletedBucket = targetBucket?.state === 'COMPLETED';
+        const completedAt = isCompletedBucket
+            ? (draggedTask.completed_at || new Date().toISOString())
+            : null;
+
         // Insert into new array
-        const updatedDraggedTask = { ...draggedTask, bucket_id: newBucketId };
+        const updatedDraggedTask: Task = {
+            ...draggedTask,
+            bucket_id: newBucketId,
+            completed_at: completedAt,
+        };
         filteredTasks.splice(newIndex, 0, updatedDraggedTask);
 
         // Build reordered IDs
@@ -1078,6 +1192,26 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                             }
                                         >
                                             <div className="flex flex-col gap-3">
+                                                <button
+                                                    onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
+                                                    className="w-full py-2 flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/50 hover:bg-muted/40 rounded-lg transition-colors text-xs font-medium cursor-pointer"
+                                                >
+                                                    <Plus size={14} /> Add Task
+                                                </button>
+
+                                                {/* In-flight new task creation ghost card */}
+                                                {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
+                                                    <div className="border border-dashed border-primary/40 bg-primary/5 rounded-lg p-3 animate-pulse">
+                                                        <div className="flex items-center gap-2 mb-1.5">
+                                                            <Loader2 size={13} className="animate-spin text-primary" />
+                                                            <span className="text-xs text-primary font-medium">Creating task...</span>
+                                                        </div>
+                                                        <div className="text-xs text-foreground font-medium truncate">
+                                                            {creatingTaskTitle || 'New task'}
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {colTasks.map(task => {
                                                     const isDeleting = deletingTaskIds.has(task.id!);
                                                     if (isDeleting) {
@@ -1122,50 +1256,33 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                                     const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
 
                                                     return (
-                                                        <KanbanCard
-                                                            key={task.id}
-                                                            id={task.id!}
-                                                            title={task.title}
-                                                            type={task.type}
-                                                            weight={task.weight}
-                                                            assignee={assigneeName}
-                                                            assigneeAvatar={assigneeAvatar}
-                                                            assignees={cardAssignees}
-                                                            pr={!!task.prUrl}
-                                                            repoUrl={task.repo_url}
-                                                            description={task.description}
-                                                            warnStagnant={task.warnStagnant}
-                                                            isSuggested={task.isSuggested}
-                                                            isCompleted={isTaskCompleted}
-                                                            onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
-                                                            onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
-                                                            onClick={() => handleOpenTask(task)}
-                                                            onDelete={() => setTaskToDelete(task.id!)}
-                                                            onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
-                                                        />
+                                                         <KanbanCard
+                                                             key={task.id}
+                                                             id={task.id!}
+                                                             title={task.title}
+                                                             type={task.type}
+                                                             weight={task.weight}
+                                                             assignee={assigneeName}
+                                                             assigneeAvatar={assigneeAvatar}
+                                                             assignees={cardAssignees}
+                                                             pr={!!task.prUrl}
+                                                             repoUrl={task.repo_url}
+                                                             description={task.description}
+                                                             warnStagnant={task.warnStagnant}
+                                                             isSuggested={task.isSuggested}
+                                                             isCompleted={isTaskCompleted}
+                                                             isUpdating={updatingTaskIds.has(String(task.id))}
+                                                             start_date={task.start_date}
+                                                             target_date={task.target_date}
+                                                             completed_at={task.completed_at}
+                                                             onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
+                                                             onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
+                                                             onClick={() => handleOpenTask(task)}
+                                                             onDelete={() => setTaskToDelete(task.id!)}
+                                                             onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
+                                                         />
                                                     );
                                                 })}
-
-                                                {/* In-flight new task creation ghost card */}
-                                                {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
-                                                    <div className="border border-dashed border-primary/40 bg-primary/5 rounded-lg p-3 animate-pulse">
-                                                        <div className="flex items-center gap-2 mb-1.5">
-                                                            <Loader2 size={13} className="animate-spin text-primary" />
-                                                            <span className="text-xs text-primary font-medium">Creating task...</span>
-                                                        </div>
-                                                        <div className="text-xs text-foreground font-medium truncate">
-                                                            {creatingTaskTitle || 'New task'}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <button
-                                                    onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
-                                                    className="w-full py-2 flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/50 hover:bg-muted/40 rounded-lg transition-colors text-xs font-medium cursor-pointer"
-                                                >
-                                                    <Plus size={14} /> Add Task
-                                                </button>
-
                                             </div>
                                         </KanbanColumn>
 
@@ -1337,8 +1454,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                     buckets={buckets}
                     members={members}
                     projectRepoUrls={project?.gh_repo_url || []}
+                    allTasks={tasks}
                     onClose={handleCloseTask}
                     onUpdate={handleUpdateTask}
+                    onDuplicate={handleDuplicateTask}
                 />
             )}
 
@@ -1388,6 +1507,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                 onEdit={(t) => handleOpenTask(t)}
                 onToggleComplete={(tId, completed) => handleToggleTaskComplete(tId, completed)}
                 onMoveToBucket={handleMoveTaskToBucket}
+                onDuplicate={handleDuplicateTask}
                 onDelete={(tId) => setTaskToDelete(tId)}
             />
 

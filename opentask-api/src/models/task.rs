@@ -26,10 +26,91 @@ pub struct DatabaseTask {
     #[serde(default)]
     #[sqlx(default)]
     pub diagram_ids: Option<Vec<SafeId>>,
+    #[serde(default, deserialize_with = "deserialize_optional_date")]
+    #[sqlx(default)]
+    pub start_date: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "deserialize_optional_date")]
+    #[sqlx(default)]
+    pub target_date: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "deserialize_optional_date")]
+    #[sqlx(default)]
+    pub completed_at: Option<DateTime<Utc>>,
     pub last_activity_at: Option<DateTime<Utc>>,
     pub order_idx: Option<i32>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+pub fn deserialize_optional_date<'de, D>(
+    deserializer: D,
+) -> Result<Option<DateTime<Utc>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper {
+        Val(DateTime<Utc>),
+        EmptyStr(String),
+        Null,
+    }
+
+    match Option::<Helper>::deserialize(deserializer)? {
+        None | Some(Helper::Null) => Ok(None),
+        Some(Helper::EmptyStr(s)) if s.trim().is_empty() => Ok(None),
+        Some(Helper::EmptyStr(s)) => {
+            let trimmed = s.trim();
+            let dt = DateTime::parse_from_rfc3339(trimmed)
+                .map(|d| d.with_timezone(&Utc))
+                .or_else(|_| {
+                    chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S")
+                        .map(|d| d.and_utc())
+                })
+                .or_else(|_| {
+                    chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d")
+                        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
+                })
+                .map_err(serde::de::Error::custom)?;
+            Ok(Some(dt))
+        }
+        Some(Helper::Val(dt)) => Ok(Some(dt)),
+    }
+}
+
+pub fn deserialize_optional_nullable_date<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<DateTime<Utc>>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper {
+        Val(DateTime<Utc>),
+        EmptyStr(String),
+        Null,
+    }
+
+    match Option::<Helper>::deserialize(deserializer)? {
+        None | Some(Helper::Null) => Ok(Some(None)),
+        Some(Helper::EmptyStr(s)) if s.trim().is_empty() => Ok(Some(None)),
+        Some(Helper::EmptyStr(s)) => {
+            let trimmed = s.trim();
+            let dt = DateTime::parse_from_rfc3339(trimmed)
+                .map(|d| d.with_timezone(&Utc))
+                .or_else(|_| {
+                    chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S")
+                        .map(|d| d.and_utc())
+                })
+                .or_else(|_| {
+                    chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d")
+                        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
+                })
+                .map_err(serde::de::Error::custom)?;
+            Ok(Some(Some(dt)))
+        }
+        Some(Helper::Val(dt)) => Ok(Some(Some(dt))),
+    }
 }
 
 pub fn deserialize_optional_nullable_safe_id<'de, D>(
@@ -75,6 +156,12 @@ pub struct TaskUpdatePayload {
     pub attachments: Option<serde_json::Value>,
     pub diagram_ids: Option<Vec<SafeId>>,
     pub order_idx: Option<i32>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_date")]
+    pub start_date: Option<Option<DateTime<Utc>>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_date")]
+    pub target_date: Option<Option<DateTime<Utc>>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_date")]
+    pub completed_at: Option<Option<DateTime<Utc>>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

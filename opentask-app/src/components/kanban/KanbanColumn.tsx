@@ -72,11 +72,14 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     }
   };
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget && !(e.target as HTMLElement).closest('[data-column-header]')) {
+  const handleHeaderDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only allow drag if not clicking buttons or interactive elements inside header
+    if ((e.target as HTMLElement).closest('button')) {
+      e.preventDefault();
       return;
     }
     if (onDragStartColumn) {
+      e.stopPropagation();
       e.dataTransfer.effectAllowed = 'move';
       onDragStartColumn(e, id);
     }
@@ -88,8 +91,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
   return (
     <div
-      draggable={!!onDragStartColumn}
-      onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -101,8 +102,16 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           : 'bg-muted/30 border-border/70'
       )}
     >
-      {/* Column Header */}
-      <div data-column-header="true" className="px-3.5 py-2 border-b border-border/60 bg-card/60 rounded-t-xl select-none shrink-0 backdrop-blur-xs">
+      {/* Column Header (Restricted drag handle for bucket moves) */}
+      <div
+        data-column-header="true"
+        draggable={!!onDragStartColumn}
+        onDragStart={handleHeaderDragStart}
+        className={cn(
+          "px-3.5 py-2 border-b border-border/60 bg-card/60 rounded-t-xl select-none shrink-0 backdrop-blur-xs",
+          onDragStartColumn ? "cursor-grab active:cursor-grabbing" : ""
+        )}
+      >
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 min-w-0 pr-2">
             <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', colorClass)} />

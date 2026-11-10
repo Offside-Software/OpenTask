@@ -86,6 +86,21 @@ pub async fn create_task(
     let b_id = target_bucket_id
         .ok_or_else(|| AppError::BadRequest("No valid bucket found for task".to_string()))?;
 
+    let bucket_state_row = crate::db::query("SELECT state FROM opentask.buckets WHERE id = $1 LIMIT 1;")
+        .bind(b_id)
+        .fetch_optional(&state.pool)
+        .await?;
+    let is_completed_bucket = bucket_state_row
+        .and_then(|r| r.try_get::<String, _>("state").ok())
+        .map(|s| s == "COMPLETED")
+        .unwrap_or(false);
+
+    let completed_at = if is_completed_bucket {
+        payload.completed_at.or_else(|| Some(chrono::Utc::now()))
+    } else {
+        None
+    };
+
     let max_idx_row = crate::db::query(
         "SELECT COALESCE(MAX(order_idx), -1) as max_idx FROM opentask.tasks WHERE bucket_id = $1;",
     )
@@ -94,7 +109,13 @@ pub async fn create_task(
     .await?;
     let max_idx: i32 = max_idx_row.try_get("max_idx").unwrap_or(-1);
 
-    let order_idx = payload.order_idx.unwrap_or(max_idx + 1);
+    let order_idx = payload.order_idx.unwrap_or(0);
+    if order_idx == 0 && max_idx >= 0 {
+        let _ = crate::db::query("UPDATE opentask.tasks SET order_idx = order_idx + 1 WHERE bucket_id = $1;")
+            .bind(b_id)
+            .execute(&state.pool)
+            .await;
+    }
 
     let raw_assignee_ids: Vec<i64> = if let Some(ref a_ids) = payload.assignee_ids {
         a_ids.iter().map(|id| id.0).collect()
@@ -109,14 +130,15 @@ pub async fn create_task(
         r#"
         INSERT INTO opentask.tasks
             (id, project_id, bucket_id, meeting_id, parent_task_id, lead_assignee_id, suggested_assignee_id, assignee_ids,
-             title, description, type, weight, branch_name, repo_url, attachments, last_activity_at, order_idx, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, '[]'::jsonb), NOW(), $16, NOW(), NOW())
+             title, description, type, weight, branch_name, repo_url, attachments, start_date, target_date, completed_at, last_activity_at, order_idx, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, '[]'::jsonb), $16, $17, $18, NOW(), $19, NOW(), NOW())
         RETURNING id, project_id, bucket_id, meeting_id,
                   parent_task_id, lead_assignee_id, suggested_assignee_id,
                   COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids,
                   title, description, type as task_type, weight, branch_name, repo_url,
                   COALESCE(attachments, '[]'::jsonb) as attachments,
                   COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
+                  start_date, target_date, completed_at,
                   last_activity_at, order_idx, created_at, updated_at;
         "#
     )
@@ -135,6 +157,9 @@ pub async fn create_task(
     .bind(payload.branch_name)
     .bind(payload.repo_url)
     .bind(payload.attachments)
+    .bind(payload.start_date)
+    .bind(payload.target_date)
+    .bind(completed_at)
     .bind(order_idx)
     .fetch_one(&state.pool)
     .await?;
@@ -198,6 +223,7 @@ pub async fn list_tasks(
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
                COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
+               start_date, target_date, completed_at,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE ($1::BIGINT IS NULL OR project_id = $1)
@@ -225,6 +251,7 @@ pub async fn get_task(
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
                COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
+               start_date, target_date, completed_at,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE id = $1
@@ -251,6 +278,8 @@ pub async fn update_task(
                 COALESCE(assignee_ids, '{}'::BIGINT[]) as assignee_ids, \
                 title, description, type as task_type, weight, branch_name, repo_url, \
                 COALESCE(attachments, '[]'::jsonb) as attachments, \
+                COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids, \
+                start_date, target_date, completed_at, \
                 last_activity_at, order_idx, created_at, updated_at \
          FROM opentask.tasks WHERE id = $1 LIMIT 1;"
     )
@@ -327,6 +356,32 @@ pub async fn update_task(
         builder.push(", order_idx = ");
         builder.push_bind(order_idx);
     }
+    if let Some(ref start_opt) = payload.start_date {
+        builder.push(", start_date = ");
+        builder.push_bind(*start_opt);
+    }
+    if let Some(ref target_opt) = payload.target_date {
+        builder.push(", target_date = ");
+        builder.push_bind(*target_opt);
+    }
+    if let Some(ref comp_opt) = payload.completed_at {
+        builder.push(", completed_at = ");
+        builder.push_bind(*comp_opt);
+    } else if let Some(bucket_id) = payload.bucket_id {
+        let b_row = crate::db::query("SELECT state FROM opentask.buckets WHERE id = $1 LIMIT 1;")
+            .bind(bucket_id.0)
+            .fetch_optional(&state.pool)
+            .await?;
+        let is_completed = b_row
+            .and_then(|r| r.try_get::<String, _>("state").ok())
+            .map(|s| s == "COMPLETED")
+            .unwrap_or(false);
+        if is_completed {
+            builder.push(", completed_at = COALESCE(completed_at, NOW())");
+        } else {
+            builder.push(", completed_at = NULL");
+        }
+    }
 
     builder.push(" WHERE id = ");
     builder.push_bind(task_id.0);
@@ -337,6 +392,7 @@ pub async fn update_task(
                    title, description, type as task_type, weight, branch_name, repo_url, \
                    COALESCE(attachments, '[]'::jsonb) as attachments, \
                    COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids, \
+                   start_date, target_date, completed_at, \
                    last_activity_at, order_idx, created_at, updated_at;",
     );
 
@@ -650,6 +706,7 @@ pub async fn search_tasks(
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
                COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
+               start_date, target_date, completed_at,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1
@@ -717,8 +774,13 @@ pub async fn reorder_tasks(
         UPDATE opentask.tasks AS t
         SET order_idx = u.order_idx,
             bucket_id = u.bucket_id,
+            completed_at = CASE
+                WHEN b.state = 'COMPLETED' THEN COALESCE(t.completed_at, NOW())
+                ELSE NULL
+            END,
             updated_at = NOW()
         FROM UNNEST($1::BIGINT[], $2::INT[], $3::BIGINT[]) AS u(id, order_idx, bucket_id)
+        JOIN opentask.buckets b ON b.id = u.bucket_id
         WHERE t.id = u.id AND t.project_id = $4;
         "#,
     )
@@ -865,6 +927,7 @@ pub async fn get_bucket_tasks(
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
                COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
+               start_date, target_date, completed_at,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1 AND bucket_id = $2
