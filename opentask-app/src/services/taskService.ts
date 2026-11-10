@@ -42,12 +42,16 @@ export const taskService = {
       "repo_url",
       "attachments",
       "order_idx",
+      "start_date",
+      "target_date",
+      "completed_at",
+      "diagram_ids",
     ];
 
     for (const key of allowedKeys) {
       if (key in data) {
         let val = data[key];
-        if (key === "assignee_ids") {
+        if (key === "assignee_ids" || key === "diagram_ids") {
           if (Array.isArray(val)) {
             payload[key] = val.map((id) => String(id));
           } else {

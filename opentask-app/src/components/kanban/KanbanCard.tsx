@@ -1,7 +1,7 @@
 import React from 'react';
 import { Badge } from '../../design-system/Badge';
 import { MarkdownRenderer, hasMarkdownSyntax } from '../../design-system/MarkdownRenderer';
-import { Clock, GitPullRequest, MoreHorizontal, Check, GitBranch } from 'lucide-react';
+import { Clock, GitPullRequest, MoreHorizontal, Check, GitBranch, Calendar, Loader2 } from 'lucide-react';
 import type { TaskType } from '../../models';
 import { getTaskTypeVariant, parseTaskTypes } from '../../utils/taskTypes';
 import { TrashButton } from '../../design-system/TrashButton';
@@ -25,6 +25,12 @@ interface KanbanCardProps {
   status?: string;
   warnStagnant?: boolean;
   isSuggested?: boolean;
+  isUpdating?: boolean;
+  isSaving?: boolean;
+  isDeleting?: boolean;
+  start_date?: string | null;
+  target_date?: string | null;
+  completed_at?: string | null;
   pr?: boolean;
   repoUrl?: string;
   isCompleted?: boolean;
@@ -46,6 +52,31 @@ const getInitials = (name?: string): string => {
   return clean.slice(0, 2).toUpperCase();
 };
 
+const formatDatePreview = (dateStr?: string | null) => {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return null;
+  }
+};
+
+const getTargetDateStatus = (dateStr?: string | null) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(d);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return 'overdue';
+  if (diffDays <= 1) return 'due-soon';
+  return 'upcoming';
+};
+
 export const KanbanCard: React.FC<KanbanCardProps> = ({
   id,
   title,
@@ -56,6 +87,12 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   assignees,
   warnStagnant,
   isSuggested,
+  isUpdating = false,
+  isSaving = false,
+  isDeleting = false,
+  start_date,
+  target_date,
+  completed_at,
   pr,
   repoUrl,
   isCompleted = false,
@@ -68,6 +105,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 }) => {
   const [isOver, setIsOver] = React.useState(false);
   const { showToast } = useToast();
+  const isLocked = Boolean(isSaving || isUpdating || isDeleting);
 
   const effectiveAssignees: CardAssignee[] = React.useMemo(() => {
     if (assignees && assignees.length > 0) return assignees;
@@ -78,11 +116,20 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   }, [assignees, assignee, assigneeAvatar]);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isLocked) {
+      e.preventDefault();
+      return;
+    }
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('taskId', id.toString());
+    e.dataTransfer.setData('text/plain', id.toString());
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isLocked) return;
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     setIsOver(true);
   };
 
@@ -91,12 +138,13 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isLocked) return;
     e.preventDefault();
     e.stopPropagation();
     setIsOver(false);
 
     if (onDropTask) {
-      const draggedId = e.dataTransfer.getData('taskId');
+      const draggedId = e.dataTransfer.getData('taskId') || e.dataTransfer.getData('text/plain');
       if (draggedId) {
         onDropTask(draggedId, id);
       }
@@ -115,8 +163,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 
   return (
     <div
-      draggable
-      onClick={onClick}
+      draggable={!isLocked}
+      onClick={isLocked ? undefined : onClick}
       onContextMenu={(e) => {
         if (onContextMenu) {
           e.preventDefault();
@@ -129,8 +177,15 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'p-3.5 rounded-lg bg-card text-card-foreground border group flex flex-col gap-2.5 transition-all duration-150 cursor-grab active:cursor-grabbing select-none shadow-xs',
-        isOver
+        'p-3.5 rounded-lg bg-card text-card-foreground border group flex flex-col gap-2.5 transition-all duration-150 select-none shadow-xs',
+        isLocked
+          ? 'cursor-default'
+          : 'cursor-grab active:cursor-grabbing',
+        isDeleting
+          ? 'border-destructive/40 bg-destructive/5 opacity-40 pointer-events-none'
+          : isUpdating
+          ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/40 animate-pulse'
+          : isOver
           ? 'border-primary bg-primary/5 ring-1 ring-primary/40 shadow-sm'
           : warnStagnant
           ? 'border-destructive/40 bg-destructive/5'
@@ -167,7 +222,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         )}>
           {title}
         </h4>
-        <div className="flex items-center gap-1 shrink-0 -mt-0.5">
+        <div className="flex items-center gap-1.5 shrink-0 -mt-0.5">
+          {isUpdating && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium border border-primary/20">
+              <Loader2 size={10} className="animate-spin text-primary shrink-0" />
+              <span>Saving…</span>
+            </span>
+          )}
+
           <button
             type="button"
             onClick={(e) => {
@@ -180,7 +242,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             #{String(id).slice(-4)}
           </button>
 
-          {onDelete && (
+          {onDelete && !isUpdating && !isSaving && (
             <TrashButton
               onClick={(e) => {
                 e.stopPropagation();
@@ -245,6 +307,43 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         </div>
       )}
 
+      {/* Date Scheduling Badge */}
+      {(target_date || start_date || (isCompleted && completed_at)) && (
+        <div className="flex items-center gap-1.5 flex-wrap text-[11px] mt-0.5">
+          {isCompleted ? (
+            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+              <Check size={11} strokeWidth={2.5} />
+              <span>Done {formatDatePreview(completed_at)}</span>
+            </span>
+          ) : target_date ? (
+            (() => {
+              const status = getTargetDateStatus(target_date);
+              return (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium border text-[11px]",
+                    status === 'overdue'
+                      ? "text-destructive bg-destructive/10 border-destructive/20"
+                      : status === 'due-soon'
+                      ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
+                      : "text-muted-foreground bg-muted/50 border-border/60"
+                  )}
+                  title={start_date ? `Start: ${formatDatePreview(start_date)} • Due: ${formatDatePreview(target_date)}` : `Due: ${formatDatePreview(target_date)}`}
+                >
+                  <Calendar size={11} className="shrink-0" />
+                  <span>{status === 'overdue' ? 'Overdue: ' : 'Due: '}{formatDatePreview(target_date)}</span>
+                </span>
+              );
+            })()
+          ) : start_date ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium border text-muted-foreground bg-muted/50 border-border/60 text-[11px]">
+              <Calendar size={11} className="shrink-0" />
+              <span>Starts: {formatDatePreview(start_date)}</span>
+            </span>
+          ) : null}
+        </div>
+      )}
+
       {/* Card Footer */}
       <div className="mt-1.5 pt-2 border-t border-border/60 flex items-center justify-between">
         {effectiveAssignees.length > 0 ? (
@@ -257,7 +356,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 <img
                   src={effectiveAssignees[0].avatarUrl}
                   alt={effectiveAssignees[0].name}
-                  className="w-4 h-4 rounded-full object-cover shrink-0"
+                  draggable={false}
+                  className="w-4 h-4 rounded-full object-cover shrink-0 pointer-events-none"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     const fallback = e.currentTarget.nextElementSibling;
@@ -286,7 +386,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                     <img
                       src={a.avatarUrl}
                       alt={a.name}
-                      className="w-5 h-5 rounded-full border border-background object-cover bg-muted"
+                      draggable={false}
+                      className="w-5 h-5 rounded-full border border-background object-cover bg-muted pointer-events-none"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         const fallback = e.currentTarget.nextElementSibling;

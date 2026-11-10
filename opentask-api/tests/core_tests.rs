@@ -321,6 +321,35 @@ fn test_task_update_payload_deserialization() {
         payload_num_id.lead_assignee_id,
         Some(Some(SafeId(94695191667019776)))
     );
+
+    // 6. Dates deserialization on TaskUpdatePayload
+    let json_dates = r#"{
+        "start_date": "2026-11-15T10:00:00Z",
+        "target_date": "2026-11-20",
+        "completed_at": null
+    }"#;
+    let payload_dates: TaskUpdatePayload = serde_json::from_str(json_dates).unwrap();
+    assert!(payload_dates.start_date.unwrap().is_some());
+    assert!(payload_dates.target_date.unwrap().is_some());
+    assert_eq!(payload_dates.completed_at, Some(None));
+
+    let json_empty_dates = r#"{"start_date": "", "target_date": "   "}"#;
+    let payload_empty_dates: TaskUpdatePayload = serde_json::from_str(json_empty_dates).unwrap();
+    assert_eq!(payload_empty_dates.start_date, Some(None));
+    assert_eq!(payload_empty_dates.target_date, Some(None));
+
+    // 7. Dates deserialization on DatabaseTask (used in create_task / duplication)
+    use opentask_api::models::task::DatabaseTask;
+    let json_db_task = r#"{
+        "title": "Created with dates",
+        "start_date": "2026-11-15",
+        "target_date": "2026-11-20T14:30:00",
+        "completed_at": ""
+    }"#;
+    let db_task: DatabaseTask = serde_json::from_str(json_db_task).unwrap();
+    assert!(db_task.start_date.is_some());
+    assert!(db_task.target_date.is_some());
+    assert!(db_task.completed_at.is_none());
 }
 
 #[test]

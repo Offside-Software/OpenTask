@@ -1,6 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Plus, Settings2, ChevronDown, Loader2, Expand } from 'lucide-react';
-import { Badge } from '../../design-system/Badge';
+import { Plus, Settings2, ChevronDown, Loader2, Expand } from 'lucide-react';
 import { TrashButton } from '../../design-system/TrashButton';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +8,6 @@ interface KanbanColumnProps {
   name: string;
   description?: string;
   colorClass: string;
-  statusText: string;
   taskCount: number;
   totalTasks?: number;
   hasMoreTasks?: boolean;
@@ -31,7 +29,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   name,
   description,
   colorClass,
-  statusText,
   taskCount,
   totalTasks,
   hasMoreTasks,
@@ -51,6 +48,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     setIsOver(true);
   };
 
@@ -74,8 +72,15 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     }
   };
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleHeaderDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only allow drag if not clicking buttons or interactive elements inside header
+    if ((e.target as HTMLElement).closest('button')) {
+      e.preventDefault();
+      return;
+    }
     if (onDragStartColumn) {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'move';
       onDragStartColumn(e, id);
     }
   };
@@ -86,8 +91,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
   return (
     <div
-      draggable={!!onDragStartColumn}
-      onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -99,9 +102,17 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           : 'bg-muted/30 border-border/70'
       )}
     >
-      {/* Column Header */}
-      <div className="p-3.5 border-b border-border/60 bg-card/60 rounded-t-xl select-none shrink-0 backdrop-blur-xs">
-        <div className="flex justify-between items-center mb-2">
+      {/* Column Header (Restricted drag handle for bucket moves) */}
+      <div
+        data-column-header="true"
+        draggable={!!onDragStartColumn}
+        onDragStart={handleHeaderDragStart}
+        className={cn(
+          "px-3.5 py-2 border-b border-border/60 bg-card/60 rounded-t-xl select-none shrink-0 backdrop-blur-xs",
+          onDragStartColumn ? "cursor-grab active:cursor-grabbing" : ""
+        )}
+      >
+        <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 min-w-0 pr-2">
             <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', colorClass)} />
             <h3 className="text-foreground font-semibold text-sm truncate" title={name}>
@@ -117,11 +128,18 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                 ? `${taskCount}/${totalTasks}`
                 : String(taskCount).padStart(2, '0')}
             </span>
+            <button
+              type="button"
+              onClick={() => onAddTask && onAddTask(id)}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+            >
+              <Plus size={12} />
+            </button>
             {onFocusBucket && (
               <button
                 type="button"
                 onClick={() => onFocusBucket(id)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                 title="Focus bucket"
               >
                 <Expand size={13} />
@@ -131,7 +149,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               <button
                 type="button"
                 onClick={() => onEditBucket(id)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                 title="Column settings"
               >
                 <Settings2 size={13} />
@@ -152,23 +170,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             {description}
           </p>
         )}
-
-        <div className="flex items-center gap-2">
-          <Badge
-            variant={statusText === 'RUNNING' ? 'success' : statusText === 'PAUSED' ? 'warning' : 'default'}
-            className="text-[10px] py-0.5"
-          >
-            <CheckCircle2 size={11} /> {statusText}
-          </Badge>
-          <button
-            type="button"
-            onClick={() => onAddTask && onAddTask(id)}
-            className="bg-background hover:bg-muted text-foreground border border-border shadow-xs flex items-center px-2 py-0.5 rounded-md font-medium text-xs gap-1 transition-colors cursor-pointer"
-          >
-            <Plus size={12} />
-            <span>Add task</span>
-          </button>
-        </div>
       </div>
 
       {/* Task List */}

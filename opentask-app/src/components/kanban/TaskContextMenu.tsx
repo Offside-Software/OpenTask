@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Edit3, CheckSquare, RotateCcw, FolderInput, ChevronRight, Trash2 } from 'lucide-react';
+import { Edit3, CheckSquare, RotateCcw, FolderInput, ChevronRight, Trash2, Copy } from 'lucide-react';
 import type { Task, Bucket } from '../../models';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,7 @@ interface TaskContextMenuProps {
   buckets: Bucket[];
   onClose: () => void;
   onEdit: (task: Task) => void;
+  onDuplicate?: (task: Task) => void;
   onToggleComplete: (taskId: string | number, completed: boolean) => void;
   onMoveToBucket: (taskId: string | number, bucketId: string | number) => void;
   onDelete: (taskId: string | number) => void;
@@ -34,6 +35,7 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({
   buckets,
   onClose,
   onEdit,
+  onDuplicate,
   onToggleComplete,
   onMoveToBucket,
   onDelete,
@@ -127,6 +129,21 @@ export const TaskContextMenu: React.FC<TaskContextMenuProps> = ({
           <Edit3 size={13} />
           <span>Edit task</span>
         </button>
+
+        {/* Duplicate */}
+        {onDuplicate && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onDuplicate(task);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <Copy size={13} />
+            <span>Duplicate task</span>
+          </button>
+        )}
 
         {/* 2. Mark As Complete */}
         <button

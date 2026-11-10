@@ -5,7 +5,8 @@ import { useToast } from "../design-system/Toast";
 
 interface UseAsyncReorderQueueOptions {
   projectId: string | number;
-  onTasksSynced?: () => void;
+  onTasksSynced?: (syncedTaskIds: (string | number)[]) => void;
+  onTasksFailed?: (failedTaskIds: (string | number)[]) => void;
   onBucketsSynced?: () => void;
   debounceMs?: number;
 }
@@ -19,6 +20,7 @@ interface UseAsyncReorderQueueOptions {
 export const useAsyncReorderQueue = ({
   projectId,
   onTasksSynced,
+  onTasksFailed,
   onBucketsSynced,
   debounceMs = 60,
 }: UseAsyncReorderQueueOptions) => {
@@ -113,19 +115,21 @@ export const useAsyncReorderQueue = ({
             : taskService.reorderTasksBatch(projectId, targetBucket, batchItems),
         );
 
+        const allBatchIds = batchItems.map((item) => item.id);
         if (success) {
           snapshot.forEach((ids, bId) => {
             if (pendingTasks.current.get(bId) === ids) {
               pendingTasks.current.delete(bId);
             }
           });
-          onTasksSynced?.();
+          onTasksSynced?.(allBatchIds);
         } else {
+          onTasksFailed?.(allBatchIds);
           showToast("Sync warning: Some task moves could not be saved to server", "error");
         }
       }, debounceMs);
     },
-    [projectId, debounceMs, onTasksSynced, showToast],
+    [projectId, debounceMs, onTasksSynced, onTasksFailed, showToast],
   );
 
   /**

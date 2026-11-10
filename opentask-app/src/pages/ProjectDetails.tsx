@@ -200,6 +200,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         updateBucketLocally,
         addTaskLocally,
         removeTaskLocally,
+        updatingTaskIds,
+        markTaskUpdating,
+        unmarkTaskUpdating,
     } = useBoard(projectId);
 
     const handleMemberRemoved = useCallback((userId: string | number) => {
@@ -240,9 +243,19 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     // Seamless asynchronous reorder queue (debounced + silent retries, zero-latency UI)
     const { queueTaskReorder, queueBucketReorder, cancelTaskFromQueue, hasPendingReorders } = useAsyncReorderQueue({
         projectId,
-        onTasksSynced: () => {
+        onTasksSynced: (syncedTaskIds) => {
+            if (syncedTaskIds && syncedTaskIds.length > 0) {
+                syncedTaskIds.forEach(id => unmarkTaskUpdating(id));
+            }
             refreshDashboard(true);
+            void refreshBoard(true);
             notifyActivityUpdated();
+        },
+        onTasksFailed: (failedTaskIds) => {
+            if (failedTaskIds && failedTaskIds.length > 0) {
+                failedTaskIds.forEach(id => unmarkTaskUpdating(id));
+            }
+            void refreshBoard(true);
         },
         onBucketsSynced: () => refreshDashboard(true),
         debounceMs: 50,
@@ -255,6 +268,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             setMeetingEventKey(k => k + 1);
             if (hasPendingReorders()) {
                 // Skip board reload while optimistic moves or network syncs are pending/in flight
+                return;
+            }
+            if (event.entity === 'task' && event.entity_id && updatingTaskIds.has(String(event.entity_id))) {
+                // Skip board reload if this task is actively being updated locally
                 return;
             }
             void refreshBoard(true);
@@ -275,7 +292,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         } else if (event.entity === 'meeting_job') {
             setMeetingEventKey(k => k + 1);
         }
-    }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally]);
+    }, [projectId, refreshBoard, refreshDashboard, refreshMembers, hasPendingReorders, refreshMeeting, refreshMeetings, removeMeetingLocally, updatingTaskIds]);
 
     useProjectRealtime(projectId, { onEvent: handleProjectEvent });
 
@@ -330,18 +347,26 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     }, [focusBucket, selectedTaskForEdit, showTaskModal, selectedBucketForEdit, bucketToDelete, taskToDelete, isMcpModalOpen]);
 
     // Open / Close task modal with URL query param synchronization
+    const closedTaskIdRef = useRef<string | null>(null);
+    const autoOpenedTaskIdRef = useRef<string | null>(null);
+
     const handleOpenTask = (task: Task) => {
-        setSelectedTaskForEdit(task);
+        closedTaskIdRef.current = null;
         if (task?.id) {
+            autoOpenedTaskIdRef.current = String(task.id);
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev);
                 next.set('taskId', String(task.id));
                 return next;
             }, { replace: true });
         }
+        setSelectedTaskForEdit(task);
     };
 
     const handleCloseTask = () => {
+        const currentId = selectedTaskForEdit?.id ? String(selectedTaskForEdit.id) : (taskIdParam || null);
+        closedTaskIdRef.current = currentId;
+        autoOpenedTaskIdRef.current = currentId;
         setSelectedTaskForEdit(null);
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
@@ -350,17 +375,29 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         }, { replace: true });
     };
 
-    // Auto-open task if ?taskId=... query param is present
+    // Auto-open task if ?taskId=... query param is present on mount or navigation
     React.useEffect(() => {
-        if (!taskIdParam) return;
+        if (!taskIdParam) {
+            closedTaskIdRef.current = null;
+            autoOpenedTaskIdRef.current = null;
+            return;
+        }
+
+        // If the task was explicitly closed or already auto-opened, prevent re-opening on background task/board updates
+        if (closedTaskIdRef.current === taskIdParam || autoOpenedTaskIdRef.current === taskIdParam) {
+            return;
+        }
+
         const found = tasks.find(t => String(t.id) === String(taskIdParam));
         if (found) {
+            autoOpenedTaskIdRef.current = taskIdParam;
             setSelectedTaskForEdit(found);
             setActiveTab('Tasks');
         } else if (!boardLoading) {
             taskService.getTaskById(taskIdParam)
                 .then(t => {
                     if (t && String(t.project_id) === String(projectId)) {
+                        autoOpenedTaskIdRef.current = taskIdParam;
                         setSelectedTaskForEdit(t);
                         setActiveTab('Tasks');
                     }
@@ -506,14 +543,37 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         }
     };
 
+    // Listen for cross-task reference navigation from Markdown links (e.g. #123)
+    useEffect(() => {
+        const handleNavigateTask = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.taskId) {
+                const targetId = String(detail.taskId);
+                if (targetId.startsWith('diagram-')) return;
+                const found = tasks.find(t => String(t.id) === targetId);
+                if (found) {
+                    handleOpenTask(found);
+                } else {
+                    taskService.getTaskById(targetId)
+                        .then(t => {
+                            if (t) handleOpenTask(t);
+                        })
+                        .catch(err => console.warn("Failed to open referenced task:", err));
+                }
+            }
+        };
+        window.addEventListener('opentask:navigate-task', handleNavigateTask);
+        return () => window.removeEventListener('opentask:navigate-task', handleNavigateTask);
+    }, [tasks]);
+
     const handleCreateTask = async (data: { project_id: number | string; title: string; type: TaskType; weight: number; bucket_id?: number | string }) => {
         setIsCreatingTask(true);
         setCreatingTaskBucketId(data.bucket_id);
         setCreatingTaskTitle(data.title);
         try {
-            const created = await createTask(data);
+            const created = await createTask({ ...data, order_idx: 0 });
             if (created) {
-                addTaskLocally(created);
+                addTaskLocally(created, true);
             }
             // Immediately disable the indicator as soon as task is created
             setIsCreatingTask(false);
@@ -529,6 +589,41 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             setIsCreatingTask(false);
             setCreatingTaskBucketId(undefined);
             setCreatingTaskTitle('');
+        }
+    };
+
+    const handleDuplicateTask = async (task: Task) => {
+        if (!task.id) return;
+        const dupTitle = `${task.title} (Copy)`;
+        const payload = {
+            project_id: projectId,
+            title: dupTitle,
+            description: task.description || undefined,
+            type: task.type || 'TASK',
+            weight: task.weight ?? 1,
+            bucket_id: task.bucket_id,
+            assignee_ids: task.assignee_ids,
+            lead_assignee_id: task.lead_assignee_id,
+            branch_name: task.branch_name,
+            repo_url: task.repo_url,
+            attachments: task.attachments,
+            diagram_ids: task.diagram_ids,
+            start_date: task.start_date,
+            target_date: task.target_date,
+            order_idx: 0,
+        };
+        try {
+            const created = await createTask(payload as any);
+            if (created) {
+                addTaskLocally(created, true);
+                showToast(`Task duplicated: "${dupTitle}"`, 'success');
+                refreshDashboard(true);
+                refreshBoard(true);
+                notifyActivityUpdated();
+            }
+        } catch (err: any) {
+            console.error("Failed to duplicate task:", err);
+            showToast(err?.message || "Failed to duplicate task", "error");
         }
     };
 
@@ -566,26 +661,28 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     };
 
     const handleUpdateTask = async (taskId: number | string, data: Partial<Task>) => {
+        markTaskUpdating(taskId);
         // 1. Write optimistic patch to state + cache immediately (no delay)
         updateTaskLocally(taskId, data);
         setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(taskId) ? { ...prev, ...data } : prev));
         // 2. Fire API in background
-        updateTask(taskId, data)
-            .then((confirmed) => {
-                // 3. Write server-confirmed result back to cache to prevent stale reload
-                if (confirmed?.id) {
-                    updateTaskLocally(confirmed.id, confirmed);
-                    setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(confirmed.id) ? { ...prev, ...confirmed } : prev));
-                }
-                refreshDashboard(true);
-                refreshBoard(true);
-                notifyActivityUpdated();
-            })
-            .catch((err) => {
-                console.error("Failed to update task:", err);
-                // 4. On failure, rollback by pulling fresh data
-                refreshBoard(true);
-            });
+        try {
+            const confirmed = await updateTask(taskId, data);
+            // 3. Write server-confirmed result back to cache to prevent stale reload
+            if (confirmed?.id) {
+                updateTaskLocally(confirmed.id, confirmed);
+                setSelectedTaskForEdit(prev => (prev && String(prev.id) === String(confirmed.id) ? { ...prev, ...confirmed } : prev));
+            }
+            refreshDashboard(true);
+            await refreshBoard(true);
+            notifyActivityUpdated();
+        } catch (err) {
+            console.error("Failed to update task:", err);
+            // 4. On failure, rollback by pulling fresh data
+            await refreshBoard(true);
+        } finally {
+            unmarkTaskUpdating(taskId);
+        }
     };
 
     const handleToggleTaskComplete = async (taskId: number | string, completed: boolean) => {
@@ -611,7 +708,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
         }
 
         if (targetBucket && targetBucket.id) {
-            handleUpdateTask(taskId, { bucket_id: targetBucket.id });
+            const completedAt = completed ? new Date().toISOString() : null;
+            updateTaskLocally(taskId, { bucket_id: targetBucket.id, completed_at: completedAt });
+            handleUpdateTask(taskId, { bucket_id: targetBucket.id, completed_at: completedAt });
             showToast(completed ? "Task marked as complete" : "Task marked as incomplete", "success");
         } else {
             showToast("No suitable column found", "error");
@@ -631,10 +730,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     };
 
     const handleDropTask = async (taskId: number | string, newBucketId: number | string, targetTaskId?: number | string) => {
+        markTaskUpdating(taskId);
         // Determine the task order within the target bucket based on where it was dropped
         const bucketTasks = tasks.filter(t => String(t.bucket_id) === String(newBucketId)).sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
         const draggedTask = tasks.find(t => String(t.id) === String(taskId));
-        if (!draggedTask) return;
+        if (!draggedTask) {
+            unmarkTaskUpdating(taskId);
+            return;
+        }
 
         const sourceBucketId = draggedTask.bucket_id;
         const isCrossBucket = sourceBucketId && String(sourceBucketId) !== String(newBucketId);
@@ -651,8 +754,19 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
             }
         }
 
+        // Automatic completion date sync
+        const targetBucket = buckets.find(b => String(b.id) === String(newBucketId));
+        const isCompletedBucket = targetBucket?.state === 'COMPLETED';
+        const completedAt = isCompletedBucket
+            ? (draggedTask.completed_at || new Date().toISOString())
+            : null;
+
         // Insert into new array
-        const updatedDraggedTask = { ...draggedTask, bucket_id: newBucketId };
+        const updatedDraggedTask: Task = {
+            ...draggedTask,
+            bucket_id: newBucketId,
+            completed_at: completedAt,
+        };
         filteredTasks.splice(newIndex, 0, updatedDraggedTask);
 
         // Build reordered IDs
@@ -723,6 +837,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
     };
 
     const handleDragStartColumn = (e: React.DragEvent<HTMLDivElement>, columnId: string | number) => {
+        e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('columnId', columnId.toString());
     };
 
@@ -841,233 +956,209 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                     <div
                         className={
                             focusBucket
-                                ? "fixed inset-x-0 bottom-0 z-[45] bg-background p-3 sm:p-5 flex flex-col min-h-0 overflow-hidden select-none animate-in fade-in duration-150"
-                                : "bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col flex-1 min-h-0 shadow-xs"
+                                ? "fixed inset-x-0 bottom-0 z-[45] bg-background p-3 flex flex-col min-h-0 overflow-hidden select-none animate-in fade-in duration-150"
+                                : "bg-card border border-border rounded-xl p-3 flex flex-col flex-1 min-h-0 shadow-xs"
                         }
                         style={focusBucket ? { top: 'var(--titlebar-height, 0px)' } : undefined}
                     >
                         <div className="flex justify-between items-center mb-3 pb-3 border-b border-border flex-wrap gap-2 shrink-0">
-                            <div>
-                                {focusBucket ? (
-                                    <>
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <span className="text-xs font-semibold uppercase tracking-wider text-primary inline-block">
-                                                Expanded Kanban Workspace
-                                            </span>
-                                            <span className="text-muted-foreground text-xs truncate max-w-sm sm:max-w-md">
-                                                {project ? project.name : 'Project'}
-                                            </span>
+                            <div className="flex w-full gap-2 justify-space-between">
+                                { /* Left SIDE */}
+                                <div className="flex items-center gap-3 flex-1 min-w-[260px] flex-wrap">
+                                    <div className="relative flex-1 min-w-[220px] max-w-[410px]">
+                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted-foreground">
+                                            <Search size={14} />
                                         </div>
-                                        <h2 className="text-base sm:text-lg font-semibold text-foreground">
-                                            Task Flow Pipeline
-                                        </h2>
-                                    </>
-                                ) : (
-                                    <>
-                                        <h2 className="text-base font-semibold text-foreground">
-                                            Task Flow Pipeline
-                                        </h2>
-                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                            6-stage stack architecture • Draft → Completed
-                                        </p>
-                                    </>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <div className="flex items-center border border-border bg-muted/40 p-0.5 rounded-lg">
-                                    <button
-                                        type="button"
-                                        onClick={() => setColumnDensity('normal')}
-                                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${columnDensity === 'normal'
-                                            ? 'bg-background text-foreground shadow-xs font-semibold'
-                                            : 'text-muted-foreground hover:text-foreground'
-                                            }`}
-                                        title="Standard column width (316px)"
-                                    >
-                                        Standard
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setColumnDensity('wide')}
-                                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${columnDensity === 'wide'
-                                            ? 'bg-background text-foreground shadow-xs font-semibold'
-                                            : 'text-muted-foreground hover:text-foreground'
-                                            }`}
-                                        title="Wide column width (420px)"
-                                    >
-                                        Wide
-                                    </button>
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setIsMcpModalOpen(true)}
-                                    title="Configure IDE Model Context Protocol (MCP) server endpoints"
-                                >
-                                    <Cpu size={13} />
-                                    <span>AI MCP</span>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleSyncAndReviewPrs}
-                                    disabled={isSyncingPrs}
-                                    title="Scan connected repositories and immediately run Gemini AI Code Review on open PRs"
-                                >
-                                    <Sparkles size={13} className={isSyncingPrs ? 'animate-spin' : ''} />
-                                    <span>{isSyncingPrs ? 'Reviewing PRs...' : 'Sync & Review PRs'}</span>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleRefreshTasksOnly}
-                                    disabled={isRefreshingTasks}
-                                    title="Refresh tasks without reloading the web page"
-                                >
-                                    <RefreshCw size={13} className={isRefreshingTasks ? 'animate-spin' : ''} />
-                                    <span>{isRefreshingTasks ? 'Syncing...' : 'Refresh'}</span>
-                                </Button>
-                                {focusBucket ? (
-                                    <Button
-                                        variant="primary"
-                                        size="sm"
-                                        onClick={() => {
-                                            setFocusBucket(false);
-                                            setSelectedBucketFocus('ALL');
-                                        }}
-                                        title="Exit expanded view (Esc)"
-                                    >
-                                        <Shrink size={13} />
-                                        <span>Collapse</span>
-                                        <kbd className="hidden sm:inline bg-primary-foreground/20 text-primary-foreground px-1 py-0.2 text-[9px] rounded font-mono">ESC</kbd>
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setFocusBucket(true)}
-                                        title="Expand bucket and board workspace"
-                                    >
-                                        <Expand size={13} />
-                                        <span>Expand</span>
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Task Search Bar & Assignee Filter */}
-                        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap bg-card p-2.5 sm:p-3 border border-border rounded-lg shadow-xs shrink-0">
-                            <div className="flex items-center gap-3 flex-1 min-w-[260px] flex-wrap">
-                                <div className="relative flex-1 min-w-[220px] max-w-xl">
-                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted-foreground">
-                                        <Search size={14} />
+                                        <input
+                                            ref={searchInputRef}
+                                            type="text"
+                                            value={taskSearchQuery}
+                                            onChange={(e) => setTaskSearchQuery(e.target.value)}
+                                            onKeyDown={handleSearchKeyDown}
+                                            placeholder="Search tasks (title, #id, tag, assignee)... [/]"
+                                            className="w-full bg-background border border-input rounded-md pl-9 pr-8 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+                                        />
+                                        {taskSearchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setTaskSearchQuery('')}
+                                                className="absolute inset-y-0 right-2.5 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                                                title="Clear search (Esc)"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
                                     </div>
-                                    <input
-                                        ref={searchInputRef}
-                                        type="text"
-                                        value={taskSearchQuery}
-                                        onChange={(e) => setTaskSearchQuery(e.target.value)}
-                                        onKeyDown={handleSearchKeyDown}
-                                        placeholder="Search tasks (title, #id, tag, assignee)... [/]"
-                                        className="w-full bg-background border border-input rounded-md pl-9 pr-8 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
-                                    />
-                                    {taskSearchQuery && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setTaskSearchQuery('')}
-                                            className="absolute inset-y-0 right-2.5 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
-                                            title="Clear search (Esc)"
+
+                                    {/* Assignee Filter Dropdown */}
+                                    <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2.5 py-1.5 shadow-xs">
+                                        <Filter size={13} className="text-primary shrink-0" />
+                                        <span className="text-xs font-medium text-muted-foreground shrink-0">Assignee:</span>
+                                        <select
+                                            value={selectedAssigneeFilter}
+                                            onChange={(e) => setSelectedAssigneeFilter(e.target.value)}
+                                            className="bg-transparent text-xs font-medium text-foreground focus:outline-none cursor-pointer"
                                         >
-                                            <X size={14} />
-                                        </button>
+                                            <option value="ALL" className="bg-card text-foreground">All Assignees ({tasks.length})</option>
+                                            <option value="UNASSIGNED" className="bg-card text-foreground">
+                                                Unassigned ({tasks.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id).length})
+                                            </option>
+                                            {members.map(m => {
+                                                const uid = String(m.user_id);
+                                                const targetIds = new Set<string>([uid]);
+                                                if (m.id) targetIds.add(String(m.id));
+
+                                                const count = tasks.filter(t =>
+                                                    (t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)))) ||
+                                                    (t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id)))
+                                                ).length;
+                                                return (
+                                                    <option key={uid} value={uid} className="bg-card text-foreground">
+                                                        @{m.gh_username || m.display_name || `Member #${uid}`} ({count})
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </div>
+
+                                    {/* Bucket Focus Dropdown */}
+                                    <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2.5 py-1.5 shadow-xs">
+                                        <Filter size={13} className="text-primary shrink-0" />
+                                        <span className="text-xs font-medium text-muted-foreground shrink-0">Column:</span>
+                                        <select
+                                            value={selectedBucketFocus}
+                                            onChange={(e) => setSelectedBucketFocus(e.target.value)}
+                                            className="bg-transparent text-xs font-medium text-foreground focus:outline-none cursor-pointer"
+                                        >
+                                            <option value="ALL" className="bg-card text-foreground">
+                                                All Columns ({buckets.length})
+                                            </option>
+                                            {buckets.map(b => {
+                                                const bTasksCount = matchingTasks.filter(t => String(t.bucket_id) === String(b.id)).length;
+                                                return (
+                                                    <option key={b.id} value={String(b.id)} className="bg-card text-foreground">
+                                                        {b.name || b.state} ({bTasksCount})
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </div>
+
+                                    {(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL' || selectedBucketFocus !== 'ALL') && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2 py-1 bg-muted text-muted-foreground border border-border rounded-md text-xs font-medium">
+                                                <span className="text-primary font-semibold mr-1">{matchingTasks.length}</span>
+                                                of {tasks.length} matching
+                                            </span>
+                                            {isSearchingBackend && (
+                                                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                    <Loader2 size={12} className="animate-spin text-primary" />
+                                                    Searching backlog...
+                                                </span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setTaskSearchQuery('');
+                                                    setSelectedAssigneeFilter('ALL');
+                                                    setSelectedBucketFocus('ALL');
+                                                }}
+                                                className="p-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border text-xs cursor-pointer transition-colors"
+                                            >
+                                                <X size={13} />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
 
-                                {/* Assignee Filter Dropdown */}
-                                <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2.5 py-1.5 shadow-xs">
-                                    <Filter size={13} className="text-primary shrink-0" />
-                                    <span className="text-xs font-medium text-muted-foreground shrink-0">Assignee:</span>
-                                    <select
-                                        value={selectedAssigneeFilter}
-                                        onChange={(e) => setSelectedAssigneeFilter(e.target.value)}
-                                        className="bg-transparent text-xs font-medium text-foreground focus:outline-none cursor-pointer"
-                                    >
-                                        <option value="ALL" className="bg-card text-foreground">All Assignees ({tasks.length})</option>
-                                        <option value="UNASSIGNED" className="bg-card text-foreground">
-                                            Unassigned ({tasks.filter(t => (!t.assignee_ids || t.assignee_ids.length === 0) && !t.lead_assignee_id).length})
-                                        </option>
-                                        {members.map(m => {
-                                            const uid = String(m.user_id);
-                                            const targetIds = new Set<string>([uid]);
-                                            if (m.id) targetIds.add(String(m.id));
-
-                                            const count = tasks.filter(t =>
-                                                (t.assignee_ids && t.assignee_ids.some(id => targetIds.has(String(id)))) ||
-                                                (t.lead_assignee_id && targetIds.has(String(t.lead_assignee_id)))
-                                            ).length;
-                                            return (
-                                                <option key={uid} value={uid} className="bg-card text-foreground">
-                                                    @{m.gh_username || m.display_name || `Member #${uid}`} ({count})
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
-                                </div>
-
-                                {/* Bucket Focus Dropdown */}
-                                <div className="flex items-center gap-1.5 bg-background border border-input rounded-md px-2.5 py-1.5 shadow-xs">
-                                    <Filter size={13} className="text-primary shrink-0" />
-                                    <span className="text-xs font-medium text-muted-foreground shrink-0">Column:</span>
-                                    <select
-                                        value={selectedBucketFocus}
-                                        onChange={(e) => setSelectedBucketFocus(e.target.value)}
-                                        className="bg-transparent text-xs font-medium text-foreground focus:outline-none cursor-pointer"
-                                    >
-                                        <option value="ALL" className="bg-card text-foreground">
-                                            All Columns ({buckets.length})
-                                        </option>
-                                        {buckets.map(b => {
-                                            const bTasksCount = matchingTasks.filter(t => String(t.bucket_id) === String(b.id)).length;
-                                            return (
-                                                <option key={b.id} value={String(b.id)} className="bg-card text-foreground">
-                                                    {b.name || b.state} ({bTasksCount})
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
-                                </div>
-
-                                {(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL' || selectedBucketFocus !== 'ALL') && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="px-2 py-1 bg-muted text-muted-foreground border border-border rounded-md text-xs font-medium">
-                                            <span className="text-primary font-semibold mr-1">{matchingTasks.length}</span>
-                                            of {tasks.length} matching
-                                        </span>
-                                        {isSearchingBackend && (
-                                            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                <Loader2 size={12} className="animate-spin text-primary" />
-                                                Searching backlog...
-                                            </span>
-                                        )}
+                                { /* Right SIDE */}
+                                <div className='flex items-center gap-3'>
+                                    { /* Standard / Wide Mode */}
+                                    <div className="flex items-center border border-border bg-muted/40 p-0.5 rounded-lg">
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setTaskSearchQuery('');
-                                                setSelectedAssigneeFilter('ALL');
-                                                setSelectedBucketFocus('ALL');
-                                            }}
-                                            className="p-1 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground border border-border text-xs cursor-pointer transition-colors"
+                                            onClick={() => setColumnDensity('normal')}
+                                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${columnDensity === 'normal'
+                                                ? 'bg-background text-foreground shadow-xs font-semibold'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                                }`}
+                                            title="Standard column width (316px)"
                                         >
-                                            <X size={13} />
+                                            Standard
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setColumnDensity('wide')}
+                                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${columnDensity === 'wide'
+                                                ? 'bg-background text-foreground shadow-xs font-semibold'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                                }`}
+                                            title="Wide column width (420px)"
+                                        >
+                                            Wide
                                         </button>
                                     </div>
-                                )}
+
+                                    { /* AI MCP */}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsMcpModalOpen(true)}
+                                        title="Configure IDE Model Context Protocol (MCP) server endpoints"
+                                    >
+                                        <Cpu size={13} />
+                                        <span>AI MCP</span>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleSyncAndReviewPrs}
+                                        disabled={isSyncingPrs}
+                                        title="Scan connected repositories and immediately run Gemini AI Code Review on open PRs"
+                                    >
+                                        <Sparkles size={13} className={isSyncingPrs ? 'animate-spin' : ''} />
+                                        <span>{isSyncingPrs ? 'Reviewing PRs...' : 'Sync & Review PRs'}</span>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleRefreshTasksOnly}
+                                        disabled={isRefreshingTasks}
+                                        title="Refresh tasks without reloading the web page"
+                                    >
+                                        <RefreshCw size={13} className={isRefreshingTasks ? 'animate-spin' : ''} />
+                                    </Button>
+                                    {focusBucket ? (
+                                        <Button
+                                            variant="primary"
+                                            size="sm"
+                                            onClick={() => {
+                                                setFocusBucket(false);
+                                                setSelectedBucketFocus('ALL');
+                                            }}
+                                            title="Exit expanded view (Esc)"
+                                        >
+                                            <Shrink size={13} />
+                                            <kbd className="hidden sm:inline bg-primary-foreground/20 text-primary-foreground px-1 py-0.2 text-[9px] rounded font-mono">ESC</kbd>
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setFocusBucket(true)}
+                                            title="Expand bucket and board workspace"
+                                        >
+                                            <Expand size={13} />
+                                        </Button>
+                                    )}
+                                </div>
+
                             </div>
                         </div>
                         {tasksLoading || bucketsLoading ? (
                             <div className="flex-1 flex items-center justify-center text-slate-500 text-[14px]">Loading board state...</div>
                         ) : (
-                            <div ref={boardScrollRef} className="flex gap-4 overflow-x-auto pb-2 flex-1 min-h-0 items-stretch">
+                            <div ref={boardScrollRef} className="flex gap-3 overflow-x-auto pb-2 flex-1 min-h-0 items-stretch">
                                 {displayBuckets.map(bucket => {
                                     const isFiltered = Boolean(taskSearchQuery.trim() || selectedAssigneeFilter !== 'ALL');
                                     const colTasks = matchingTasks.filter(t => String(t.bucket_id) === String(bucket.id));
@@ -1078,7 +1169,6 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                             name={bucket.name || bucket.state}
                                             description={bucket.description}
                                             colorClass={STATUS_COLORS[bucket.state] || 'bg-slate-500'}
-                                            statusText="ACTIVE"
                                             taskCount={colTasks.length}
                                             totalTasks={isFiltered ? colTasks.length : bucket.task_count}
                                             isLoadingMore={!!loadingBuckets[String(bucket.id)]}
@@ -1102,6 +1192,26 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                             }
                                         >
                                             <div className="flex flex-col gap-3">
+                                                <button
+                                                    onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
+                                                    className="w-full py-2 flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/50 hover:bg-muted/40 rounded-lg transition-colors text-xs font-medium cursor-pointer"
+                                                >
+                                                    <Plus size={14} /> Add Task
+                                                </button>
+
+                                                {/* In-flight new task creation ghost card */}
+                                                {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
+                                                    <div className="border border-dashed border-primary/40 bg-primary/5 rounded-lg p-3 animate-pulse">
+                                                        <div className="flex items-center gap-2 mb-1.5">
+                                                            <Loader2 size={13} className="animate-spin text-primary" />
+                                                            <span className="text-xs text-primary font-medium">Creating task...</span>
+                                                        </div>
+                                                        <div className="text-xs text-foreground font-medium truncate">
+                                                            {creatingTaskTitle || 'New task'}
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {colTasks.map(task => {
                                                     const isDeleting = deletingTaskIds.has(task.id!);
                                                     if (isDeleting) {
@@ -1146,50 +1256,33 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                                                     const assigneeAvatar = assignedMember?.avatar_url || (assignedMember?.gh_username ? `https://github.com/${assignedMember.gh_username}.png?size=64` : undefined);
 
                                                     return (
-                                                        <KanbanCard
-                                                            key={task.id}
-                                                            id={task.id!}
-                                                            title={task.title}
-                                                            type={task.type}
-                                                            weight={task.weight}
-                                                            assignee={assigneeName}
-                                                            assigneeAvatar={assigneeAvatar}
-                                                            assignees={cardAssignees}
-                                                            pr={!!task.prUrl}
-                                                            repoUrl={task.repo_url}
-                                                            description={task.description}
-                                                            warnStagnant={task.warnStagnant}
-                                                            isSuggested={task.isSuggested}
-                                                            isCompleted={isTaskCompleted}
-                                                            onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
-                                                            onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
-                                                            onClick={() => handleOpenTask(task)}
-                                                            onDelete={() => setTaskToDelete(task.id!)}
-                                                            onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
-                                                        />
+                                                         <KanbanCard
+                                                             key={task.id}
+                                                             id={task.id!}
+                                                             title={task.title}
+                                                             type={task.type}
+                                                             weight={task.weight}
+                                                             assignee={assigneeName}
+                                                             assigneeAvatar={assigneeAvatar}
+                                                             assignees={cardAssignees}
+                                                             pr={!!task.prUrl}
+                                                             repoUrl={task.repo_url}
+                                                             description={task.description}
+                                                             warnStagnant={task.warnStagnant}
+                                                             isSuggested={task.isSuggested}
+                                                             isCompleted={isTaskCompleted}
+                                                             isUpdating={updatingTaskIds.has(String(task.id))}
+                                                             start_date={task.start_date}
+                                                             target_date={task.target_date}
+                                                             completed_at={task.completed_at}
+                                                             onToggleComplete={(completed) => handleToggleTaskComplete(task.id!, completed)}
+                                                             onContextMenu={(e) => setContextMenu({ task, x: e.clientX, y: e.clientY })}
+                                                             onClick={() => handleOpenTask(task)}
+                                                             onDelete={() => setTaskToDelete(task.id!)}
+                                                             onDropTask={(draggedTaskId, targetTaskId) => handleDropTask(draggedTaskId, bucket.id!, targetTaskId)}
+                                                         />
                                                     );
                                                 })}
-
-                                                {/* In-flight new task creation ghost card */}
-                                                {isCreatingTask && String(creatingTaskBucketId) === String(bucket.id) && (
-                                                    <div className="border border-dashed border-primary/40 bg-primary/5 rounded-lg p-3 animate-pulse">
-                                                        <div className="flex items-center gap-2 mb-1.5">
-                                                            <Loader2 size={13} className="animate-spin text-primary" />
-                                                            <span className="text-xs text-primary font-medium">Creating task...</span>
-                                                        </div>
-                                                        <div className="text-xs text-foreground font-medium truncate">
-                                                            {creatingTaskTitle || 'New task'}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <button
-                                                    onClick={() => { setSelectedBucketTarget(bucket.id); setShowTaskModal(true); }}
-                                                    className="w-full py-2 flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/50 hover:bg-muted/40 rounded-lg transition-colors text-xs font-medium cursor-pointer"
-                                                >
-                                                    <Plus size={14} /> Add Task
-                                                </button>
-
                                             </div>
                                         </KanbanColumn>
 
@@ -1361,8 +1454,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                     buckets={buckets}
                     members={members}
                     projectRepoUrls={project?.gh_repo_url || []}
+                    allTasks={tasks}
                     onClose={handleCloseTask}
                     onUpdate={handleUpdateTask}
+                    onDuplicate={handleDuplicateTask}
                 />
             )}
 
@@ -1412,6 +1507,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsProps> = ({ projectId, o
                 onEdit={(t) => handleOpenTask(t)}
                 onToggleComplete={(tId, completed) => handleToggleTaskComplete(tId, completed)}
                 onMoveToBucket={handleMoveTaskToBucket}
+                onDuplicate={handleDuplicateTask}
                 onDelete={(tId) => setTaskToDelete(tId)}
             />
 

@@ -130,6 +130,7 @@ pub async fn list_diagram_tasks(
                title, description, type as task_type, weight, branch_name, repo_url,
                COALESCE(attachments, '[]'::jsonb) as attachments,
                COALESCE(diagram_ids, '{}'::BIGINT[]) as diagram_ids,
+               start_date, target_date, completed_at,
                last_activity_at, order_idx, created_at, updated_at
         FROM opentask.tasks
         WHERE project_id = $1 AND $2 = ANY(diagram_ids)
