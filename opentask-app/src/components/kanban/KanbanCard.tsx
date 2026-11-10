@@ -78,11 +78,15 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   }, [assignees, assignee, assigneeAvatar]);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('taskId', id.toString());
+    e.dataTransfer.setData('text/plain', id.toString());
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     setIsOver(true);
   };
 
@@ -96,7 +100,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     setIsOver(false);
 
     if (onDropTask) {
-      const draggedId = e.dataTransfer.getData('taskId');
+      const draggedId = e.dataTransfer.getData('taskId') || e.dataTransfer.getData('text/plain');
       if (draggedId) {
         onDropTask(draggedId, id);
       }
@@ -257,7 +261,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 <img
                   src={effectiveAssignees[0].avatarUrl}
                   alt={effectiveAssignees[0].name}
-                  className="w-4 h-4 rounded-full object-cover shrink-0"
+                  draggable={false}
+                  className="w-4 h-4 rounded-full object-cover shrink-0 pointer-events-none"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     const fallback = e.currentTarget.nextElementSibling;
@@ -286,7 +291,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                     <img
                       src={a.avatarUrl}
                       alt={a.name}
-                      className="w-5 h-5 rounded-full border border-background object-cover bg-muted"
+                      draggable={false}
+                      className="w-5 h-5 rounded-full border border-background object-cover bg-muted pointer-events-none"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         const fallback = e.currentTarget.nextElementSibling;
